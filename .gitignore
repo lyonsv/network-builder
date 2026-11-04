@@ -13,6 +13,7 @@ coverage
 outputs/
 *.csv
 !examples/*.csv
+!test/fixtures/*.csv
 
 # local tooling
 .claude/

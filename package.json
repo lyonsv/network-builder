@@ -1,0 +1,73 @@
+{
+  "name": "network-builder",
+  "version": "0.1.0",
+  "description": "Turn your LinkedIn connections into targeted lists: score your network for any goal (angel investors, buyers, hires) with Claude, research the people you pick, and export CRM-ready CSVs. Runs locally through Claude Code, with no API key needed.",
+  "keywords": [
+    "linkedin",
+    "connections",
+    "network",
+    "crm",
+    "leads",
+    "lead-list",
+    "angel-investors",
+    "fundraising",
+    "claude",
+    "claude-code",
+    "cli",
+    "sqlite"
+  ],
+  "homepage": "https://github.com/lyonsv/network-builder#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lyonsv/network-builder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lyonsv/network-builder/issues"
+  },
+  "license": "MIT",
+  "author": "Vincent Lyons",
+  "type": "module",
+  "bin": {
+    "network-builder": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsup",
+    "start": "node dist/bin.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "boxen": "^9.0.0",
+    "cli-progress": "^3.12.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^15.0.0",
+    "csv-parse": "^7.0.3",
+    "csv-stringify": "^6.9.0",
+    "execa": "^10.2.1",
+    "gradient-string": "^3.0.0",
+    "p-limit": "^7.3.3",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/cli-progress": "^3.11.6",
+    "@types/node": "^26.6.6",
+    "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

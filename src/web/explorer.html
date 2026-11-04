@@ -1,0 +1,3002 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__NB_TITLE__</title>
+<style>
+:root {
+  --bg: #f7f7f5;
+  --panel: #ffffff;
+  --panel-2: #f2f2ef;
+  --text: #1c1c1a;
+  --muted: #6b6b66;
+  --faint: #9a9a94;
+  --border: #e4e4df;
+  --border-strong: #d2d2cc;
+  --accent: #3b5bdb;
+  --accent-soft: #e7ecff;
+  --accent-text: #ffffff;
+  --good: #1f8a4c;
+  --good-soft: #e3f4ea;
+  --warn: #a8670a;
+  --warn-soft: #fbf0dc;
+  --bad: #c2332f;
+  --bad-soft: #fbe5e4;
+  --info: #2f6db5;
+  --info-soft: #e2edf9;
+  --row-hover: #fafaf8;
+  --row-sel: #eef1fd;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
+  --radius: 10px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121212;
+    --panel: #1a1a1a;
+    --panel-2: #222221;
+    --text: #ecece8;
+    --muted: #a3a39d;
+    --faint: #75756f;
+    --border: #2c2c2a;
+    --border-strong: #3a3a37;
+    --accent: #7c95ff;
+    --accent-soft: #232a45;
+    --accent-text: #0f1220;
+    --good: #5cc98a;
+    --good-soft: #17301f;
+    --warn: #e2a64a;
+    --warn-soft: #33270f;
+    --bad: #f07b76;
+    --bad-soft: #3a1b1a;
+    --info: #79aef0;
+    --info-soft: #172739;
+    --row-hover: #1f1f1e;
+    --row-sel: #1f2440;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* ---------- header ---------- */
+.top {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.wrap { max-width: 1480px; margin: 0 auto; padding: 0 20px; }
+.head { display: flex; align-items: center; gap: 16px; padding: 14px 0 10px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 420px; }
+.logo {
+  width: 30px; height: 30px; border-radius: 8px; flex: none;
+  background: linear-gradient(135deg, #5b7cfa, #9b5de5 60%, #f15bb5);
+  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px;
+}
+.titles { min-width: 0; }
+.app { font-size: 12px; color: var(--muted); letter-spacing: .02em; }
+.goal { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12.5px;
+  background: var(--panel); border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+}
+.chip b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip.live { color: var(--good); }
+.chip.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+.chip.offline { color: var(--warn); }
+.chip.offline::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+.chip.static { color: var(--muted); }
+
+/* ---------- toolbar / filters ---------- */
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 0 12px; }
+.search {
+  flex: 1 1 280px; position: relative; min-width: 220px;
+}
+.search input {
+  width: 100%; padding: 8px 12px 8px 32px; border-radius: 8px;
+  border: 1px solid var(--border-strong); background: var(--panel);
+}
+.search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--faint); }
+.ctl {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel);
+  font-size: 12.5px; color: var(--muted); white-space: nowrap;
+}
+.ctl select, .ctl input[type=number], .ctl input[type=date] {
+  border: 0; background: transparent; padding: 2px 0; color: var(--text); font-size: 13px;
+}
+.ctl input[type=number] { width: 44px; }
+.ctl input[type=range] { width: 90px; accent-color: var(--accent); }
+.ctl input[type=checkbox] { accent-color: var(--accent); }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-strong);
+  background: var(--panel); font-size: 13px; font-weight: 500; white-space: nowrap;
+  transition: background .12s, border-color .12s, opacity .12s;
+}
+.btn:hover:not(:disabled) { background: var(--panel-2); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.ghost:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+.btn.sm { padding: 3px 9px; font-size: 12.5px; border-radius: 7px; }
+.btn.danger { color: var(--bad); }
+
+/* ---------- view bar / dropdowns ---------- */
+.viewbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 0 12px; }
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { border: 0; background: transparent; padding: 5px 11px; font-size: 12.5px; cursor: pointer; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg b { font-variant-numeric: tabular-nums; }
+details.dd { position: relative; display: inline-block; }
+details.dd > summary { list-style: none; cursor: pointer; user-select: none; }
+details.dd > summary::-webkit-details-marker { display: none; }
+details.dd[open] > summary { border-color: var(--accent); color: var(--text); }
+.dd-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 230px; max-height: 380px; overflow: auto;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.18); padding: 6px;
+}
+.dd-pop.right { left: auto; right: 0; }
+.dd-pop.up { top: auto; bottom: calc(100% + 6px); }
+#lensSelPop { width: min(520px, 92vw); left: 50%; transform: translateX(-50%); }
+[hidden] { display: none !important; }
+.lensmenu-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; }
+.lensmenu-row.cur { background: var(--accent-soft); }
+.lensmenu-row .g { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lensmenu-row .n { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.dd-pop.wide { min-width: 320px; }
+.opt { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.opt:hover { background: var(--panel-2); }
+.opt .n { margin-left: auto; padding-left: 12px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.opt input { accent-color: var(--accent); }
+.dd-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 4px 6px 8px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.dd-note { padding: 8px; font-size: 12.5px; color: var(--muted); max-width: 300px; white-space: normal; }
+.dd-sep { height: 1px; background: var(--border); margin: 5px 0; }
+.morepop { display: flex; flex-direction: column; gap: 6px; padding: 6px; }
+.morepop .ctl { justify-content: space-between; }
+.morepop .ctl input[type=text] { border: 0; background: transparent; width: 150px; color: var(--text); font-size: 13px; padding: 2px 0; }
+.badge { display: inline-block; min-width: 17px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 11px; font-weight: 700; text-align: center; line-height: 17px; }
+.tag { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 11.5px; line-height: 18px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); margin: 1px 3px 1px 0; white-space: nowrap; }
+.tag.t-theme { background: var(--accent-soft, var(--panel-2)); color: var(--accent, inherit); border-color: transparent; }
+.recent .chips { margin-bottom: 6px; }
+.recent-list { list-style: none; margin: 0; padding: 0; }
+.recent-list li { padding: 5px 0; border-bottom: 1px dashed var(--border); }
+.recent-list li:last-child { border-bottom: 0; }
+.recent-list .per { display: inline-block; min-width: 72px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+.recent-title { font-weight: 600; margin-left: 2px; }
+.recent-sum { color: var(--muted); font-size: 12.5px; margin: 2px 0 0 76px; }
+@media (max-width: 640px) { .recent-sum { margin-left: 0; } }
+.tag.t-investor, .tag.t-angel, .tag.t-vc { background: var(--good-soft); color: var(--good); border-color: transparent; }
+.tag.t-founder, .tag.t-exited-founder { background: var(--info-soft); color: var(--info); border-color: transparent; }
+.tag.t-open-to-work { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+td.tags { max-width: 210px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+td.small { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+td.co-cell { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm { border: 0; background: transparent; color: var(--faint); cursor: pointer; font-size: 14px; line-height: 1; padding: 4px 7px; border-radius: 6px; margin-right: 4px; }
+.rm:hover { color: var(--bad); background: var(--bad-soft); }
+.list-row { display: flex; align-items: center; gap: 4px; padding: 3px 4px 3px 8px; border-radius: 6px; }
+.list-row:hover { background: var(--panel-2); }
+.list-row .ln { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.list-row .ln small { color: var(--faint); font-variant-numeric: tabular-nums; }
+.list-row.cur .ln { font-weight: 600; color: var(--accent); }
+.dd-action { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text); }
+.dd-action:hover:not(:disabled) { background: var(--panel-2); }
+.dd-action:disabled { color: var(--faint); cursor: not-allowed; }
+tbody tr.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.kbd-hint { color: var(--faint); font-size: 12px; white-space: nowrap; }
+.kbd-hint kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--panel); color: var(--muted); }
+
+/* ---------- static notice ---------- */
+.notice {
+  margin: 14px 0 0; padding: 10px 14px; border-radius: var(--radius);
+  background: var(--warn-soft); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.notice code { font-family: var(--mono); font-size: 12px; background: color-mix(in srgb, var(--panel) 70%, transparent); padding: 2px 6px; border-radius: 5px; color: var(--text); user-select: all; word-break: break-all; }
+
+/* ---------- table ---------- */
+main { padding: 14px 0 120px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1100px; }
+thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 12px;
+  text-transform: uppercase; letter-spacing: .04em; text-align: left;
+  padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; user-select: none;
+}
+thead th.sortable { cursor: pointer; }
+thead th.sortable:hover { color: var(--text); }
+thead th .arrow { display: inline-block; width: 10px; margin-left: 3px; color: var(--accent); }
+tbody td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tbody tr.row { cursor: pointer; transition: background .1s; }
+tbody tr.row:hover { background: var(--row-hover); }
+tbody tr.row.sel { background: var(--row-sel); }
+tbody tr.row.open td { border-bottom-color: transparent; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.chk, th.chk { width: 34px; text-align: center; padding-left: 12px; padding-right: 4px; }
+td.chk input, th.chk input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+.rank { color: var(--faint); font-variant-numeric: tabular-nums; }
+.name { font-weight: 600; white-space: nowrap; }
+.name a { color: var(--text); }
+.name a:hover { color: var(--accent); }
+.li { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 700; color: #fff; background: #0a66c2; border-radius: 3px; padding: 0 4px; line-height: 15px; vertical-align: 1px; }
+.title { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.title .co { color: var(--text); }
+.why { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.date { white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pill {
+  display: inline-block; min-width: 34px; text-align: center; padding: 2px 7px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.s-hi { background: var(--good-soft); color: var(--good); }
+.s-mid { background: var(--warn-soft); color: var(--warn); }
+.s-lo { background: var(--panel-2); color: var(--faint); }
+.s-none { color: var(--faint); font-weight: 400; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); flex: none; }
+.st-done { color: var(--good); } .st-done .dot { background: var(--good); }
+.st-error { color: var(--bad); } .st-error .dot { background: var(--bad); }
+.st-queued { color: var(--info); } .st-queued .dot { background: var(--info); }
+.st-running { color: var(--accent); }
+.st-none { color: var(--faint); }
+.prior { font-size: 11px; padding: 1px 6px; border-radius: 999px; font-weight: 600; background: var(--info-soft); color: var(--info); white-space: nowrap; }
+details.prior-sec { margin-top: 14px; border: 1px dashed var(--border-strong); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
+details.prior-sec > summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--info); }
+details.prior-sec[open] > summary { margin-bottom: 8px; }
+.spin {
+  width: 11px; height: 11px; border-radius: 50%; flex: none;
+  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.conf { font-size: 11px; padding: 1px 6px; border-radius: 999px; font-weight: 600; }
+.c-high { background: var(--good-soft); color: var(--good); }
+.c-medium { background: var(--warn-soft); color: var(--warn); }
+.c-low { background: var(--bad-soft); color: var(--bad); }
+td.act { text-align: right; white-space: nowrap; }
+
+/* ---------- detail ---------- */
+tr.detail td { padding: 0; background: var(--panel); }
+.detail-inner {
+  display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease;
+}
+tr.detail.shown .detail-inner { grid-template-rows: 1fr; }
+.detail-clip { overflow: hidden; }
+.detail-body {
+  margin: 0 12px 14px 46px; padding: 16px 18px; border-radius: var(--radius);
+  background: var(--panel-2); border: 1px solid var(--border);
+  display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 22px;
+}
+@media (max-width: 900px) { .detail-body { grid-template-columns: 1fr; margin-left: 12px; } }
+.sec + .sec { margin-top: 14px; }
+.sec h4 { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.sec p { margin: 0; white-space: pre-wrap; }
+.sec ul { margin: 0; padding-left: 18px; }
+.sec li + li { margin-top: 4px; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; font-size: 13px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.signal { padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); }
+.signal + .signal { margin-top: 6px; }
+.signal-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-weight: 600; font-size: 13px; }
+.signal p { margin-top: 3px; color: var(--muted); font-size: 13px; }
+.str { font-size: 11px; padding: 1px 7px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+.str-strong { background: var(--good-soft); color: var(--good); }
+.str-moderate { background: var(--info-soft); color: var(--info); }
+.str-weak { background: var(--warn-soft); color: var(--warn); }
+.str-none { background: var(--panel-2); color: var(--faint); border: 1px solid var(--border); }
+.sources li { overflow-wrap: anywhere; }
+.sources .host { color: var(--faint); font-size: 12px; }
+.err { color: var(--bad); background: var(--bad-soft); padding: 8px 10px; border-radius: 8px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.empty-detail { color: var(--muted); }
+
+/* ---------- pager / empty ---------- */
+.foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; border-top: 1px solid var(--border); background: var(--panel); }
+.foot .info { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.pager { display: flex; gap: 6px; align-items: center; }
+.empty { padding: 48px 20px; text-align: center; color: var(--muted); }
+.paths { margin-top: 14px; color: var(--faint); font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+.paths code { font-family: var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+
+/* ---------- selection bar ---------- */
+.selbar {
+  position: fixed; left: 50%; bottom: 18px; z-index: 30;
+  transform: translate(-50%, 140%); opacity: 0;
+  transition: transform .2s ease, opacity .2s ease;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+  padding: 9px 10px 9px 16px; border-radius: 14px;
+  background: var(--panel); border: 1px solid var(--border-strong); box-shadow: 0 10px 40px rgba(0,0,0,.18);
+  max-width: calc(100vw - 24px);
+}
+.selbar.show { transform: translate(-50%, 0); opacity: 1; }
+.selbar .count { font-weight: 600; white-space: nowrap; }
+.selbar .hiddensel { font-weight: 500; color: var(--warn); display: inline-flex; align-items: center; gap: 6px; }
+.selbar .count { display: inline-flex; align-items: center; flex-wrap: wrap; }
+.selbar .est { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.selbar .sep { width: 1px; height: 22px; background: var(--border); }
+.dlg input[type=text] { width: 100%; padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--panel); margin: 2px 0 12px; }
+.dlg .lbl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.radios { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; font-size: 13px; }
+.radios label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.radios input { accent-color: var(--accent); margin-top: 3px; }
+.radios small { display: block; color: var(--muted); }
+.toast .act-link { margin-left: 12px; border: 0; background: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: 0; font-size: 13px; }
+
+/* ---------- dialog / toast ---------- */
+dialog {
+  border: 1px solid var(--border-strong); border-radius: 14px; padding: 0; background: var(--panel); color: var(--text);
+  box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(440px, calc(100vw - 32px));
+}
+dialog::backdrop { background: rgba(0,0,0,.35); }
+.dlg { padding: 20px 20px 16px; }
+.dlg h3 { margin: 0 0 8px; font-size: 16px; }
+.dlg p { margin: 0 0 16px; color: var(--muted); }
+.dlg .row-btns { display: flex; justify-content: flex-end; gap: 8px; }
+.toasts { position: fixed; right: 16px; top: 16px; z-index: 50; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast {
+  pointer-events: auto; padding: 9px 14px; border-radius: 10px; font-size: 13px; max-width: 380px;
+  background: var(--panel); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
+  animation: tin .18s ease;
+}
+.toast.bad { border-color: color-mix(in srgb, var(--bad) 50%, transparent); color: var(--bad); }
+.toast.good { border-color: color-mix(in srgb, var(--good) 50%, transparent); }
+@keyframes tin { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (max-width: 640px) { .wrap { padding: 0 12px; } .goal { white-space: normal; } }
+
+/* ---------- v6 explorer additions ---------- */
+.lensbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 0 12px; }
+.lensbar .lbl { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.lensbar select { max-width: 360px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--panel); font-size: 13px; }
+.starters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; width: 100%; font-size: 12.5px; color: var(--muted); }
+.lensws { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; margin: -4px 0 12px; border: 1px solid var(--accent-soft); background: color-mix(in srgb, var(--accent-soft) 45%, var(--panel)); border-radius: 10px; }
+.lensws[hidden] { display: none; }
+.lenstabs button b { font-weight: 700; margin-left: 3px; }
+.lensws .thr { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.lensws .thr input[type=range] { width: 130px; }
+.lensws .thr input[type=number] { width: 52px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--panel); font-size: 12.5px; }
+.lensws .thr .hint { font-size: 11.5px; }
+.lact { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 24px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; line-height: 1; }
+.lact:hover { border-color: var(--accent); color: var(--accent); }
+.lact.rm:hover { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+.lact.add:hover { border-color: var(--good); color: var(--good); background: var(--good-soft); }
+.lact:disabled { opacity: .45; cursor: default; }
+td.lensact { width: 34px; padding-right: 0; white-space: nowrap; }
+.lacts { display: inline-flex; gap: 4px; }
+tr.row.leaving { opacity: 0; transform: translateX(12px); transition: opacity .18s ease, transform .18s ease; }
+.pinchip { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 4px; line-height: 16px; margin-left: 4px; }
+.pinchip.pin-in { background: var(--accent-soft); color: var(--accent); }
+.pinchip.pin-out { background: var(--bad-soft); color: var(--bad); }
+.resultsbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 2px 10px; font-size: 13px; color: var(--muted); }
+.resultsbar .big { font-size: 17px; font-weight: 700; color: var(--text); }
+.resultsbar .fchip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 4px 1px 8px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font-size: 12px; }
+.resultsbar .fchip button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0 3px; line-height: 1; }
+.resultsbar .fchip button:hover { color: var(--bad); }
+.resultsbar .act-link { font-size: 12.5px; }
+.lensmem { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.lensmem input[type=number] { width: 52px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--panel); font-size: 12.5px; }
+.lensmem select { padding: 4px 6px; font-size: 12.5px; }
+.lensmem b { color: var(--text); }
+.mem { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-right: 5px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--muted); font-size: 11px; line-height: 1; cursor: pointer; padding: 0; vertical-align: middle; }
+.mem.in { background: var(--good-soft, #e6f6ec); border-color: var(--good, #2f9e5b); color: var(--good, #2f9e5b); font-weight: 700; }
+.mem.pin-in { box-shadow: 0 0 0 2px var(--accent-soft); border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.mem.pin-out { text-decoration: line-through; color: var(--bad, #c0392b); border-color: var(--bad, #c0392b); }
+.mem:hover { border-color: var(--accent); }
+.mem:disabled { cursor: default; opacity: .5; }
+.lensbar select.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.newlens { display: inline-flex; gap: 6px; align-items: center; flex: 1 1 360px; min-width: 260px; }
+.newlens input { flex: 1; min-width: 160px; padding: 6px 10px; border-radius: 8px; border: 1px dashed var(--border-strong); background: var(--panel); font-size: 13px; }
+.newlens input:focus { border-style: solid; border-color: var(--accent); }
+.newlens .est { color: var(--faint); font-size: 12px; white-space: nowrap; }
+.jobchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.presets { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 0 0 12px; font-size: 12.5px; color: var(--faint); }
+.preset { border: 1px solid var(--border); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-size: 12.5px; }
+.preset:hover { color: var(--accent); border-color: var(--accent); }
+.preset[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; }
+.basis { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 4px; line-height: 16px; margin-left: 4px; vertical-align: 1px; text-transform: uppercase; letter-spacing: .03em; }
+.b-headline { background: var(--panel-2); color: var(--faint); border: 1px solid var(--border); }
+.b-light { background: var(--info-soft); color: var(--info); }
+.b-deep { background: var(--good-soft); color: var(--good); }
+.stale { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 4px; line-height: 16px; margin-left: 4px; background: var(--warn-soft); color: var(--warn); }
+.depth { font-size: 11px; padding: 1px 7px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.d-light { background: var(--info-soft); color: var(--info); }
+.d-deep { background: var(--good-soft); color: var(--good); }
+.d-legacy { background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12.5px; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--border-strong); }
+.timeline li { position: relative; padding: 0 0 8px 10px; }
+.timeline li::before { content: ""; position: absolute; left: -20px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); border: 2px solid var(--panel-2); }
+.timeline li.cur::before { background: var(--accent); }
+.timeline .role { font-weight: 600; }
+.timeline .per { color: var(--faint); font-size: 12px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.lens-scores { width: 100%; border-collapse: collapse; min-width: 0; font-size: 13px; }
+.lens-scores td { padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.lens-scores tr.cur td { background: var(--accent-soft); }
+.lens-scores td.g { font-weight: 600; max-width: 180px; }
+.lens-scores td.r { color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.notice.info { background: var(--info-soft); color: var(--info); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
+.paused { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="head">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">nb</div>
+        <div class="titles">
+          <div class="app">network-builder · explorer</div>
+          <div class="goal" id="goal">Your network</div>
+        </div>
+      </div>
+      <div class="stats" id="stats" aria-live="polite"></div>
+    </div>
+    <div class="lensbar" id="lensbar">
+      <span class="lbl" title="A lens scores your whole network against one goal. Switch lenses to rank the same people for different purposes.">Lens</span>
+      <select id="lensSel" aria-label="Active lens"></select>
+      <button class="btn sm ghost" id="lensEdit" type="button" title="Reword this lens and re-score it (your manual adds/removes and threshold are kept)" hidden>✎ Edit</button>
+      <button class="btn sm ghost danger" id="lensDel" type="button" title="Delete this lens (its scores only — no people or profiles are deleted)" hidden>🗑</button>
+      <button class="btn sm" id="lensStale" type="button" hidden></button>
+      <button class="btn sm ghost" id="lensAll" type="button" hidden></button>
+      <span id="lensJob"></span>
+      <form class="newlens" id="newLensForm" autocomplete="off">
+        <input id="newLensGoal" type="text" maxlength="200" placeholder="New lens — e.g. “heads of marketing in fintech”" aria-label="New lens goal">
+        <span class="est" id="newLensEst"></span>
+        <button class="btn sm primary" id="newLensBtn" type="submit">Score network</button>
+      </form>
+      <div class="starters" id="lensStarters" hidden></div>
+    </div>
+    <div class="lensws" id="lensWs" hidden>
+      <div class="seg lenstabs" role="group" aria-label="Lens membership">
+        <button type="button" data-lv="in" title="People in this lens (on a focused row: r removes, a adds)">In lens <b id="lvIn"></b></button>
+        <button type="button" data-lv="out" title="Not in the lens and not removed — add the good ones, remove (dismiss) the rest">Candidates <b id="lvOut"></b></button>
+        <button type="button" data-lv="removed" title="People you removed — hidden everywhere else in this lens; restore from here if you change your mind">Removed <b id="lvRem"></b></button>
+        <button type="button" data-lv="all" title="In lens + candidates (people you removed only show under Removed)">Everyone</button>
+      </div>
+      <span class="thr" title="People scoring at or above this are in the lens automatically. People you add by hand always stay in; people you remove always stay out.">
+        Include score ≥
+        <input id="lensThrRange" type="range" min="0" max="100" step="1" aria-label="Lens score cut-off">
+        <input id="lensThr" type="number" min="0" max="100" step="1" aria-label="Lens score cut-off">
+        <span class="hint" id="lensThrHint"></span>
+      </span>
+      <span style="flex:1"></span>
+      <button class="btn sm" id="lensBulk" type="button"></button>
+      <button class="btn sm danger" id="lensBulkDismiss" type="button" hidden></button>
+      <button class="btn sm primary" id="lensExport" type="button" title="Export everyone in this lens as CSV (CRM or full)">⬇ Export lens</button>
+    </div>
+    <div class="toolbar" role="search">
+      <label class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span class="sr">Search</span>
+        <input id="q" type="search" placeholder="Search names, titles, companies, career, investments…  &quot;exact phrase&quot;  ( / )" autocomplete="off">
+      </label>
+      <label class="ctl" title="Also match the active lens's reasons. Off by default: reasons often mention the goal even when ruling someone out.">
+        <input id="searchReasons" type="checkbox"> include lens reasons</label>
+      <span class="ctl" id="minScoreCtl" title="Only show people scoring at least this in the active lens (a view filter — it doesn't change who is in the lens)">Show score ≥
+        <input id="minScoreRange" type="range" min="0" max="100" step="1">
+        <input id="minScore" type="number" min="0" max="100" step="1" aria-label="Minimum lens score">
+      </span>
+      <span id="msSen"></span>
+      <span id="msFn"></span>
+      <span id="msTags"></span>
+      <label class="ctl">Profile
+        <select id="dossier">
+          <option value="any">Any</option>
+          <option value="none">No web profile</option>
+          <option value="has">Has web profile</option>
+          <option value="light">Light</option>
+          <option value="deep">Deep</option>
+          <option value="active">Queued / running</option>
+        </select>
+      </label>
+      <details class="dd" id="moreDd">
+        <summary class="ctl">More filters <span id="moreBadge"></span> ▾</summary>
+        <div class="dd-pop morepop">
+          <label class="ctl">Company contains <input id="co" type="text" autocomplete="off" placeholder="e.g. capital"></label>
+          <label class="ctl">Past company contains <input id="past" type="text" autocomplete="off" placeholder="e.g. google"></label>
+          <label class="ctl">Talking about contains <input id="talk" type="text" autocomplete="off" placeholder="e.g. ai agents"></label>
+          <label class="ctl">Location contains <input id="loc" type="text" autocomplete="off" placeholder="e.g. dublin"></label>
+          <label class="ctl">Industry contains <input id="ind" type="text" autocomplete="off" placeholder="e.g. fintech"></label>
+          <label class="ctl">Confidence
+            <select id="conf">
+              <option value="any">Any</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label class="ctl">Identity
+            <select id="idc">
+              <option value="any">Any</option>
+              <option value="yes">Confirmed</option>
+              <option value="no">Unconfirmed</option>
+            </select>
+          </label>
+          <span class="ctl">Connected
+            <input id="from" type="date" aria-label="Connected from">–<input id="to" type="date" aria-label="Connected to">
+          </span>
+        </div>
+      </details>
+      <button class="btn ghost sm" id="reset" type="button">Reset filters</button>
+    </div>
+    <div class="presets" id="presets"></div>
+    <div class="viewbar">
+      <div class="seg" role="group" aria-label="Show rows">
+        <button type="button" data-show="all" aria-pressed="true">All</button>
+        <button type="button" data-show="sel" aria-pressed="false">Selected <b id="segSelN">0</b></button>
+        <button type="button" data-show="unsel" aria-pressed="false">Not selected</button>
+      </div>
+      <button class="btn sm primary" id="addFiltered" type="button" title="Add every row matching the current filters to the selection">＋ Add filtered</button>
+      <button class="btn sm" id="removeFiltered" type="button" title="Remove every row matching the current filters from the selection">− Remove filtered</button>
+      <button class="btn sm ghost" id="invertFiltered" type="button" title="Flip selection for the rows matching the current filters">Invert</button>
+      <span class="ctl">Top
+        <input id="topN" type="number" min="1" step="1" value="20" aria-label="Number of top rows to select">
+        <button class="btn sm" id="selTop" type="button" title="Replace the selection with the top N rows of the current view">Select</button>
+      </span>
+      <span class="kbd-hint" title="Keyboard: j/k or ↑/↓ move between rows · x or Space toggles selection · Enter expands · / search"><kbd>j</kbd><kbd>k</kbd> move · <kbd>x</kbd> select · <kbd>r</kbd>/<kbd>a</kbd> remove/add (lens)</span>
+      <span style="flex:1"></span>
+      <details class="dd" id="listsDd">
+        <summary class="btn sm">Lists <span id="listsN"></span> ▾</summary>
+        <div class="dd-pop right wide" id="listsPop"></div>
+      </details>
+      <details class="dd" id="colsDd">
+        <summary class="btn sm">Columns ▾</summary>
+        <div class="dd-pop right" id="colsPop"></div>
+      </details>
+      <button class="btn sm" id="dlCsv" type="button" title="Download the currently filtered rows as CSV, all fields (shift-click for everyone)">⬇ Filtered CSV</button>
+      <button class="btn sm" id="snapNow" type="button" hidden title="Write a read-only HTML snapshot of the explorer to the outputs folder">Snapshot</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="notice"></div>
+  <div class="resultsbar" id="resultsBar" aria-live="polite"></div>
+  <div class="card" style="margin-top:14px">
+    <div class="tablewrap">
+      <table>
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" hidden>No people match these filters.</div>
+    <div class="foot">
+      <div class="info" id="pageInfo"></div>
+      <div class="pager">
+        <label class="ctl">Rows
+          <select id="pageSize">
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+            <option value="0">All</option>
+          </select>
+        </label>
+        <button class="btn sm" id="prev" type="button" aria-label="Previous page">‹ Prev</button>
+        <button class="btn sm" id="next" type="button" aria-label="Next page">Next ›</button>
+      </div>
+    </div>
+  </div>
+  <div class="paths" id="paths"></div>
+</main>
+
+<div class="selbar" id="selbar" role="region" aria-label="Selection actions">
+  <span class="count" id="selCount"></span>
+  <button class="btn primary sm" id="exportSel" type="button">⬇ Export CSV</button>
+  <button class="btn sm" id="saveListSel" type="button">Save as list</button>
+  <button class="btn ghost sm" id="viewSel" type="button">Review</button>
+  <span class="sep"></span>
+  <span class="est" id="selEst"></span>
+  <button class="btn sm" id="lightSel" type="button">Build light profiles</button>
+  <button class="btn sm" id="deepSel" type="button">Deep profile</button>
+  <button class="btn sm" id="cancelQueued" type="button">Cancel queued</button>
+  <span class="sep" id="lensSelSep"></span>
+  <details class="dd" id="lensSelDd">
+    <summary class="btn sm" id="lensSelBtn">＋ Add to lens ▾</summary>
+    <div class="dd-pop up wide" id="lensSelPop"></div>
+  </details>
+  <span class="sep"></span>
+  <button class="btn ghost sm" id="clearSel" type="button">Clear</button>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" class="dlg">
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgBody"></p>
+    <div class="row-btns">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn" value="alt" type="submit" id="dlgAlt" hidden></button>
+      <button class="btn primary" value="ok" type="submit" id="dlgOk">Continue</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="dlgIn">
+  <form method="dialog" class="dlg">
+    <h3 id="dlgInTitle"></h3>
+    <p id="dlgInBody"></p>
+    <input type="text" id="dlgInVal" autocomplete="off" maxlength="80" aria-labelledby="dlgInTitle">
+    <div class="row-btns">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn primary" value="ok" type="submit" id="dlgInOk">Save</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="dlgEx">
+  <form method="dialog" class="dlg">
+    <h3>Export CSV</h3>
+    <p id="dlgExBody"></p>
+    <label class="lbl" for="dlgExName">List name (used in the file name)</label>
+    <input type="text" id="dlgExName" autocomplete="off" maxlength="80">
+    <div class="radios">
+      <label><input type="radio" name="preset" value="crm" checked><span>CRM upload<small>First Name, Last Name, Email, Job Title, Company, LinkedIn URL, seniority, function, tags, location, profile summary, career, investments, boards + the active lens score/reason</small></span></label>
+      <label><input type="radio" name="preset" value="ahoy"><span>Ahoy CRM import<small>Separate Companies (Company Name, Domain, Industry), Contacts and Notes (Title, Content) CSVs using Ahoy's field names: names split and cleaned, each contact's Company matching the Companies file, fit reasons in Notes (not Summary). Downloads as one .zip. Domains are left blank — reconcile against your CRM before importing.</small></span></label>
+      <label><input type="radio" name="preset" value="full"><span>Full<small>Every field, including the full web profile and scores for every lens</small></span></label>
+    </div>
+    <div class="row-btns">
+      <button class="btn" value="cancel" type="submit">Cancel</button>
+      <button class="btn" value="save" type="submit" id="dlgExSave" title="Write the CSV into the outputs folder">Save to outputs</button>
+      <button class="btn primary" value="download" type="submit" id="dlgExDl">Download</button>
+    </div>
+  </form>
+</dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script id="nb-data" type="application/json">__NB_DATA__</script>
+<script>
+(function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- data
+  var state;
+  try {
+    state = JSON.parse(document.getElementById('nb-data').textContent || '{}');
+  } catch (e) {
+    document.body.textContent = 'Could not read embedded explorer data: ' + e.message;
+    return;
+  }
+  state.people = Array.isArray(state.people) ? state.people : [];
+  state.lenses = Array.isArray(state.lenses) ? state.lenses : [];
+  state.lists = Array.isArray(state.lists) ? state.lists : [];
+  state.queue = state.queue || { queued: [], running: [], pausedUntil: null, lensJob: null, seq: 0 };
+  state.costs = state.costs || { enrich: 0, dossier: 0, lens: 0, research: 0, total: 0, incomplete: false };
+  state.estimates = state.estimates || { lightUsd: 0.015, deepUsd: 0.13, lensUsdPer1000: 0.3, lensRerankUsdPer100: 0.5 };
+
+  var LIVE = !!(state.api && state.api.token && /^https?:$/.test(location.protocol));
+  var TOKEN = LIVE ? state.api.token : '';
+  var EST = state.estimates;
+  var lists = state.lists;
+  var lenses = state.lenses;
+
+  // ---------------------------------------------------------------- profile vocab (mirrors src/types.ts)
+  var SENIORITY = ['founder/owner', 'c-suite', 'partner', 'vp', 'director', 'head of', 'manager',
+    'senior ic', 'ic', 'advisor/board', 'student', 'unknown'];
+  var FUNCTIONS = ['investing', 'general management', 'sales', 'marketing', 'engineering', 'product', 'design',
+    'data/ai', 'operations', 'finance', 'people/recruiting', 'legal', 'consulting', 'customer success',
+    'media/creative', 'education/research', 'healthcare', 'public sector', 'other', 'unknown'];
+  var TAGS = ['investor', 'angel', 'vc', 'founder', 'exited founder', 'executive', 'operator', 'advisor',
+    'board member', 'recruiter', 'consultant', 'academic', 'creator', 'public sector', 'open to work'];
+  var PRESETS = ['investor', 'founder', '"head of marketing"', 'CTO', 'recruiter', 'board', 'Google', '"product manager"'];
+
+  // CSV export presets (v6). Keep CRM_COLUMNS in sync with the server's v6 CRM preset (a test reads this marker).
+  // Row mappers: crmRow(p, lens) / fullRow(p, lensList) — pure functions of an ExplorerPerson (+ lens objects).
+  var CRM_COLUMNS = /*NB_CRM_COLUMNS*/["First Name","Last Name","Email","Job Title","Company","LinkedIn URL","Seniority","Function","Industry","Tags","Location","Connected On","Summary","Current Role","Career","Investments","Boards","Recent Themes","Profile Depth","Profile Confidence","Lens","Fit Score","Fit Reason"]/*END*/;
+  // Full preset base columns; one `<lensId>_score` + `<lensId>_reason` pair is appended per lens (in lenses order).
+  var FULL_COLUMNS = ['full_name', 'first_name', 'last_name', 'title', 'company', 'role', 'seniority', 'function',
+    'industry', 'tags', 'region', 'linkedin_url', 'email', 'connected_on', 'profile_depth', 'profile_date',
+    'identity_confirmed', 'confidence', 'one_liner', 'current_role', 'current_company', 'location', 'career',
+    'education', 'investing_summary', 'investments', 'boards', 'expertise', 'notable', 'public_presence',
+    'recent_themes', 'recent_activity', 'sources'];
+
+  function prof(p) { return p && p.profile && typeof p.profile === 'object' ? p.profile : null; }
+  function seniorityOf(p) { var pr = prof(p); return (pr && pr.seniority) || 'unknown'; }
+  function functionOf(p) { var pr = prof(p); return (pr && pr.function) || 'unknown'; }
+  function tagsOf(p) { var pr = prof(p); return pr && Array.isArray(pr.tags) ? pr.tags : []; }
+  function companyOf(p) { var pr = prof(p); return (pr && pr.company) || p.company || ''; }
+  function industryOf(p) { var pr = prof(p); return (pr && pr.industry) || ''; }
+  /** The best goal-free web profile (Dossier object) for a person, or null. */
+  function dos(p) { return p && p.dossier && p.dossier.status === 'ok' && p.dossier.dossier ? p.dossier.dossier : null; }
+  function depthOf(p) { return dos(p) ? (p.dossier.depth === 'deep' ? 'deep' : 'light') : 'none'; }
+  function locationOf(p) { var d = dos(p), pr = prof(p); return (d && d.location) || (pr && pr.region) || ''; }
+  function careerCompanies(p) {
+    var d = dos(p);
+    if (!d) return '';
+    var arr = Array.isArray(d.career) ? d.career.map(function (c) { return c && c.company; }) : [];
+    arr.push(d.currentCompany);
+    return arr.filter(Boolean).join(' \u0001 ');
+  }
+  /** Recent themes + activity titles/summaries (deep dossiers), for search and the "Talking about" filter. */
+  function recentHay(p) {
+    var d = dos(p);
+    if (!d) return '';
+    var parts = Array.isArray(d.recentThemes) ? d.recentThemes.slice() : [];
+    (Array.isArray(d.recentActivity) ? d.recentActivity : []).forEach(function (r) {
+      if (r) parts.push([r.kind, r.title, r.summary].filter(Boolean).join(' '));
+    });
+    return parts.filter(Boolean).join(' \u0001 ');
+  }
+  function lensById(id) { for (var i = 0; i < lenses.length; i++) if (lenses[i].id === id) return lenses[i]; return null; }
+  function scoreOf(p, lensId) { return lensId && p && p.scores && p.scores[lensId] ? p.scores[lensId] : null; }
+  // ---- lens membership: in = pinned in, or (score ≥ threshold and not pinned out). Pins are saved on the server.
+  function thrOf(l) { var t = Number(l && l.threshold); return isFinite(t) ? t : 70; }
+  var pinCache = new WeakMap();
+  function pinSets(l) {
+    var ps = pinCache.get(l);
+    if (!ps) {
+      ps = { inn: new Set(Array.isArray(l.pinnedIn) ? l.pinnedIn : []), out: new Set(Array.isArray(l.pinnedOut) ? l.pinnedOut : []) };
+      pinCache.set(l, ps);
+    }
+    return ps;
+  }
+  function pinOf(l, id) { var ps = pinSets(l); return ps.inn.has(id) ? 'in' : ps.out.has(id) ? 'out' : ''; }
+  function byScore(l, p) { var sc = scoreOf(p, l.id); return !!sc && (Number(sc.score) || 0) >= thrOf(l); }
+  function isMember(l, p) { var pin = pinOf(l, p.id); return pin === 'in' ? true : pin === 'out' ? false : byScore(l, p); }
+  function memberCount(l) {
+    var n = 0;
+    for (var i = 0; i < people.length; i++) if (isMember(l, people[i])) n++;
+    return n;
+  }
+  /** Scored / stale / unscored counts from the people we hold (authoritative for what the table shows).
+   *  `needs` = stale + unscored = exactly what the server's "refresh" re-scores. */
+  function lensCounts(lensId) {
+    var scored = 0, stale = 0;
+    for (var i = 0; i < people.length; i++) {
+      var sc = people[i].scores && people[i].scores[lensId];
+      if (sc) { scored++; if (sc.stale) stale++; }
+    }
+    var unscored = people.length - scored;
+    return { scored: scored, stale: stale, unscored: unscored, needs: stale + unscored };
+  }
+
+  var people = state.people;
+  var byId = new Map();
+  // Queue state comes ONLY from server snapshots (SSE events, POST responses, /api/state), ordered by seq.
+  var qmap = new Map(), rmap = new Map();
+  var pausedUntil = null, pausedManual = false, lensJob = null;
+  var lastSeq = -1;
+  var costs = state.costs;
+  var connected = LIVE ? 'connecting' : 'static';
+  function setQueueMaps(q) {
+    qmap = new Map(); rmap = new Map();
+    (q.queued || []).forEach(function (j) { if (j && j.id) qmap.set(j.id, j.depth || 'light'); });
+    (q.running || []).forEach(function (j) { if (j && j.id) rmap.set(j.id, j.depth || 'light'); });
+    pausedUntil = q.pausedUntil || null;
+    pausedManual = !!q.pausedManual;
+    lensJob = q.lensJob || null;
+    lastSeq = typeof q.seq === 'number' ? q.seq : lastSeq;
+  }
+  setQueueMaps(state.queue);
+
+  function reindex() {
+    byId.clear();
+    for (var i = 0; i < people.length; i++) byId.set(people[i].id, i);
+  }
+  reindex();
+
+  // ---------------------------------------------------------------- prefs
+  var STORE_ID = state.dbPath || 'default';
+  var PREF_KEY = 'nbx-prefs:' + STORE_ID;
+  var DEFAULT_UI = {
+    q: '', searchReasons: false, minScore: 0, dossier: 'any', conf: 'any', idc: 'any', from: '', to: '',
+    co: '', past: '', talk: '', loc: '', ind: '', sen: [], fn: [], tags: [], lens: '',
+    sortKey: 'name', sortDir: 1, pageSize: 100, show: 'all', hidden: [], listId: '', lensView: 'in'
+  };
+  function cloneDefaults() {
+    var o = {};
+    Object.keys(DEFAULT_UI).forEach(function (k) { o[k] = Array.isArray(DEFAULT_UI[k]) ? DEFAULT_UI[k].slice() : DEFAULT_UI[k]; });
+    return o;
+  }
+  var ui = cloneDefaults();
+  try {
+    var saved = JSON.parse(localStorage.getItem(PREF_KEY) || 'null');
+    if (saved && typeof saved === 'object') {
+      Object.keys(DEFAULT_UI).forEach(function (k) {
+        if (!(k in saved)) return;
+        if (Array.isArray(DEFAULT_UI[k])) { if (Array.isArray(saved[k])) ui[k] = saved[k].filter(function (x) { return typeof x === 'string'; }); }
+        else if (typeof saved[k] === typeof DEFAULT_UI[k]) ui[k] = saved[k];
+      });
+    }
+  } catch (e) { /* storage unavailable */ }
+  if (['all', 'sel', 'unsel'].indexOf(ui.show) < 0) ui.show = 'all';
+  if (ui.lensView === 'pinned') ui.lensView = 'removed';
+  if (['all', 'in', 'out', 'removed'].indexOf(ui.lensView) < 0) ui.lensView = 'in';
+  try {
+    var urlLens = new URLSearchParams(location.search).get('lens');
+    if (urlLens && lensById(urlLens)) { ui.lens = urlLens; ui.sortKey = 'score'; ui.sortDir = -1; }
+  } catch (e) { /* ignore */ }
+  if (ui.lens && !lensById(ui.lens)) ui.lens = '';
+  if (!ui.lens && (ui.sortKey === 'score' || ui.sortKey === 'reason')) { ui.sortKey = 'name'; ui.sortDir = 1; }
+  function savePrefs() {
+    try { localStorage.setItem(PREF_KEY, JSON.stringify(ui)); } catch (e) { /* ignore */ }
+  }
+
+  var page = 0;
+  // The working selection: used for profiling and CSV/CRM export. Persisted in localStorage.
+  var selected = new Set();
+  var SEL_KEY = 'nbx-sel:' + STORE_ID;
+  try {
+    var savedSel = JSON.parse(localStorage.getItem(SEL_KEY) || 'null');
+    if (Array.isArray(savedSel)) savedSel.forEach(function (id) { if (byId.has(id)) selected.add(id); });
+  } catch (e) { /* storage unavailable */ }
+  var expanded = new Set();
+  var anchorId = null;
+  // filtered + sorted person IDS. Rows always read the current object via get(id) — never stale copies.
+  var view = [];
+  function get(id) { var i = byId.get(id); return i === undefined ? undefined : people[i]; }
+
+  // ---------------------------------------------------------------- helpers
+  function $(id) { return document.getElementById(id); }
+
+  /** Create an element. attrs: class, text, title, href, etc. Children: nodes or strings (set as text). */
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    if (attrs) {
+      for (var k in attrs) {
+        if (!Object.prototype.hasOwnProperty.call(attrs, k)) continue;
+        var v = attrs[k];
+        if (v === undefined || v === null || v === false) continue;
+        if (k === 'class') el.className = v;
+        else if (k === 'text') el.textContent = String(v);
+        else if (k === 'on') { for (var ev in v) el.addEventListener(ev, v[ev]); }
+        else if (k === 'href') { var u = safeUrl(v); if (u) el.setAttribute('href', u); }
+        else if (k in el && typeof v !== 'string') el[k] = v;
+        else el.setAttribute(k, v === true ? '' : String(v));
+      }
+    }
+    for (var i = 2; i < arguments.length; i++) append(el, arguments[i]);
+    return el;
+  }
+  function append(el, c) {
+    if (c === undefined || c === null || c === false) return;
+    if (Array.isArray(c)) { c.forEach(function (x) { append(el, x); }); return; }
+    el.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function safeUrl(u) {
+    if (typeof u !== 'string') return '';
+    var t = u.trim();
+    if (!/^https?:\/\//i.test(t)) return '';
+    try { return new URL(t).href; } catch (e) { return ''; }
+  }
+  function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
+  function usd(n) {
+    n = Number(n) || 0;
+    if (n > 0 && n < 0.01) return '$' + n.toFixed(4);
+    return '$' + n.toFixed(2);
+  }
+  function scoreClass(n) { return n >= 80 ? 's-hi' : n >= 50 ? 's-mid' : 's-lo'; }
+  function scorePill(n) {
+    if (typeof n !== 'number' || !isFinite(n)) return h('span', { class: 'pill s-none', text: '–' });
+    return h('span', { class: 'pill ' + scoreClass(n), text: String(Math.round(n)) });
+  }
+  var BASIS = {
+    headline: { cls: 'b-headline', txt: 'title', tip: 'Scored from the LinkedIn headline + parsed profile only' },
+    'dossier-light': { cls: 'b-light', txt: 'light', tip: 'Scored with a light web profile' },
+    'dossier-deep': { cls: 'b-deep', txt: 'deep', tip: 'Scored with a deep web profile' }
+  };
+  function basisChip(b) {
+    var x = BASIS[b] || BASIS.headline;
+    return h('span', { class: 'basis ' + x.cls, title: x.tip, text: x.txt });
+  }
+  function staleChip() { return h('span', { class: 'stale', title: 'This person’s info changed since they were scored — “Update stale” re-scores them', text: 'stale' }); }
+  function fmtDate(iso) { var d = new Date(iso); return iso && !isNaN(d) ? d.toLocaleDateString() : (iso || ''); }
+  function fmtTime(iso) { var d = new Date(iso); return iso && !isNaN(d) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''; }
+  function isoDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; }
+  function debounce(fn, ms) {
+    var t;
+    return function () { clearTimeout(t); var a = arguments; t = setTimeout(function () { fn.apply(null, a); }, ms); };
+  }
+  /** action: optional { label, fn } rendered as a link button (e.g. Undo). */
+  function toast(msg, kind, action) {
+    var t = h('div', { class: 'toast' + (kind ? ' ' + kind : ''), role: 'status' }, msg,
+      action ? h('button', { class: 'act-link', type: 'button', text: action.label,
+        on: { click: function () { t.remove(); action.fn(); } } }) : null);
+    $('toasts').appendChild(t);
+    setTimeout(function () { t.remove(); }, action ? 9000 : kind === 'bad' ? 7000 : 3500);
+  }
+  /** Mirrors slugify() in src/io/output.ts (export file names use max 40, fallback 'list'). */
+  function slug(s, maxLen) {
+    var out = String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    var max = maxLen || 40;
+    if (out.length > max) out = out.slice(0, max).replace(/-+$/, '');
+    return out || 'list';
+  }
+  function todayIso() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function promptDlg(title, body, initial, okLabel, maxLen) {
+    var dlg = $('dlgIn'), inp = $('dlgInVal');
+    inp.maxLength = maxLen || 80;
+    $('dlgInTitle').textContent = title;
+    $('dlgInBody').textContent = body || '';
+    $('dlgInOk').textContent = okLabel || 'Save';
+    inp.value = initial || '';
+    if (typeof dlg.showModal !== 'function') {
+      var v = window.prompt(title, initial || '');
+      return Promise.resolve(v && v.trim() ? v.trim() : null);
+    }
+    return new Promise(function (resolve) {
+      dlg.returnValue = '';
+      dlg.addEventListener('close', function onClose() {
+        dlg.removeEventListener('close', onClose);
+        var v = inp.value.trim();
+        resolve(dlg.returnValue === 'ok' && v ? v : null);
+      });
+      dlg.showModal();
+      inp.focus(); inp.select();
+    });
+  }
+  $('dlgInVal').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('dlgIn').close('ok'); } });
+  $('dlgExName').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('dlgEx').close('download'); } });
+  function confirmDlg(title, body, okLabel) {
+    return choiceDlg(title, body, okLabel).then(function (c) { return c === 'ok'; });
+  }
+  /** Cancel / optional alt / primary. Resolves 'ok', 'alt' or null. */
+  function choiceDlg(title, body, okLabel, altLabel) {
+    var dlg = $('dlg');
+    $('dlgTitle').textContent = title;
+    $('dlgBody').textContent = body;
+    $('dlgOk').textContent = okLabel || 'Continue';
+    $('dlgAlt').hidden = !altLabel;
+    $('dlgAlt').textContent = altLabel || '';
+    if (typeof dlg.showModal !== 'function') return Promise.resolve(window.confirm(title + '\n\n' + body) ? 'ok' : null);
+    return new Promise(function (resolve) {
+      dlg.returnValue = '';
+      dlg.addEventListener('close', function onClose() {
+        dlg.removeEventListener('close', onClose);
+        resolve(dlg.returnValue === 'ok' ? 'ok' : dlg.returnValue === 'alt' ? 'alt' : null);
+      });
+      dlg.showModal();
+    });
+  }
+  /**
+   * The selection survives filtering, so an action can reach people the current filters hide. When it would, ask:
+   * all of them, or only the ones on screen? Resolves the ids to act on, or null (cancelled).
+   */
+  function scopeToShown(ids, what) {
+    var shownSet = new Set(view);
+    var shown = ids.filter(function (id) { return shownSet.has(id); });
+    var hidden = ids.length - shown.length;
+    if (!hidden) return Promise.resolve(ids);
+    return choiceDlg(hidden.toLocaleString() + ' of these ' + ids.length.toLocaleString() + ' aren’t on screen',
+      'Your selection includes ' + hidden.toLocaleString() + ' ' + (hidden === 1 ? 'person' : 'people') + ' hidden by the current filters or search. ' +
+      what + ' all ' + ids.length.toLocaleString() + (shown.length ? ', or only the ' + shown.length.toLocaleString() + ' you can see?' : '?'),
+      'All ' + ids.length.toLocaleString(), shown.length ? 'Only the ' + shown.length.toLocaleString() + ' shown' : '').then(function (c) {
+      return c === 'ok' ? ids : c === 'alt' ? shown : null;
+    });
+  }
+
+  // ---------------------------------------------------------------- search
+  /** Split a query into lowercase terms; "quoted phrases" stay together. All terms must match. */
+  function parseQuery(q) {
+    var out = [], re = /"([^"]*)"|(\S+)/g, m;
+    var s = String(q || '').toLowerCase();
+    while ((m = re.exec(s))) {
+      var t = (m[1] !== undefined ? m[1] : m[2]).trim();
+      if (t && t !== '"') out.push(t.replace(/^"+|"+$/g, ''));
+    }
+    return out.filter(Boolean);
+  }
+  // haystack, cached per person object (replaced objects get recomputed).
+  var hayCache = new WeakMap();
+  function hay(p) {
+    var v = hayCache.get(p);
+    if (v === undefined) {
+      var pr = prof(p), d = dos(p);
+      var parts = [p.fullName, p.title, p.company, p.url,
+        pr && pr.company, pr && pr.role, pr && pr.industry, pr && pr.region, pr && pr.seniority, pr && pr.function, tagsOf(p).join(' ')];
+      if (d) {
+        parts.push(d.oneLiner, d.currentRole, d.currentCompany, d.location, d.investingSummary);
+        (d.career || []).forEach(function (c) { if (c) parts.push([c.role, c.company, c.period].filter(Boolean).join(' ')); });
+        ['education', 'investments', 'boards', 'expertise', 'notable', 'publicPresence'].forEach(function (k) {
+          if (Array.isArray(d[k])) parts.push(d[k].join(' \u0001 '));
+        });
+        parts.push(recentHay(p));
+      }
+      v = parts.filter(Boolean).join(' \u0001 ').toLowerCase();
+      hayCache.set(p, v);
+    }
+    if (ui.searchReasons && ui.lens) {
+      var sc = scoreOf(p, ui.lens);
+      if (sc && sc.reason) return v + ' \u0001 ' + String(sc.reason).toLowerCase();
+    }
+    return v;
+  }
+
+  // ---------------------------------------------------------------- filter + sort
+  function jobOf(p) { return rmap.has(p.id) ? 'running' : qmap.has(p.id) ? 'queued' : ''; }
+  function matches(p, terms) {
+    if (ui.show === 'sel' && !selected.has(p.id)) return false;
+    if (ui.show === 'unsel' && selected.has(p.id)) return false;
+    if (ui.sen.length && ui.sen.indexOf(seniorityOf(p)) < 0) return false;
+    if (ui.fn.length && ui.fn.indexOf(functionOf(p)) < 0) return false;
+    if (ui.tags.length) {
+      var tg = tagsOf(p), any = false;
+      for (var t = 0; t < ui.tags.length; t++) if (tg.indexOf(ui.tags[t]) >= 0) { any = true; break; }
+      if (!any) return false;
+    }
+    if (ui.co && companyOf(p).toLowerCase().indexOf(ui.co.toLowerCase()) < 0) return false;
+    if (ui.ind && industryOf(p).toLowerCase().indexOf(ui.ind.toLowerCase()) < 0) return false;
+    if (ui.loc && locationOf(p).toLowerCase().indexOf(ui.loc.toLowerCase()) < 0) return false;
+    if (ui.past && careerCompanies(p).toLowerCase().indexOf(ui.past.toLowerCase()) < 0) return false;
+    if (ui.talk && recentHay(p).toLowerCase().indexOf(ui.talk.toLowerCase()) < 0) return false;
+    if (ui.lens && ui.minScore > 0) {
+      var sc = scoreOf(p, ui.lens);
+      if (!sc || (Number(sc.score) || 0) < ui.minScore) return false;
+    }
+    var dp = depthOf(p), job = jobOf(p);
+    if (ui.dossier === 'none' && dp !== 'none') return false;
+    if (ui.dossier === 'has' && dp === 'none') return false;
+    if (ui.dossier === 'light' && dp !== 'light') return false;
+    if (ui.dossier === 'deep' && dp !== 'deep') return false;
+    if (ui.dossier === 'active' && !job) return false;
+    var d = dos(p);
+    if (ui.conf !== 'any' && (!d || d.confidence !== ui.conf)) return false;
+    if (ui.idc === 'yes' && (!d || !d.identityConfirmed)) return false;
+    if (ui.idc === 'no' && (!d || d.identityConfirmed)) return false;
+    if (ui.from || ui.to) {
+      var cd = isoDate(p.connectedOn);
+      if (!cd) return false;
+      if (ui.from && cd < ui.from) return false;
+      if (ui.to && cd > ui.to) return false;
+    }
+    if (terms.length) {
+      var hs = hay(p);
+      for (var i = 0; i < terms.length; i++) if (hs.indexOf(terms[i]) === -1) return false;
+    }
+    return true;
+  }
+
+  var PROFILE_ORDER = { running: 0, queued: 1, deep: 2, light: 3, none: 4 };
+  function profileState(p) { return jobOf(p) || depthOf(p); }
+  function sortVal(p, key) {
+    switch (key) {
+      case 'score': { var sc = scoreOf(p, ui.lens); return sc ? Number(sc.score) : undefined; }
+      case 'name': return (p.fullName || '').toLowerCase() || undefined;
+      case 'title': return (p.title || '').toLowerCase() || undefined;
+      case 'company': return companyOf(p).toLowerCase() || undefined;
+      case 'seniority': var si = SENIORITY.indexOf(seniorityOf(p)); return si < 0 || seniorityOf(p) === 'unknown' ? undefined : si;
+      case 'function': return functionOf(p) === 'unknown' || functionOf(p) === 'other' ? undefined : functionOf(p);
+      case 'tags': return tagsOf(p).length ? tagsOf(p).join(' ') : undefined;
+      case 'location': return locationOf(p).toLowerCase() || undefined;
+      case 'connected': return isoDate(p.connectedOn) || undefined;
+      case 'reason': { var s2 = scoreOf(p, ui.lens); return s2 && s2.reason ? String(s2.reason).toLowerCase() : undefined; }
+      case 'profile': return PROFILE_ORDER[profileState(p)];
+      default: return undefined;
+    }
+  }
+  function cmpPeople(a, b) {
+    var key = ui.sortKey, dir = ui.sortDir;
+    var x = sortVal(a, key), y = sortVal(b, key);
+    var xu = x === undefined || x === null || x === '', yu = y === undefined || y === null || y === '';
+    var tie = (a.fullName || '').localeCompare(b.fullName || '');
+    if (xu && yu) return tie;
+    if (xu) return 1; // missing values always last
+    if (yu) return -1;
+    if (x < y) return -dir;
+    if (x > y) return dir;
+    return tie;
+  }
+  /** counts per lens tab, over the people matching every other filter */
+  var lensTabCounts = { 'in': 0, out: 0, removed: 0, all: 0 };
+  function lensBucket(l, p) { return isMember(l, p) ? 'in' : pinOf(l, p.id) === 'out' ? 'removed' : 'out'; }
+  function compute() {
+    var terms = parseQuery(ui.q);
+    var list = people.filter(function (p) { return matches(p, terms); });
+    var ml = lensById(ui.lens);
+    lensTabCounts = { 'in': 0, out: 0, removed: 0, all: list.length };
+    if (ml) {
+      var keep = [];
+      list.forEach(function (p) {
+        var b = lensBucket(ml, p);
+        lensTabCounts[b]++;
+        // removed people only ever show on the Removed tab
+        if (ui.lensView === b || (ui.lensView === 'all' && b !== 'removed')) keep.push(p);
+      });
+      list = keep;
+    }
+    list.sort(cmpPeople);
+    view = list.map(function (p) { return p.id; });
+    var ps = ui.pageSize || view.length || 1;
+    var maxPage = Math.max(0, Math.ceil(view.length / ps) - 1);
+    if (page > maxPage) page = maxPage;
+  }
+
+  // ---------------------------------------------------------------- header / stats
+  // `lensOnly` columns only show when a lens is active; `hideable` ones can be toggled from the Columns menu.
+  var COLUMNS = [
+    { id: 'chk', label: '', cls: 'chk' },
+    { id: 'lensact', label: '', cls: 'lensact', lensOnly: true },
+    { id: 'score', key: 'score', label: 'Score', cls: 'num', title: 'Score in the active lens (0–100)', lensOnly: true },
+    { id: 'name', key: 'name', label: 'Name' },
+    { id: 'title', key: 'title', label: 'Title', hideable: true },
+    { id: 'company', key: 'company', label: 'Company', hideable: true },
+    { id: 'seniority', key: 'seniority', label: 'Seniority', hideable: true },
+    { id: 'function', key: 'function', label: 'Function', hideable: true },
+    { id: 'tags', key: 'tags', label: 'Tags', hideable: true },
+    { id: 'location', key: 'location', label: 'Location', hideable: true },
+    { id: 'connected', key: 'connected', label: 'Connected', hideable: true },
+    { id: 'reason', key: 'reason', label: 'Why (lens)', hideable: true, lensOnly: true },
+    { id: 'profile', key: 'profile', label: 'Web profile', hideable: true },
+    { id: 'act', label: '', cls: 'act' }
+  ];
+  function visibleCols() {
+    return COLUMNS.filter(function (c) {
+      if (c.lensOnly && !ui.lens) return false;
+      return !c.hideable || ui.hidden.indexOf(c.id) < 0;
+    });
+  }
+  var headChk;
+  function renderHead() {
+    var tr = $('headRow');
+    tr.textContent = '';
+    visibleCols().forEach(function (c) {
+      var th = h('th', { class: (c.cls || '') + (c.key ? ' sortable' : ''), title: c.title, scope: 'col' });
+      if (c.id === 'chk') {
+        headChk = h('input', { type: 'checkbox', 'aria-label': 'Select all filtered rows', title: 'Select / deselect all filtered rows' });
+        headChk.addEventListener('change', function () {
+          var on = headChk.checked;
+          bulk(on ? 'Selected all filtered' : 'Deselected all filtered', function () {
+            view.forEach(function (id) { if (on) selected.add(id); else selected.delete(id); });
+          });
+        });
+        th.appendChild(headChk);
+      } else if (c.key) {
+        th.tabIndex = 0;
+        var active = ui.sortKey === c.key;
+        th.setAttribute('aria-sort', active ? (ui.sortDir === 1 ? 'ascending' : 'descending') : 'none');
+        append(th, c.label);
+        append(th, h('span', { class: 'arrow', text: active ? (ui.sortDir === 1 ? '▲' : '▼') : '' }));
+        var go = function () {
+          if (ui.sortKey === c.key) ui.sortDir = -ui.sortDir;
+          else {
+            ui.sortKey = c.key;
+            ui.sortDir = (c.key === 'score' || c.key === 'connected') ? -1 : 1;
+          }
+          page = 0; savePrefs(); refresh();
+        };
+        th.addEventListener('click', go);
+        th.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+      } else {
+        append(th, c.label);
+      }
+      tr.appendChild(th);
+    });
+  }
+
+  function renderColsMenu() {
+    var pop = $('colsPop');
+    pop.textContent = '';
+    pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: 'Show columns' }),
+      h('button', { class: 'btn ghost sm', type: 'button', text: 'Show all', on: { click: function () {
+        ui.hidden = []; savePrefs(); renderColsMenu(); refresh();
+      } } })));
+    COLUMNS.forEach(function (c) {
+      if (!c.hideable) return;
+      var cb = h('input', { type: 'checkbox' });
+      cb.checked = ui.hidden.indexOf(c.id) < 0;
+      cb.addEventListener('change', function () {
+        ui.hidden = ui.hidden.filter(function (x) { return x !== c.id; });
+        if (!cb.checked) ui.hidden.push(c.id);
+        savePrefs(); refresh();
+      });
+      pop.appendChild(h('label', { class: 'opt' }, cb, h('span', { text: c.label + (c.lensOnly ? ' (when a lens is active)' : '') })));
+    });
+  }
+
+  function resumeQueue() {
+    api('/api/dossiers/resume', {}).then(function (res) {
+      if (res && res.queue) refreshLight(applyQueue(res.queue));
+      renderStats();
+      toast('Resumed web profiles', 'good');
+    }).catch(function (e) { toast('Resume failed: ' + e.message, 'bad'); });
+  }
+  function pausedActive() { return pausedUntil && new Date(pausedUntil).getTime() > Date.now(); }
+  function renderStats() {
+    var total = people.length, light = 0, deep = 0, withProfile = 0;
+    for (var i = 0; i < people.length; i++) {
+      var dp = depthOf(people[i]);
+      if (dp === 'light') light++; else if (dp === 'deep') deep++;
+      if (prof(people[i])) withProfile++;
+    }
+    var box = $('stats');
+    box.textContent = '';
+    function chip(label, val, cls, title) {
+      return h('span', { class: 'chip' + (cls ? ' ' + cls : ''), title: title }, h('b', { text: String(val) }), ' ' + label);
+    }
+    append(box, chip('people', total.toLocaleString()));
+    if (withProfile < total) append(box, chip('profiled', withProfile.toLocaleString() + '/' + total.toLocaleString(), null, 'People with a parsed headline profile (company, seniority, function, tags)'));
+    append(box, chip('web profiles', (light + deep).toLocaleString(), null, light.toLocaleString() + ' light · ' + deep.toLocaleString() + ' deep'));
+    if (rmap.size || qmap.size || pausedActive() || pausedManual) {
+      var txt = (rmap.size ? rmap.size + ' running' : '') + (rmap.size && qmap.size ? ' · ' : '') + (qmap.size ? qmap.size + ' queued' : '');
+      if (pausedManual) {
+        append(box, h('span', { class: 'chip paused', title: 'Web search kept hitting the rate limit, so profiles are paused until you resume' },
+          (txt ? txt + ' · ' : '') + 'paused (rate limit) ',
+          LIVE ? h('button', { type: 'button', class: 'btn sm', text: 'Resume', on: { click: resumeQueue } }) : null));
+      } else if (pausedActive()) {
+        append(box, h('span', { class: 'chip paused', title: 'Web search is rate-limited; the queue resumes automatically',
+          text: (txt ? txt + ' · ' : '') + 'paused until ' + fmtTime(pausedUntil) + ' (rate limit)' }));
+      } else append(box, h('span', { class: 'chip', text: txt }));
+    }
+    append(box, h('span', { class: 'chip', title: 'Total spend recorded in the database · profiles ' + usd(costs.enrich) + ' · web profiles ' + usd(costs.dossier) +
+      ' · lenses (incl. earlier ranking) ' + usd(costs.lens) + ' · legacy research ' + usd(costs.research) + (costs.incomplete ? ' (lower bound: some calls were cut off)' : '') },
+      h('b', { text: (costs.incomplete ? '≥ ' : '') + usd(costs.total) }), ' spent'));
+    if (LIVE) {
+      var label = connected === 'live' ? 'live' : connected === 'connecting' ? 'connecting…' : 'reconnecting…';
+      append(box, h('span', { class: 'chip ' + (connected === 'live' ? 'live' : 'offline'), text: label, title: 'Connected to the local network-builder server' }));
+    } else {
+      append(box, h('span', { class: 'chip static', text: 'snapshot', title: 'Static snapshot — profiling and lenses are disabled' }));
+    }
+  }
+
+  var STARTER_LENSES = ['potential angel investors', 'heads of marketing and senior marketing leaders',
+    'founders who have sold a company', 'journalists and editors at news organisations',
+    'recruiters and talent leaders', 'potential customers: '];
+  // ---------------------------------------------------------------- lens bar
+  function renderLensBar() {
+    var sel = $('lensSel');
+    sel.textContent = '';
+    sel.appendChild(h('option', { value: '', text: 'No lens — explore everyone' }));
+    lenses.forEach(function (l) {
+      var bits = [l.goal], lc = lensCounts(l.id);
+      bits.push(Math.max(lc.scored, Number(l.scored) || 0).toLocaleString() + ' scored');
+      if (lc.stale) bits.push(lc.stale.toLocaleString() + ' stale');
+      if (lc.unscored && lc.scored) bits.push(lc.unscored.toLocaleString() + ' new');
+      sel.appendChild(h('option', { value: l.id, text: bits.join(' · ') }));
+    });
+    sel.value = ui.lens || '';
+    sel.classList.toggle('active', !!ui.lens);
+    var cur = lensById(ui.lens);
+    $('lensDel').hidden = !cur || !LIVE;
+    $('lensEdit').hidden = !cur || !LIVE;
+    $('lensEdit').disabled = !!lensJob;
+    renderLensWs();
+    var st = $('lensStale');
+    var lcCur = cur ? lensCounts(cur.id) : { stale: 0, unscored: 0, needs: 0 };
+    var nStale = lcCur.needs;
+    st.hidden = !cur || !nStale;
+    st.disabled = !LIVE || !!lensJob;
+    st.textContent = '↻ Update ' + nStale.toLocaleString() + (lcCur.unscored ? ' (stale + new)' : ' stale');
+    var all = $('lensAll');
+    all.hidden = !cur || !LIVE;
+    all.disabled = !!lensJob;
+    all.textContent = 'Re-score all ≈ ' + usd(lensCost(people.length, cur));
+    all.title = 'Re-score everyone in “' + (cur ? cur.goal : '') + '” with the current scoring rules (use after the rules improve, or for old headline-only scores)';
+    st.title = LIVE ? 'Re-score the ' + nStale + ' people who are new or whose info changed since they were scored (≈ ' + usd(lensCost(nStale, cur)) + ')' : 'Needs the live explorer';
+    var job = $('lensJob');
+    job.textContent = '';
+    if (lensJob) {
+      var jl = lensById(lensJob.lensId);
+      append(job, h('span', { class: 'jobchip', title: 'Lens scoring in progress' }, h('span', { class: 'spin', 'aria-hidden': 'true' }),
+        (lensJob.phase === 'rerank' ? 'Re-checking top' : 'Scoring') + ' “' + (jl ? jl.goal : lensJob.lensId) + '” ' +
+        (Number(lensJob.done) || 0).toLocaleString() + '/' + (Number(lensJob.total) || 0).toLocaleString()));
+    }
+    paintNewLensEst();
+    var stx = $('lensStarters');
+    stx.hidden = lenses.length > 0 || !LIVE;
+    if (!stx.hidden && !stx.childNodes.length) {
+      append(stx, h('span', { text: 'Start with a lens:' }));
+      STARTER_LENSES.forEach(function (g) {
+        append(stx, h('button', { class: 'preset', type: 'button', text: g, title: 'Use this goal (you can edit it before scoring)',
+          on: { click: function () { $('newLensGoal').value = g; $('newLensGoal').focus(); } } }));
+      });
+    }
+    $('newLensBtn').disabled = !LIVE || !!lensJob;
+    $('newLensGoal').disabled = !LIVE;
+    $('newLensBtn').title = LIVE ? (lensJob ? 'Another lens is being scored — wait for it to finish' : '') : 'Creating lenses needs the live explorer';
+    $('minScoreCtl').style.opacity = ui.lens ? '' : '.45';
+    $('minScore').disabled = !ui.lens; $('minScoreRange').disabled = !ui.lens;
+    $('goal').textContent = cur ? 'Lens: ' + cur.goal : 'Your network';
+    $('goal').title = cur ? cur.goal : 'Exploring everyone — pick or create a lens to score people for a goal';
+  }
+  /** first pass over n people + rerank of min(rerankTop, n) (lens = existing lens, or null for a new one: top 150) */
+  function lensCost(n, lens) {
+    n = Math.max(n, 1);
+    var top = lens ? (lens.rerankModel ? Number(lens.rerankTop) || 0 : 0) : 150;
+    return (Number(EST.lensUsdPer1000) || 0) * n / 1000 + (Number(EST.lensRerankUsdPer100) || 0) * Math.min(top, n) / 100;
+  }
+  function paintNewLensEst() {
+    $('newLensEst').textContent = LIVE ? '≈ ' + usd(lensCost(people.length)) : '';
+  }
+  function setLens(id) {
+    var changed = (id || '') !== ui.lens;
+    ui.lens = id && lensById(id) ? id : '';
+    if (ui.lens) { ui.sortKey = 'score'; ui.sortDir = -1; if (changed) ui.lensView = 'in'; }
+    else if (ui.sortKey === 'score' || ui.sortKey === 'reason') { ui.sortKey = 'name'; ui.sortDir = 1; }
+    page = 0; savePrefs();
+    try {
+      var u = new URL(location.href);
+      if (ui.lens) u.searchParams.set('lens', ui.lens); else u.searchParams.delete('lens');
+      history.replaceState(null, '', u.toString());
+    } catch (e) { /* ignore */ }
+    renderLensBar(); refresh();
+  }
+  function upsertLens(l) {
+    if (!l || !l.id) return;
+    for (var i = 0; i < lenses.length; i++) if (lenses[i].id === l.id) { lenses[i] = l; return; }
+    lenses.push(l);
+  }
+  function mergeLensScores(lensId, scores) {
+    if (!Array.isArray(scores)) return [];
+    var ids = [];
+    scores.forEach(function (s) {
+      var p = get(s.personId);
+      if (!p) return;
+      if (!p.scores || typeof p.scores !== 'object') p.scores = {};
+      p.scores[lensId] = { score: s.score, reason: s.reason, basis: s.basis, stale: false };
+      ids.push(s.personId);
+    });
+    return ids;
+  }
+  function createLens(goal) {
+    goal = String(goal || '').trim();
+    if (!goal) { $('newLensGoal').focus(); return; }
+    var est = lensCost(people.length);
+    confirmDlg('Score your network for “' + goal + '”?',
+      'Every one of your ' + people.length.toLocaleString() + ' people gets a 0–100 score with a reason, using their headline, parsed profile and any web profile. ' +
+      'The top candidates are then re-checked by a stronger model. Estimated cost ≈ ' + usd(est) + ' (rough). Results stream in as they finish.',
+      'Score network').then(function (ok) {
+      if (!ok) return;
+      api('/api/lenses', { goal: goal }).then(function (res) {
+        if (res && res.lens) { upsertLens(res.lens); $('newLensGoal').value = ''; setLens(res.lens.id); }
+        var n = res && typeof res.scoring === 'number' ? res.scoring : people.length;
+        if (res && res.existing) toast(n ? 'Lens “' + goal + '” already exists — updating ' + n.toLocaleString() + ' stale or new scores' : 'Lens “' + goal + '” already exists and is up to date', n ? 'good' : undefined);
+        else toast('Scoring ' + n.toLocaleString() + ' people for “' + goal + '”', 'good');
+      }).catch(function (e) {
+        toast(/409|busy/i.test(e.message) ? 'Another lens is being scored — try again when it finishes.' : 'Could not create lens: ' + e.message, 'bad');
+      });
+    });
+  }
+  function refreshStale() {
+    var cur = lensById(ui.lens);
+    if (!cur) return;
+    var n = lensCounts(cur.id).needs;
+    confirmDlg('Update ' + n + ' scores?', 'Scores the people who are new to “' + cur.goal + '” or whose info changed since they were scored (≈ ' + usd(lensCost(n, cur)) + ').', 'Update').then(function (ok) {
+      if (!ok) return;
+      api('/api/lenses/' + encodeURIComponent(cur.id) + '/refresh', {}).then(function (res) {
+        if (res && res.lens) { upsertLens(res.lens); renderLensBar(); }
+        toast('Re-scoring ' + n + ' people…', 'good');
+      }).catch(function (e) { toast(/409|busy/i.test(e.message) ? 'Another lens is being scored — try again when it finishes.' : 'Update failed: ' + e.message, 'bad'); });
+    });
+  }
+  function rescoreAll() {
+    var cur = lensById(ui.lens);
+    if (!cur) return;
+    var est = lensCost(people.length, cur);
+    confirmDlg('Re-score everyone for “' + cur.goal + '”?',
+      'All ' + people.length.toLocaleString() + ' people are scored again with the current rules (headline, parsed profile and any web profile), and the top candidates re-checked by the stronger model. Existing scores are replaced as results arrive. Estimated cost ≈ ' + usd(est) + ' (rough).',
+      'Re-score all').then(function (ok) {
+      if (!ok) return;
+      api('/api/lenses/' + encodeURIComponent(cur.id) + '/refresh', { all: true }).then(function (res) {
+        if (res && res.lens) { upsertLens(res.lens); renderLensBar(); }
+        toast('Re-scoring ' + ((res && res.scoring) || people.length).toLocaleString() + ' people…', 'good');
+      }).catch(function (e) { toast(/409|busy/i.test(e.message) ? 'Another lens is being scored — try again when it finishes.' : 'Re-score failed: ' + e.message, 'bad'); });
+    });
+  }
+  function editLens() {
+    var cur = lensById(ui.lens);
+    if (!cur) return;
+    var est = lensCost(people.length, cur);
+    promptDlg('Edit lens', 'Describe who belongs in this lens — be specific about roles, seniority and what makes someone a fit. Everyone is then re-scored for the new wording (≈ ' + usd(est) + '). Your manual adds/removes and threshold are kept.',
+      cur.goal, 'Save & re-score', 300).then(function (goal) {
+      if (!goal || goal === cur.goal) return;
+      api('/api/lenses/' + encodeURIComponent(cur.id), { goal: goal, rescore: true }, 'PUT').then(function (res) {
+        people.forEach(function (p) { var sc = p.scores && p.scores[cur.id]; if (sc) sc.stale = true; });
+        applyLenses(res);
+        toast('Re-scoring ' + ((res && res.scoring) || people.length).toLocaleString() + ' people for “' + goal + '”', 'good');
+      }).catch(function (e) { toast(/409/.test(e.message) || /already/.test(e.message) ? e.message : 'Edit failed: ' + e.message, 'bad'); });
+    });
+  }
+  function deleteLens() {
+    var cur = lensById(ui.lens);
+    if (!cur) return;
+    confirmDlg('Delete lens “' + cur.goal + '”?', 'This removes the lens and its scores. People, profiles and lists are not affected.', 'Delete').then(function (ok) {
+      if (!ok) return;
+      api('/api/lenses/' + encodeURIComponent(cur.id), undefined, 'DELETE').then(function (res) {
+        lenses = res && Array.isArray(res.lenses) ? res.lenses : lenses.filter(function (l) { return l.id !== cur.id; });
+        people.forEach(function (p) { if (p.scores) delete p.scores[cur.id]; });
+        setLens('');
+        toast('Deleted lens “' + cur.goal + '”');
+      }).catch(function (e) { toast('Delete failed: ' + e.message, 'bad'); });
+    });
+  }
+
+  // ---------------------------------------------------------------- lens membership
+  /** Detail-panel toggle (any lens). */
+  function memBtn(l, p) {
+    var inn = isMember(l, p), pin = pinOf(l, p.id);
+    var cls = 'mem' + (inn ? ' in' : '') + (pin === 'in' ? ' pin-in' : pin === 'out' ? ' pin-out' : '');
+    var why = pin === 'in' ? 'Added by hand' : pin === 'out' ? 'Removed by hand' : inn ? 'In by score (≥ ' + thrOf(l) + ')' : 'Not in (score below ' + thrOf(l) + ')';
+    return h('button', { class: cls, type: 'button', disabled: !LIVE, text: inn ? '✓' : pin === 'out' ? '✕' : '+',
+      title: why + ' — click to ' + (inn ? 'remove from' : 'add to') + ' “' + l.goal + '”',
+      'aria-label': (inn ? 'Remove ' : 'Add ') + (p.fullName || 'person') + (inn ? ' from ' : ' to ') + l.goal,
+      on: { click: function (e) { e.stopPropagation(); setMembership(l.id, [p.id], !inn); } } });
+  }
+  /** Row action in the active lens: ✕ remove (members), ↺ restore (removed by hand), ＋ add (candidates). */
+  function lensActBtn(l, p) {
+    var inn = isMember(l, p), pin = pinOf(l, p.id);
+    var kind = inn ? 'rm' : pin === 'out' ? 'restore' : 'add';
+    var label = { rm: '✕', restore: '↺', add: '＋' }[kind];
+    var tip = { rm: 'Remove from lens (r)', restore: 'Restore to lens (a)', add: 'Add to lens (a)' }[kind];
+    var btn = function (k, txt, t, wantIn) {
+      return h('button', { class: 'lact ' + k, type: 'button', disabled: !LIVE, text: txt, title: t,
+        'aria-label': t.replace(/ \(.\)$/, '') + ': ' + (p.fullName || 'person'),
+        on: { click: function (e) { e.stopPropagation(); lensActOn(p.id, wantIn, e.currentTarget.closest('tr')); } } });
+    };
+    if (kind === 'add') return [btn('add', '＋', tip, true), btn('rm', '✕', 'Dismiss — move to Removed (r)', false)];
+    return btn(kind, label, tip, !inn);
+  }
+  function pinChip(l, p) {
+    var pin = pinOf(l, p.id);
+    if (pin === 'in') return h('span', { class: 'pinchip pin-in', text: 'added', title: 'Added by hand — stays in whatever the score' });
+    if (pin === 'out') return h('span', { class: 'pinchip pin-out', text: 'removed', title: 'Removed by hand — stays out whatever the score' });
+    return null;
+  }
+  /** Act on one row: fade it out if it leaves the current tab, keep keyboard focus on the next row. */
+  function lensActOn(id, wantIn, tr) {
+    if (!ui.lens) return;
+    var next = tr ? (tr.nextElementSibling && tr.nextElementSibling.classList.contains('detail') ? tr.nextElementSibling.nextElementSibling : tr.nextElementSibling) : null;
+    var nextId = next && next.getAttribute('data-id');
+    var hadFocus = tr && tr.contains(document.activeElement);
+    var leaves = ui.lensView !== 'all';
+    if (tr && leaves) tr.classList.add('leaving');
+    if (hadFocus) focusAfterRender = leaves ? nextId : id;
+    setTimeout(function () { setMembership(ui.lens, [id], wantIn); }, tr && leaves ? 170 : 0);
+  }
+
+  var focusAfterRender = null;
+  // Pin edits apply locally at once (optimistic), then go to the server one request at a time.
+  var pinQueue = Promise.resolve(), pinPending = 0;
+  function replaceLens(l) { for (var i = 0; i < lenses.length; i++) if (lenses[i].id === l.id) { lenses[i] = l; return; } }
+  function applyPinsLocal(lensId, ids, pin) {
+    var l = lensById(lensId);
+    if (!l) return;
+    var inn = new Set(l.pinnedIn || []), out = new Set(l.pinnedOut || []);
+    ids.forEach(function (id) { inn.delete(id); out.delete(id); if (pin === 'in') inn.add(id); else if (pin === 'out') out.add(id); });
+    replaceLens(Object.assign({}, l, { pinnedIn: Array.from(inn), pinnedOut: Array.from(out) }));
+  }
+  function sendPins(lensId, reqs) {
+    reqs.forEach(function (r) { applyPinsLocal(lensId, r.ids, r.pin); });
+    lensChanged();
+    reqs.forEach(function (r) {
+      pinPending++;
+      pinQueue = pinQueue.then(function () {
+        return api('/api/lenses/' + encodeURIComponent(lensId), r, 'PUT').then(function (res) {
+          pinPending--;
+          if (!pinPending && res && Array.isArray(res.lenses)) { lenses = res.lenses; lensChanged(); }
+        }, function (e) {
+          pinPending--;
+          toast('Could not update the lens: ' + e.message, 'bad');
+          api('/api/state').then(applyState).catch(function () { /* next event fixes it */ });
+        });
+      });
+    });
+    return pinQueue;
+  }
+  /** Put people in (wantIn) or out of a lens with the fewest pins: a pin only where the score alone disagrees. */
+  function setMembership(lensId, ids, wantIn, quiet) {
+    var l = lensById(lensId);
+    if (!l || !ids.length) return Promise.resolve();
+    var groups = { 'in': [], out: [], none: [] }, before = [], moved = 0;
+    ids.forEach(function (id) {
+      var p = get(id);
+      if (!p) return;
+      if (wantIn ? !isMember(l, p) : pinOf(l, id) !== 'out') moved++;
+      before.push({ id: id, pin: pinOf(l, id) });
+      // add: a pin only if the score alone wouldn't include them · remove: always pin out, so members leave and
+      // candidates are dismissed (they move to "Removed" and stay out even if their score rises later)
+      var want = wantIn ? (byScore(l, p) ? 'none' : 'in') : 'out';
+      if (pinOf(l, id) !== (want === 'none' ? '' : want)) groups[want].push(id);
+    });
+    var reqs = [['in', 'in'], ['out', 'out'], ['none', null]].filter(function (g) { return groups[g[0]].length; })
+      .map(function (g) { return { ids: groups[g[0]], pin: g[1] }; });
+    if (!reqs.length) return Promise.resolve();
+    var done = sendPins(lensId, reqs);
+    if (!quiet) {
+      var n = moved || ids.length;
+      toast((wantIn ? 'Added ' : 'Removed ') + (n === 1 && ids.length === 1 ? (get(ids[0]) || {}).fullName || '1 person' : n.toLocaleString() + ' people') + (wantIn ? ' to “' : ' from “') + l.goal + '”', 'good', {
+        label: 'Undo', fn: function () {
+          var g = { 'in': [], out: [], '': [] };
+          before.forEach(function (b) { g[b.pin].push(b.id); });
+          sendPins(lensId, [['in', 'in'], ['out', 'out'], ['', null]].filter(function (x) { return g[x[0]].length; })
+            .map(function (x) { return { ids: g[x[0]], pin: x[1] }; }));
+          toast('Undone');
+        }
+      });
+    }
+    return done;
+  }
+  /** Server/SSE lens updates. Ignored while our own pin edits are in flight (their last response wins). */
+  function applyLenses(res) {
+    if (pinPending) return;
+    if (res && Array.isArray(res.lenses)) lenses = res.lenses;
+    lensChanged();
+  }
+  function lensChanged() {
+    renderLensBar(); renderSelbar();
+    if (ui.lens) heavyRefresh(); else repaintVisible();
+  }
+  function repaintVisible() {
+    var rows = document.querySelectorAll('#tbody tr.row[data-id]');
+    for (var i = 0; i < rows.length; i++) updateRow(rows[i].getAttribute('data-id'));
+  }
+  // cut-off: applies locally while dragging (live counts), saved when you stop
+  function setThrLocal(v) {
+    var l = lensById(ui.lens);
+    v = Math.max(0, Math.min(100, Math.round(Number(v))));
+    if (!l || !isFinite(v)) return;
+    $('lensThr').value = String(v); $('lensThrRange').value = String(v);
+    if (v === thrOf(l)) return;
+    replaceLens(Object.assign({}, l, { threshold: v }));
+    page = 0; refresh(); renderLensWs();
+    saveThr();
+  }
+  var saveThr = debounce(function () {
+    var l = lensById(ui.lens);
+    if (!l) return;
+    pinPending++;
+    api('/api/lenses/' + encodeURIComponent(l.id), { threshold: thrOf(l) }, 'PUT').then(function (res) {
+      pinPending--; if (!pinPending && res && Array.isArray(res.lenses)) { lenses = res.lenses; lensChanged(); }
+    }, function (e) { pinPending--; toast('Could not save the cut-off: ' + e.message, 'bad'); });
+  }, 600);
+
+  function renderLensWs() {
+    var cur = lensById(ui.lens);
+    $('lensWs').hidden = !cur;
+    if (!cur) return;
+    $('lvIn').textContent = lensTabCounts['in'].toLocaleString();
+    $('lvOut').textContent = lensTabCounts.out.toLocaleString();
+    $('lvRem').textContent = lensTabCounts.removed.toLocaleString();
+    var tabs = document.querySelectorAll('#lensWs [data-lv]');
+    for (var i = 0; i < tabs.length; i++) tabs[i].setAttribute('aria-pressed', tabs[i].getAttribute('data-lv') === ui.lensView ? 'true' : 'false');
+    var t = thrOf(cur);
+    if (document.activeElement !== $('lensThr')) $('lensThr').value = String(t);
+    if (document.activeElement !== $('lensThrRange')) $('lensThrRange').value = String(t);
+    $('lensThr').disabled = $('lensThrRange').disabled = !LIVE;
+    var pi = (cur.pinnedIn || []).length;
+    $('lensThrHint').textContent = pi ? '+ ' + pi + ' added by hand' : '';
+    var n = view.length, b = $('lensBulk');
+    var kind = ui.lensView === 'in' ? 'rm' : ui.lensView === 'removed' ? 'restore' : ui.lensView === 'out' ? 'add' : '';
+    b.hidden = !kind || !LIVE;
+    b.disabled = !n;
+    b.textContent = kind === 'rm' ? '✕ Remove these ' + n.toLocaleString() : kind === 'restore' ? '↺ Restore these ' + n.toLocaleString() : '＋ Add these ' + n.toLocaleString();
+    b.title = (kind === 'rm' ? 'Remove every person shown (all pages) from' : 'Add every person shown (all pages) to') + ' “' + cur.goal + '” — filter first to target a group';
+    b.className = 'btn sm' + (kind === 'rm' ? ' danger' : '');
+    var dz = $('lensBulkDismiss');
+    dz.hidden = kind !== 'add' || !LIVE;
+    dz.disabled = !n;
+    dz.textContent = '✕ Remove these ' + n.toLocaleString();
+    dz.title = 'Dismiss every candidate shown (all pages): they move to “Removed” and stay out even if their score rises';
+    $('lensExport').textContent = '⬇ Export lens (' + memberCount(cur).toLocaleString() + ')';
+  }
+  function lensBulk(e, forceOut) {
+    var cur = lensById(ui.lens);
+    if (!cur || !view.length) return;
+    var ids = view.slice(), wantIn = forceOut === true ? false : ui.lensView !== 'in';
+    var go = function () { setMembership(cur.id, ids, wantIn); };
+    if (ids.length <= 25) return go();
+    confirmDlg((wantIn ? 'Add ' : 'Remove ') + ids.length.toLocaleString() + ' people ' + (wantIn ? 'to' : 'from') + ' “' + cur.goal + '”?',
+      'This covers everyone matching the current filters, on every page — not just the rows on screen. You can undo it from the message that follows.',
+      wantIn ? 'Add' : 'Remove').then(function (ok) { if (ok) go(); });
+  }
+  function setLensView(v) { ui.lensView = v; page = 0; savePrefs(); refresh(); }
+
+  // ---------------------------------------------------------------- results bar (count + active filters)
+  function activeFilters() {
+    var out = [];
+    function add(label, clear) { out.push({ label: label, clear: clear }); }
+    if (ui.q.trim()) add('Search: ' + ui.q.trim(), function () { ui.q = ''; });
+    if (ui.lens && ui.minScore > 0) add('Showing score ≥ ' + ui.minScore, function () { ui.minScore = 0; });
+    ui.sen.forEach(function (v) { add('Seniority: ' + v, function () { ui.sen = ui.sen.filter(function (x) { return x !== v; }); }); });
+    ui.fn.forEach(function (v) { add('Function: ' + v, function () { ui.fn = ui.fn.filter(function (x) { return x !== v; }); }); });
+    ui.tags.forEach(function (v) { add('Tag: ' + v, function () { ui.tags = ui.tags.filter(function (x) { return x !== v; }); }); });
+    [['co', 'Company'], ['past', 'Past company'], ['talk', 'Talking about'], ['loc', 'Location'], ['ind', 'Industry']].forEach(function (k) {
+      if (ui[k[0]]) add(k[1] + ': ' + ui[k[0]], function () { ui[k[0]] = ''; });
+    });
+    var DOS = { none: 'No web profile', has: 'Has web profile', light: 'Light profile', deep: 'Deep profile', active: 'Queued / running' };
+    if (ui.dossier !== 'any') add(DOS[ui.dossier] || ui.dossier, function () { ui.dossier = 'any'; });
+    if (ui.conf !== 'any') add('Confidence: ' + ui.conf, function () { ui.conf = 'any'; });
+    if (ui.idc !== 'any') add(ui.idc === 'yes' ? 'Identity confirmed' : 'Identity unconfirmed', function () { ui.idc = 'any'; });
+    if (ui.from || ui.to) add('Connected ' + (ui.from || '…') + ' – ' + (ui.to || '…'), function () { ui.from = ''; ui.to = ''; });
+    if (ui.show === 'sel') add('Selected only', function () { ui.show = 'all'; });
+    if (ui.show === 'unsel') add('Not selected only', function () { ui.show = 'all'; });
+    return out;
+  }
+  function afterFilterEdit() { syncControls(); renderFilterMenus(); renderPresets(); page = 0; savePrefs(); refresh(); }
+  function renderResultsBar() {
+    var box = $('resultsBar');
+    box.textContent = '';
+    var cur = lensById(ui.lens);
+    var one = view.length === 1, lv = cur ? ui.lensView : 'all';
+    var ctx = lv === 'in' ? (one ? 'person' : 'people') + ' in this lens' : lv === 'out' ? (one ? 'candidate' : 'candidates') + ' not in this lens'
+      : lv === 'removed' ? (one ? 'person' : 'people') + ' removed from this lens' : (one ? 'person' : 'people');
+    append(box, [h('span', { class: 'big', text: view.length.toLocaleString() }), ' ' + ctx]);
+    if (view.length !== people.length) append(box, h('span', { text: '· of ' + people.length.toLocaleString() }));
+    var af = activeFilters();
+    af.forEach(function (f) {
+      append(box, h('span', { class: 'fchip' }, f.label,
+        h('button', { type: 'button', title: 'Clear this filter', 'aria-label': 'Clear ' + f.label, text: '×', on: { click: function () { f.clear(); afterFilterEdit(); } } })));
+    });
+    if (af.length > 1) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: 'Clear all', on: { click: function () { $('reset').click(); } } }));
+    append(box, h('span', { style: 'flex:1' }));
+    var inSel = 0;
+    for (var i = 0; i < view.length; i++) if (selected.has(view[i])) inSel++;
+    if (selected.size) append(box, h('span', { text: selected.size.toLocaleString() + ' selected' + (inSel !== selected.size ? ' (' + inSel.toLocaleString() + ' shown)' : '') }));
+    if (view.length && inSel < view.length) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: 'Select these ' + view.length.toLocaleString(),
+      on: { click: function () { $('addFiltered').click(); } } }));
+    if (inSel) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: 'Deselect these', on: { click: function () { $('removeFiltered').click(); } } }));
+  }
+
+  // ---------------------------------------------------------------- rows
+  function depthChip(p) {
+    var rec = p.dossier, d = dos(p);
+    if (!d) return null;
+    if (rec.legacy) return h('span', { class: 'depth d-legacy', title: 'Converted from earlier goal-specific research', text: 'legacy' });
+    return h('span', { class: 'depth d-' + (rec.depth === 'deep' ? 'deep' : 'light'), text: rec.depth === 'deep' ? 'deep' : 'light' });
+  }
+  function profileCell(p) {
+    var job = jobOf(p);
+    if (job === 'running') return h('span', { class: 'status st-running' }, h('span', { class: 'spin', 'aria-hidden': 'true' }), 'profiling' + (rmap.get(p.id) === 'deep' ? ' (deep)' : ''));
+    if (job === 'queued') return h('span', { class: 'status st-queued' }, h('span', { class: 'dot' }), 'queued' + (qmap.get(p.id) === 'deep' ? ' (deep)' : ''));
+    var d = dos(p);
+    if (d) {
+      return h('span', { class: 'status st-done', title: (d.oneLiner || '') + (p.dossier.createdAt ? ' · ' + fmtDate(p.dossier.createdAt) : '') }, depthChip(p),
+        h('span', { class: 'conf c-' + (d.confidence || 'low'), text: d.confidence || '?' }),
+        !d.identityConfirmed ? h('span', { title: 'Identity not confirmed', text: '?id' }) : null);
+    }
+    return h('span', { class: 'status st-none' }, h('span', { class: 'dot' }), 'none');
+  }
+
+  function queueBtn(p, depth, label, force, cls) {
+    var est = depth === 'deep' ? EST.deepUsd : EST.lightUsd;
+    return h('button', { class: 'btn sm' + (cls ? ' ' + cls : ''), type: 'button', disabled: !LIVE,
+      title: LIVE ? (depth === 'deep' ? 'Deep web profile: career, investments, boards, sources (≈ ' + usd(est) + ')' : 'Light web profile: 1–2 searches (≈ ' + usd(est) + ')') : 'Needs the live explorer',
+      text: label,
+      on: { click: function (e) {
+        e.stopPropagation();
+        if (force) {
+          confirmDlg('Re-run ' + depth + ' profile?', 'Builds a fresh ' + depth + ' web profile for ' + (p.fullName || 'this person') + ' (≈ ' + usd(est) + '). The previous one is kept in history.', 'Re-run')
+            .then(function (ok) { if (ok) queueDossiers([p.id], depth, true); });
+        } else queueDossiers([p.id], depth, false);
+      } } });
+  }
+  function actionCell(p) {
+    var job = jobOf(p);
+    if (job === 'running') return h('button', { class: 'btn sm', type: 'button', disabled: true, text: 'Running…' });
+    if (job === 'queued') {
+      return h('button', { class: 'btn sm danger', type: 'button', disabled: !LIVE, text: 'Cancel',
+        on: { click: function (e) { e.stopPropagation(); cancel([p.id]); } } });
+    }
+    var dp = depthOf(p);
+    if (dp === 'none') return [queueBtn(p, 'light', 'Profile'), ' ', queueBtn(p, 'deep', 'Deep', false, 'ghost')];
+    if (dp === 'light') return queueBtn(p, 'deep', 'Deep', false, 'ghost');
+    return queueBtn(p, 'deep', '↻', true, 'ghost');
+  }
+
+  function tagChips(p) {
+    var tg = tagsOf(p);
+    if (!tg.length) return prof(p) ? null : h('span', { class: 's-none', text: '–' });
+    return tg.map(function (t) { return h('span', { class: 'tag t-' + String(t).replace(/[^a-z0-9]+/gi, '-').toLowerCase(), text: t }); });
+  }
+  function dash(v) { return v ? v : h('span', { class: 's-none', text: '–' }); }
+
+  function cellFor(c, p) {
+    var pr = prof(p);
+    switch (c.id) {
+      case 'lensact': {
+        var al = lensById(ui.lens);
+        return h('td', { class: 'lensact' }, h('span', { class: 'lacts' }, al ? lensActBtn(al, p) : null));
+      }
+      case 'chk': {
+        var chk = h('input', { type: 'checkbox', 'aria-label': 'Select ' + (p.fullName || 'row') });
+        chk.checked = selected.has(p.id);
+        chk.addEventListener('click', function (e) {
+          e.stopPropagation();
+          toggleSelect(p.id, chk.checked, e.shiftKey);
+        });
+        return h('td', { class: 'chk' }, chk);
+      }
+      case 'score': {
+        var sc = scoreOf(p, ui.lens), cl = lensById(ui.lens);
+        var pc = cl ? pinChip(cl, p) : null;
+        if (!sc) return h('td', { class: 'num' }, scorePill(undefined), pc);
+        return h('td', { class: 'num', title: (sc.reason || '') }, scorePill(Number(sc.score)), basisChip(sc.basis), sc.stale ? staleChip() : null, pc);
+      }
+      case 'name': {
+        var url = safeUrl(p.url);
+        return h('td', { class: 'name' },
+          url ? h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', text: p.fullName || url, on: { click: function (e) { e.stopPropagation(); } } }) : (p.fullName || '—'),
+          url ? h('span', { class: 'li', 'aria-hidden': 'true', text: 'in' }) : null);
+      }
+      case 'title': {
+        var co = ui.hidden.indexOf('company') >= 0 ? companyOf(p) : '';
+        var tt = (p.title || '') + (co ? ' @ ' + co : '');
+        return h('td', { class: 'title', title: tt }, p.title || '', co ? h('span', { class: 'co', text: (p.title ? ' @ ' : '') + co }) : null);
+      }
+      case 'company': return h('td', { class: 'co-cell', title: companyOf(p) }, dash(companyOf(p)));
+      case 'seniority': return h('td', { class: 'small' }, dash(pr && pr.seniority && pr.seniority !== 'unknown' ? pr.seniority : ''));
+      case 'function': return h('td', { class: 'small' }, dash(pr && pr.function && pr.function !== 'other' && pr.function !== 'unknown' ? pr.function : ''));
+      case 'tags': return h('td', { class: 'tags', title: tagsOf(p).join(', ') }, tagChips(p));
+      case 'location': return h('td', { class: 'loc', title: locationOf(p) }, dash(locationOf(p)));
+      case 'connected': return h('td', { class: 'date', text: p.connectedOn || '' });
+      case 'reason': { var s2 = scoreOf(p, ui.lens); return h('td', { class: 'why', title: s2 ? s2.reason || '' : '', text: s2 ? s2.reason || '' : '' }); }
+      case 'profile': return h('td', null, profileCell(p));
+      case 'act': {
+        var rm = ui.show === 'sel' && selected.has(p.id)
+          ? h('button', { class: 'rm', type: 'button', title: 'Remove from selection (x)', 'aria-label': 'Remove ' + (p.fullName || 'row') + ' from selection', text: '✕',
+            on: { click: function (e) { e.stopPropagation(); toggleSelect(p.id, false, false); } } })
+          : null;
+        return h('td', { class: 'act' }, rm, actionCell(p));
+      }
+    }
+    return h('td');
+  }
+
+  function rowFor(p) {
+    var isSel = selected.has(p.id), isOpen = expanded.has(p.id);
+    var tr = h('tr', { class: 'row' + (isSel ? ' sel' : '') + (isOpen ? ' open' : ''), tabindex: '0', 'aria-expanded': isOpen ? 'true' : 'false', 'data-id': p.id });
+    visibleCols().forEach(function (c) { tr.appendChild(cellFor(c, p)); });
+    tr.addEventListener('click', function (e) {
+      if (e.target.closest('button, a, input, select, label')) return;
+      if (window.getSelection && String(window.getSelection()).length > 0) return;
+      toggleExpand(p.id);
+    });
+    tr.addEventListener('keydown', function (e) {
+      if (e.target !== tr || e.metaKey || e.ctrlKey || e.altKey) return;
+      var k = e.key;
+      if (k === 'Enter') { e.preventDefault(); toggleExpand(p.id); }
+      else if (k === ' ' || k === 'x' || k === 'X') { e.preventDefault(); toggleSelect(p.id, !selected.has(p.id), e.shiftKey); }
+      else if ((k === 'Delete' || k === 'Backspace') && selected.has(p.id)) { e.preventDefault(); toggleSelect(p.id, false, false); }
+      else if ((k === 'r' || k === 'a') && ui.lens && LIVE) {
+        var kl = lensById(ui.lens);
+        if (kl && (k === 'a' ? !isMember(kl, p) : pinOf(kl, p.id) !== 'out')) { e.preventDefault(); lensActOn(p.id, k === 'a', tr); }
+      }
+      else if (k === 'j' || k === 'ArrowDown') { e.preventDefault(); moveFocus(tr, 1); }
+      else if (k === 'k' || k === 'ArrowUp') { e.preventDefault(); moveFocus(tr, -1); }
+    });
+    return tr;
+  }
+  function moveFocus(tr, dir) {
+    var rows = Array.prototype.slice.call($('tbody').querySelectorAll('tr.row'));
+    var i = rows.indexOf(tr) + dir;
+    if (i < 0 || i >= rows.length) return;
+    rows[i].focus({ preventScroll: true });
+    rows[i].scrollIntoView({ block: 'nearest' });
+  }
+
+  function sourcesEl(srcs) {
+    if (!Array.isArray(srcs) || !srcs.length) return null;
+    return h('ul', { class: 'sources' }, srcs.map(function (s) {
+      var u = safeUrl(s && s.url);
+      return h('li', null,
+        u ? h('a', { href: u, target: '_blank', rel: 'noopener noreferrer', text: (s && s.title) || u }) : ((s && (s.title || s.url)) || ''),
+        u ? h('span', { class: 'host', text: ' · ' + hostOf(u) }) : null);
+    }));
+  }
+  function careerEl(d) {
+    if (!d || !Array.isArray(d.career) || !d.career.length) return null;
+    return h('ul', { class: 'timeline' }, d.career.map(function (c) {
+      c = c || {};
+      return h('li', { class: c.current ? 'cur' : '' },
+        h('span', { class: 'role', text: c.role || '—' }), c.company ? ' · ' + c.company : '',
+        c.period ? h('span', { class: 'per', text: c.period }) : null);
+    }));
+  }
+  /** Recent activity timeline: date · kind chip · title (link) · what they said. */
+  function recentEl(d) {
+    var items = d && Array.isArray(d.recentActivity) ? d.recentActivity.filter(Boolean) : [];
+    var themes = d && Array.isArray(d.recentThemes) ? d.recentThemes.filter(Boolean) : [];
+    if (!items.length && !themes.length) return null;
+    return h('div', { class: 'recent' },
+      themes.length ? h('div', { class: 'chips' }, themes.map(function (t) { return h('span', { class: 'tag t-theme', text: String(t) }); })) : null,
+      items.length ? h('ul', { class: 'recent-list' }, items.map(function (r) {
+        var link = safeUrl(r.url);
+        return h('li', null,
+          h('span', { class: 'per', text: r.date || 'recent' }),
+          h('span', { class: 'tag k-' + String(r.kind || 'other').replace(/[^a-z]/g, ''), text: r.kind || 'other' }),
+          link ? h('a', { href: link, target: '_blank', rel: 'noopener noreferrer', class: 'recent-title', text: r.title || hostOf(link) || 'link' })
+               : h('span', { class: 'recent-title', text: r.title || '' }),
+          r.summary ? h('div', { class: 'recent-sum', text: r.summary }) : null);
+      })) : null);
+  }
+  function memberships(id) {
+    return lists.filter(function (l) { return Array.isArray(l.ids) && l.ids.indexOf(id) >= 0; });
+  }
+  /** Legacy goal-specific notes on a dossier converted from old research: { goal, fitAssessment, recommendedApproach, talkingPoints, redFlags, researchScore }. */
+  function legacyNotes(p) {
+    var n = (p.dossier && p.dossier.legacyNotes) || p.legacyNotes;
+    return n && typeof n === 'object' ? n : null;
+  }
+
+  function detailFor(p, animate) {
+    var inner = h('div', { class: 'detail-body' });
+    var d = dos(p), rec = p.dossier;
+    var left = h('div'), right = h('div');
+    function sec(title, body) { return body ? h('div', { class: 'sec' }, h('h4', { text: title }), body) : null; }
+    function para(t) { return t ? h('p', { text: t }) : null; }
+    function list(arr) {
+      if (!Array.isArray(arr) || !arr.length) return null;
+      return h('ul', null, arr.filter(Boolean).map(function (x) { return h('li', null, String(x)); }));
+    }
+
+    if (d) {
+      append(left, sec('Recent activity (last 12 months)', recentEl(d)));
+      append(left, sec('Who they are', para(d.oneLiner)));
+      append(left, sec('Career', careerEl(d)));
+      var inv = (d.investingSummary || (Array.isArray(d.investments) && d.investments.length))
+        ? h('div', null, para(d.investingSummary), Array.isArray(d.investments) && d.investments.length ? h('div', { class: 'chips', style: 'margin-top:6px' },
+          d.investments.map(function (x) { return h('span', { class: 'tag t-investor', text: String(x) }); })) : null)
+        : null;
+      append(left, sec('Investing', inv));
+      append(left, sec('Boards', list(d.boards)));
+      append(left, sec('Expertise', Array.isArray(d.expertise) && d.expertise.length ? h('div', { class: 'chips' }, d.expertise.map(function (x) { return h('span', { class: 'tag', text: String(x) }); })) : null));
+      append(left, sec('Notable', list(d.notable)));
+      append(left, sec('Education', list(d.education)));
+      append(left, sec('Public presence', list(d.publicPresence)));
+      var ln = legacyNotes(p);
+      if (ln) {
+        var lgoal = ln.goal || ln.prompt || '';
+        append(left, h('details', { class: 'prior-sec' },
+          h('summary', { text: lgoal ? 'Legacy notes for “' + lgoal + '”' : 'Legacy goal notes' }),
+          typeof ln.researchScore === 'number' ? sec('Research score (for that goal)', scorePill(ln.researchScore)) : null,
+          sec('Fit assessment', para(ln.fitAssessment)),
+          sec('Recommended approach', para(ln.recommendedApproach)),
+          sec('Talking points', list(ln.talkingPoints)),
+          sec('Red flags', list(ln.redFlags))));
+      }
+    } else {
+      var job = jobOf(p);
+      append(left, h('p', { class: 'empty-detail', text: job
+        ? 'A web profile is ' + job + ' for this person…'
+        : LIVE ? 'No web profile yet. “Profile” runs 1–2 quick searches (≈ ' + usd(EST.lightUsd) + '); “Deep” builds a full profile with career, investments and boards (≈ ' + usd(EST.deepUsd) + ').'
+          : 'No web profile yet. Open the live explorer (network-builder) to build one.' }));
+      if (LIVE && !job) append(left, h('div', { style: 'margin-top:10px;display:flex;gap:6px' }, actionCell(p)));
+    }
+
+    // scores across all lenses
+    if (lenses.length) {
+      var tb = h('table', { class: 'lens-scores' });
+      lenses.forEach(function (l) {
+        var sc = scoreOf(p, l.id);
+        tb.appendChild(h('tr', { class: l.id === ui.lens ? 'cur' : '' },
+          h('td', { class: 'g', title: l.goal }, memBtn(l, p), l.goal),
+          h('td', { class: 'num' }, scorePill(sc ? Number(sc.score) : undefined), sc ? basisChip(sc.basis) : null, sc && sc.stale ? staleChip() : null),
+          h('td', { class: 'r', text: sc ? sc.reason || '' : 'not scored' })));
+      });
+      append(left, sec('Lens scores', tb));
+    }
+
+    var facts = h('dl', { class: 'facts' });
+    function fact(k, v) { if (v === undefined || v === null || v === '') return; append(facts, [h('dt', { text: k }), h('dd', null, v)]); }
+    var url = safeUrl(p.url);
+    fact('LinkedIn', url ? h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', text: url.replace(/^https?:\/\/(www\.)?/, '') }) : null);
+    fact('Headline', p.title);
+    var pr = prof(p);
+    fact('Role', pr && pr.role);
+    fact('Company', companyOf(p));
+    fact('Seniority', pr && pr.seniority !== 'unknown' ? pr.seniority : '');
+    fact('Function', pr && pr.function !== 'other' && pr.function !== 'unknown' ? pr.function : '');
+    fact('Industry', pr && pr.industry);
+    fact('Region', pr && pr.region);
+    if (tagsOf(p).length) fact('Tags', h('span', null, tagChips(p)));
+    fact('Connected', p.connectedOn);
+    fact('Email', p.email);
+    if (d) {
+      fact('Current role', [d.currentRole, d.currentCompany].filter(Boolean).join(' · '));
+      fact('Location', d.location);
+      fact('Identity', d.identityConfirmed ? 'Confirmed' : 'Not confirmed');
+      fact('Confidence', h('span', { class: 'conf c-' + (d.confidence || 'low'), text: d.confidence || '?' }));
+      fact('Web profile', h('span', null, depthChip(p), rec.createdAt ? ' ' + fmtDate(rec.createdAt) : ''));
+      fact('Model', rec.model);
+      fact('Cost', typeof rec.costUsd === 'number' ? usd(rec.costUsd) : '');
+    }
+    var ms = memberships(p.id);
+    if (ms.length) fact('In lists', h('span', { class: 'chips' }, ms.map(function (l) { return h('span', { class: 'tag', text: l.name }); })));
+    fact('In selection', selected.has(p.id) ? 'Yes' : '');
+    append(right, sec('Details', facts));
+    if (d) append(right, sec('Sources', sourcesEl(d.sources)));
+    append(inner, [left, right]);
+
+    var tr = h('tr', { class: 'detail' + (animate ? '' : ' shown'), 'data-detail': p.id },
+      h('td', { colspan: String(visibleCols().length) }, h('div', { class: 'detail-inner' }, h('div', { class: 'detail-clip' }, inner))));
+    if (animate) requestAnimationFrame(function () { requestAnimationFrame(function () { tr.classList.add('shown'); }); });
+    return tr;
+  }
+
+  function pageSlice() {
+    var ps = ui.pageSize;
+    if (!ps) return { start: 0, end: view.length };
+    var start = page * ps;
+    return { start: start, end: Math.min(view.length, start + ps) };
+  }
+
+  function renderBody(animateId) {
+    var tbody = $('tbody');
+    var sl = pageSlice();
+    var frag = document.createDocumentFragment();
+    for (var i = sl.start; i < sl.end; i++) {
+      var p = get(view[i]);
+      if (!p) continue;
+      frag.appendChild(rowFor(p));
+      if (expanded.has(p.id)) frag.appendChild(detailFor(p, animateId === p.id));
+    }
+    tbody.textContent = '';
+    tbody.appendChild(frag);
+    $('empty').hidden = view.length > 0;
+    $('pageInfo').textContent = view.length
+      ? (sl.start + 1).toLocaleString() + '–' + sl.end.toLocaleString() + ' of ' + view.length.toLocaleString() +
+        (view.length !== people.length ? ' (filtered from ' + people.length.toLocaleString() + ')' : '') + hiddenSelNote()
+      : '0 of ' + people.length.toLocaleString() + hiddenSelNote();
+    $('prev').disabled = page <= 0 || !ui.pageSize;
+    $('next').disabled = !ui.pageSize || sl.end >= view.length;
+    syncHeadChk();
+  }
+
+  /** Re-render one person's row (and its detail) in place, if visible. */
+  function updateRow(id) {
+    var tbody = $('tbody');
+    var old = tbody.querySelector('tr.row[data-id="' + cssEsc(id) + '"]');
+    if (!old) return false;
+    var p = get(id);
+    if (!p) return false;
+    var fresh = rowFor(p);
+    var hadFocus = old.contains(document.activeElement);
+    old.replaceWith(fresh);
+    var oldDetail = tbody.querySelector('tr.detail[data-detail="' + cssEsc(id) + '"]');
+    if (oldDetail) oldDetail.replaceWith(detailFor(p, false));
+    if (hadFocus) fresh.focus();
+    return true;
+  }
+  function cssEsc(s) { return window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&'); }
+
+  function syncHeadChk() {
+    if (!headChk) return;
+    var n = 0;
+    for (var i = 0; i < view.length; i++) if (selected.has(view[i])) n++;
+    headChk.checked = view.length > 0 && n === view.length;
+    headChk.indeterminate = n > 0 && n < view.length;
+  }
+
+  // ---------------------------------------------------------------- selection
+  function hiddenSelNote() {
+    if (ui.show !== 'sel') return '';
+    var hidden = selected.size - view.length;
+    return hidden > 0 ? ' · ' + hidden.toLocaleString() + ' selected hidden by filters' : '';
+  }
+  function paintSel(id) {
+    var row = $('tbody').querySelector('tr.row[data-id="' + cssEsc(id) + '"]');
+    if (row) paintRow(row);
+  }
+  function paintRow(row) {
+    var on = selected.has(row.getAttribute('data-id'));
+    row.classList.toggle('sel', on);
+    var c = row.querySelector('td.chk input');
+    if (c) c.checked = on;
+  }
+  function paintAllSel() {
+    var rows = $('tbody').querySelectorAll('tr.row');
+    for (var i = 0; i < rows.length; i++) paintRow(rows[i]);
+    syncHeadChk();
+  }
+  function focusedRowIndex() {
+    var rows = $('tbody').querySelectorAll('tr.row');
+    for (var i = 0; i < rows.length; i++) if (rows[i].contains(document.activeElement)) return i;
+    return -1;
+  }
+  var persistSel = debounce(function () {
+    try { localStorage.setItem(SEL_KEY, JSON.stringify(Array.from(selected))); } catch (e) { /* ignore */ }
+  }, 200);
+  function afterSelChange(changedIds) {
+    if (ui.show !== 'all') {
+      var fi = focusedRowIndex();
+      compute(); renderBody();
+      if (fi >= 0) {
+        var rows = $('tbody').querySelectorAll('tr.row');
+        var r = rows[Math.min(fi, rows.length - 1)];
+        if (r) { r.focus({ preventScroll: true }); r.scrollIntoView({ block: 'nearest' }); }
+      }
+    } else if (changedIds) { changedIds.forEach(paintSel); syncHeadChk(); }
+    else paintAllSel();
+    renderSelbar(); renderViewbar(); renderResultsBar(); persistSel();
+  }
+  function toggleSelect(id, on, shift) {
+    var changed = [];
+    if (shift && anchorId && anchorId !== id) {
+      var a = view.indexOf(anchorId);
+      var b = view.indexOf(id);
+      if (a >= 0 && b >= 0) {
+        var lo = Math.min(a, b), hi = Math.max(a, b);
+        for (var i = lo; i <= hi; i++) { if (on) selected.add(view[i]); else selected.delete(view[i]); changed.push(view[i]); }
+      }
+    }
+    if (!changed.length) { if (on) selected.add(id); else selected.delete(id); changed.push(id); }
+    anchorId = id;
+    afterSelChange(changed);
+  }
+  function bulk(label, mutate) {
+    var before = new Set(selected);
+    mutate();
+    var added = 0, removed = 0;
+    selected.forEach(function (id) { if (!before.has(id)) added++; });
+    before.forEach(function (id) { if (!selected.has(id)) removed++; });
+    afterSelChange();
+    if (!added && !removed) { toast(label + ' — no change'); return; }
+    var parts = [];
+    if (added) parts.push('+' + added.toLocaleString());
+    if (removed) parts.push('−' + removed.toLocaleString());
+    toast(label + ' (' + parts.join(' / ') + ') · ' + selected.size.toLocaleString() + ' selected', null, {
+      label: 'Undo',
+      fn: function () { selected = new Set(before); afterSelChange(); toast('Undone · ' + selected.size.toLocaleString() + ' selected'); }
+    });
+  }
+  function keepOnlyShown() {
+    var before = new Set(selected), shownSet = new Set(view);
+    selected.forEach(function (id) { if (!shownSet.has(id)) selected.delete(id); });
+    afterSelChange();
+    toast('Kept the ' + selected.size.toLocaleString() + ' shown', 'good', { label: 'Undo', fn: function () { selected = before; afterSelChange(); } });
+  }
+  function renderViewbar() {
+    var n = selected.size;
+    $('segSelN').textContent = n.toLocaleString();
+    var btns = document.querySelectorAll('.seg button[data-show]');
+    for (var i = 0; i < btns.length; i++) btns[i].setAttribute('aria-pressed', btns[i].getAttribute('data-show') === ui.show ? 'true' : 'false');
+    var notSel = 0;
+    for (var j = 0; j < view.length; j++) if (!selected.has(view[j])) notSel++;
+    var inSel = view.length - notSel;
+    var add = $('addFiltered');
+    add.disabled = notSel === 0;
+    add.textContent = notSel ? '＋ Add ' + notSel.toLocaleString() + ' filtered' : '＋ Add filtered';
+    var rem = $('removeFiltered');
+    rem.disabled = inSel === 0;
+    rem.textContent = inSel ? '− Remove ' + inSel.toLocaleString() + ' filtered' : '− Remove filtered';
+    $('invertFiltered').disabled = view.length === 0;
+  }
+
+  function toggleExpand(id) {
+    var opening = !expanded.has(id);
+    if (opening) expanded.add(id); else expanded.delete(id);
+    var tbody = $('tbody');
+    var row = tbody.querySelector('tr.row[data-id="' + cssEsc(id) + '"]');
+    if (!row) return;
+    var old = tbody.querySelector('tr.detail[data-detail="' + cssEsc(id) + '"]');
+    if (old) old.remove();
+    var p = get(id);
+    if (opening && p) row.after(detailFor(p, true));
+    row.classList.toggle('open', opening);
+    row.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (!row.contains(document.activeElement)) row.focus({ preventScroll: true });
+  }
+
+  function selectionStats() {
+    var ids = [], light = [], deep = [], queuedSel = [];
+    selected.forEach(function (id) {
+      var p = get(id);
+      if (!p) return;
+      ids.push(id);
+      var job = jobOf(p), dp = depthOf(p);
+      if (job === 'queued') queuedSel.push(id);
+      if (job) return;
+      if (dp === 'none') light.push(id);
+      if (dp !== 'deep') deep.push(id);
+    });
+    return { ids: ids, light: light, deep: deep, queuedSel: queuedSel };
+  }
+  function renderSelbar() {
+    var st = selectionStats();
+    var bar = $('selbar');
+    bar.classList.toggle('show', st.ids.length > 0);
+    var shownSet = new Set(view), hiddenSel = 0;
+    st.ids.forEach(function (id) { if (!shownSet.has(id)) hiddenSel++; });
+    var sc = $('selCount');
+    sc.textContent = '';
+    append(sc, st.ids.length.toLocaleString() + ' selected');
+    if (hiddenSel) append(sc, h('span', { class: 'hiddensel', title: 'Selected people that the current filters or search hide. Actions ask before touching them.' },
+      ' · ' + hiddenSel.toLocaleString() + ' not shown ',
+      h('button', { class: 'btn sm ghost', type: 'button', text: 'Keep only shown', on: { click: keepOnlyShown } })));
+    var cur = currentList();
+    $('saveListSel').textContent = cur && LIVE ? 'Update “' + cur.name + '”' : 'Save as list';
+    $('saveListSel').disabled = !LIVE;
+    $('saveListSel').title = LIVE ? (cur ? 'Overwrite the saved list “' + cur.name + '” with this selection (shift-click: save as a new list)' : 'Save this selection as a named list') : 'Saving lists needs the live explorer';
+    $('lensSelDd').hidden = $('lensSelSep').hidden = !lenses.length;
+    $('lensSelBtn').textContent = '＋ Add to lens ▾';
+    $('lensSelBtn').title = 'Add the selected people to a lens, or remove them from one';
+    if ($('lensSelDd').open) renderLensMenu();
+    $('viewSel').textContent = ui.show === 'sel' ? 'Show all' : 'Review';
+    $('viewSel').title = ui.show === 'sel' ? 'Back to all rows' : 'Show only the selected people';
+    $('selEst').textContent = st.light.length || st.deep.length
+      ? (st.light.length ? st.light.length + ' without a profile' : 'all have a profile') + (st.deep.length ? ' · ' + st.deep.length + ' not deep' : '')
+      : 'all deep-profiled';
+    var lb = $('lightSel');
+    lb.disabled = !LIVE || !st.light.length;
+    lb.textContent = st.light.length ? 'Build light profiles (' + st.light.length + ') ≈ ' + usd(st.light.length * EST.lightUsd) : 'Build light profiles';
+    lb.title = LIVE ? 'Quick web lookup (1–2 searches each) for selected people without a web profile' : 'Needs the live explorer';
+    var db = $('deepSel');
+    db.disabled = !LIVE || !st.deep.length;
+    db.textContent = st.deep.length ? 'Deep profile (' + st.deep.length + ') ≈ ' + usd(st.deep.length * EST.deepUsd) : 'Deep profile';
+    db.title = LIVE ? 'Full web profile (career, investments, boards, sources) for selected people without a deep profile' : 'Needs the live explorer';
+    $('cancelQueued').disabled = !LIVE || qmap.size === 0;
+    $('cancelQueued').textContent = st.queuedSel.length ? 'Cancel ' + st.queuedSel.length + ' queued' : 'Cancel all queued';
+  }
+
+  // ---------------------------------------------------------------- API (live only)
+  function api(path, body, method) {
+    if (!LIVE) return Promise.reject(new Error('This needs the live explorer (static snapshot).'));
+    return fetch(path, {
+      method: method || (body === undefined ? 'GET' : 'POST'),
+      headers: { 'Content-Type': 'application/json', 'X-NB-Token': TOKEN },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    }).then(function (res) {
+      return res.text().then(function (txt) {
+        var data = null;
+        try { data = txt ? JSON.parse(txt) : null; } catch (e) { /* not json */ }
+        if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+        return data;
+      });
+    });
+  }
+
+  /** Queue goal-free web profiles. Resolves true when the server accepted the request. */
+  function queueDossiers(ids, depth, force) {
+    if (!LIVE) { toast('Profiling is disabled in a static snapshot.', 'bad'); return Promise.resolve(false); }
+    if (!ids.length) return Promise.resolve(false);
+    return api('/api/dossiers', { ids: ids, depth: depth, force: !!force }).then(function (res) {
+      var q = (res && res.queued) || [];
+      var sk = (res && res.skipped) || [];
+      var changed = applyQueue(res && res.queue);
+      if (q.length) toast('Queued ' + q.length + ' ' + depth + ' profile' + (q.length === 1 ? '' : 's') + (sk.length ? ' · skipped ' + sk.length : ''), 'good');
+      else if (sk.length) toast('Nothing queued — ' + sk.length + ' already profiled or queued.');
+      refreshLight(uniq(q.concat(changed)));
+      return true;
+    }).catch(function (e) { toast('Could not queue profiles: ' + e.message, 'bad'); return false; });
+  }
+  function cancel(ids) {
+    if (!LIVE) return;
+    api('/api/dossiers/cancel', ids ? { ids: ids } : {}).then(function (res) {
+      var c = (res && res.cancelled) || [];
+      var changed = applyQueue(res && res.queue);
+      toast(c.length ? 'Cancelled ' + c.length + ' queued' : 'Nothing to cancel');
+      refreshLight(uniq(c.concat(changed)));
+    }).catch(function (e) { toast('Cancel failed: ' + e.message, 'bad'); });
+  }
+
+  /** Apply a server queue snapshot unless a newer one (higher seq) was already applied. Returns ids whose job state changed. */
+  function applyQueue(q, authoritative) {
+    if (!q) return [];
+    var sq = typeof q.seq === 'number' ? q.seq : -1;
+    if (!authoritative && sq >= 0 && sq < lastSeq) return [];
+    var oq = qmap, or = rmap, oldJob = lensJob;
+    setQueueMaps(q);
+    var changed = [];
+    function diff(a, b) { a.forEach(function (v, id) { if (b.get(id) !== v) changed.push(id); }); }
+    diff(oq, qmap); diff(qmap, oq); diff(or, rmap); diff(rmap, or);
+    if (JSON.stringify(oldJob) !== JSON.stringify(lensJob)) renderLensBar();
+    return changed;
+  }
+  function uniq(a) { return Array.from(new Set(a)); }
+  function applyState(s) {
+    if (!s || !Array.isArray(s.people)) return;
+    people = s.people;
+    costs = s.costs || costs;
+    if (s.estimates) EST = s.estimates;
+    if (Array.isArray(s.lenses)) lenses = s.lenses;
+    if (Array.isArray(s.lists)) lists = s.lists;
+    applyQueue(s.queue, true);
+    reindex();
+    selected.forEach(function (id) { if (!byId.has(id)) selected.delete(id); });
+    if (ui.lens && !lensById(ui.lens)) ui.lens = '';
+    renderFilterMenus();
+    renderLists();
+    renderLensBar();
+    refresh();
+  }
+  function replacePerson(person) {
+    if (!person || !person.id) return;
+    var i = byId.get(person.id);
+    if (i === undefined) { people.push(person); reindex(); }
+    else people[i] = person;
+  }
+
+  /** Light refresh: when filters/sort could be affected, recompute; otherwise patch rows. */
+  var heavyRefresh = debounce(function () { refresh(); }, 250);
+  function refreshLight(ids) {
+    renderStats(); renderSelbar();
+    var sensitive = ui.dossier !== 'any' || ui.conf !== 'any' || ui.idc !== 'any' || ui.loc || ui.past || ui.talk ||
+      ui.sortKey === 'profile' || ui.sortKey === 'location' || ui.q;
+    if (sensitive) { heavyRefresh(); return; }
+    (ids || []).forEach(updateRow);
+  }
+
+  var es = null, retry = 0, retryTimer = null;
+  function connect() {
+    if (!LIVE || typeof EventSource === 'undefined') return;
+    try { es = new EventSource('/api/events?t=' + encodeURIComponent(TOKEN)); }
+    catch (e) { scheduleReconnect(); return; }
+    var wasDown = retry > 0;
+    es.addEventListener('open', function () {
+      connected = 'live'; retry = 0; renderStats();
+      if (wasDown) api('/api/state').then(applyState).catch(function () { /* next event will fix */ });
+      wasDown = false;
+    });
+    es.addEventListener('error', function () {
+      if (es) { es.close(); es = null; }
+      connected = 'down'; renderStats();
+      scheduleReconnect();
+    });
+    function on(name, fn) {
+      es.addEventListener(name, function (ev) {
+        var d;
+        try { d = JSON.parse(ev.data); } catch (e) { return; }
+        fn(d);
+      });
+    }
+    on('hello', function (d) {
+      connected = 'live';
+      applyQueue(d.queue, true);
+      if (d.costs) costs = d.costs;
+      renderLensBar(); refresh();
+    });
+    on('queue', function (d) { refreshLight(applyQueue(d.queue)); });
+    on('person', function (d) {
+      var p = d.person;
+      replacePerson(p);
+      if (d.costs) costs = d.costs;
+      if (d.error) toast('✗ ' + (p && p.fullName || 'Profile') + ': ' + d.error, 'bad');
+      else if (p && p.dossier && p.dossier.status === 'ok') {
+        toast('✓ ' + (p.fullName || 'Profile') + ' · ' + (p.dossier.depth || 'light') + ' profile · ' + usd(p.dossier.costUsd), 'good');
+      }
+      // a new dossier makes this person's scores stale → stale counts in the lens bar change
+      renderLensBar();
+      refreshLight(p ? [p.id] : []);
+    });
+    on('lens', function (d) {
+      if (d.lens) upsertLens(d.lens);
+      if (d.costs) costs = d.costs;
+      var ids = d.lens ? mergeLensScores(d.lens.id, d.scores) : [];
+      renderLensBar(); renderStats();
+      if (d.lens && d.lens.id === ui.lens && ids.length) heavyRefresh();
+      else ids.forEach(updateRow);
+    });
+    on('lenses', function (d) {
+      if (!Array.isArray(d.lenses)) return;
+      lenses = d.lenses;
+      if (ui.lens && !lensById(ui.lens)) { setLens(''); return; }
+      applyLenses(null);
+    });
+    on('lists', function (d) {
+      if (Array.isArray(d.lists)) { lists = d.lists; renderLists(); renderSelbar(); }
+    });
+    on('reload', function () {
+      // another process changed the database (e.g. `network-builder lens rescore`): pull fresh state
+      api('/api/state').then(applyState).catch(function () { /* next event will fix */ });
+    });
+    on('notice', function (d) {
+      if (d && d.message) toast(d.message, d.level === 'error' ? 'bad' : d.level === 'warn' ? null : 'good');
+    });
+  }
+  function scheduleReconnect() {
+    clearTimeout(retryTimer);
+    retry = Math.min(retry + 1, 6);
+    var delay = Math.min(30000, 500 * Math.pow(2, retry)) + Math.random() * 400;
+    retryTimer = setTimeout(connect, delay);
+  }
+
+  // ---------------------------------------------------------------- CSV export (client-side)
+  function csvCell(v) {
+    var s = v === undefined || v === null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // formula-injection guard for Excel/Sheets
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  function bullets(arr) { return Array.isArray(arr) ? arr.filter(Boolean).map(function (x) { return '• ' + x; }).join('\n') : ''; }
+  /** "• Role, Company (period)" per line. */
+  function careerText(d) {
+    if (!d || !Array.isArray(d.career)) return '';
+    return d.career.filter(Boolean).map(function (c) {
+      return '• ' + [c.role, c.company].filter(Boolean).join(', ') + (c.period ? ' (' + c.period + ')' : '');
+    }).join('\n');
+  }
+  /** "• 2026-09 podcast: Title — what they said (url)" per line (recent activity). */
+  function recentText(d) {
+    if (!d || !Array.isArray(d.recentActivity)) return '';
+    return d.recentActivity.filter(Boolean).map(function (r) {
+      return '• ' + [r.date, r.kind].filter(Boolean).join(' ') + ': ' + (r.title || '') +
+        (r.summary ? ' — ' + r.summary : '') + (r.url ? ' (' + r.url + ')' : '');
+    }).join('\n');
+  }
+  /** CRM preset row, in CRM_COLUMNS order. lens: the active lens object ({id, goal}) or null. */
+  function crmRow(p, lens) {
+    var pr = prof(p) || {}, d = dos(p);
+    var sc = lens && p.scores ? p.scores[lens.id] : null;
+    return [
+      p.firstName || '', p.lastName || '', p.email || '', pr.role || p.title || '', companyOf(p), p.url || '',
+      pr.seniority && pr.seniority !== 'unknown' ? pr.seniority : '',
+      pr.function && pr.function !== 'other' && pr.function !== 'unknown' ? pr.function : '',
+      pr.industry || '', tagsOf(p).join('; '), (d && d.location) || pr.region || '', p.connectedOn || '',
+      d ? d.oneLiner || '' : '',
+      d ? [d.currentRole, d.currentCompany].filter(Boolean).join(', ') : '',
+      careerText(d),
+      d ? ((Array.isArray(d.investments) ? d.investments.join('; ') : '') || d.investingSummary || '') : '',
+      d && Array.isArray(d.boards) ? d.boards.join('; ') : '',
+      d && Array.isArray(d.recentThemes) ? d.recentThemes.join('; ') : '',
+      d ? (p.dossier.depth || '') + (p.dossier.legacy ? ' (legacy)' : '') : '',
+      d ? d.confidence || '' : '',
+      sc ? lens.goal || '' : '', sc ? sc.score : '', sc ? sc.reason || '' : ''
+    ];
+  }
+  /** Full preset header: FULL_COLUMNS + `<lensId>_score`, `<lensId>_reason` per lens. */
+  function fullHeader(lensList) {
+    var cols = FULL_COLUMNS.slice();
+    (lensList || []).forEach(function (l) { cols.push(l.id + '_score', l.id + '_reason'); });
+    return cols;
+  }
+  /** Full preset row, in fullHeader(lensList) order. */
+  function fullRow(p, lensList) {
+    var pr = prof(p) || {}, d = dos(p), rec = d ? p.dossier : null;
+    var row = [
+      p.fullName || '', p.firstName || '', p.lastName || '', p.title || '', companyOf(p),
+      pr.role || '', pr.seniority || '', pr.function || '', pr.industry || '', tagsOf(p).join('; '), pr.region || '',
+      p.url || '', p.email || '', p.connectedOn || '',
+      rec ? (rec.depth || '') + (rec.legacy ? ' (legacy)' : '') : '', rec ? rec.createdAt || '' : '',
+      d ? (d.identityConfirmed ? 'yes' : 'no') : '', d ? d.confidence || '' : '',
+      d ? d.oneLiner || '' : '', d ? d.currentRole || '' : '', d ? d.currentCompany || '' : '', d ? d.location || '' : '',
+      careerText(d),
+      d && Array.isArray(d.education) ? d.education.join('; ') : '',
+      d ? d.investingSummary || '' : '',
+      d && Array.isArray(d.investments) ? d.investments.join('; ') : '',
+      d && Array.isArray(d.boards) ? d.boards.join('; ') : '',
+      d && Array.isArray(d.expertise) ? d.expertise.join('; ') : '',
+      d ? bullets(d.notable) : '', d ? bullets(d.publicPresence) : '',
+      d && Array.isArray(d.recentThemes) ? d.recentThemes.join('; ') : '', recentText(d),
+      d && Array.isArray(d.sources) ? d.sources.map(function (s) { return (s.title || '') + ' — ' + (s.url || ''); }).join('\n') : ''
+    ];
+    (lensList || []).forEach(function (l) {
+      var sc = p.scores ? p.scores[l.id] : null;
+      row.push(sc ? sc.score : '', sc ? sc.reason || '' : '');
+    });
+    return row;
+  }
+  function buildCsv(rows, preset) {
+    var lens = lensById(ui.lens);
+    var cols = preset === 'crm' ? CRM_COLUMNS : fullHeader(lenses);
+    var lines = [cols.map(csvCell).join(',')];
+    rows.forEach(function (p) {
+      lines.push((preset === 'crm' ? crmRow(p, lens) : fullRow(p, lenses)).map(csvCell).join(','));
+    });
+    return '\ufeff' + lines.join('\r\n') + '\r\n';
+  }
+  // ---- Ahoy CRM import bundle: one CSV per entity type (Companies, Contacts) + Notes, headers = Ahoy schema labels.
+  //      Mirrored in src/io/explorer-export.ts (toAhoyFiles) — test/export.test.ts compares them. Change both together.
+  var AHOY_COMPANY_COLUMNS = /*NB_AHOY_COMPANY*/["Company Name","Domain","Industry"]/*END*/;
+  var AHOY_CONTACT_COLUMNS = /*NB_AHOY_CONTACT*/["First Name","Last Name","Email","Job Title","Company","LinkedIn URL","Headline","Location"]/*END*/;
+  var AHOY_NOTE_COLUMNS = /*NB_AHOY_NOTE*/["First Name","Last Name","Email","LinkedIn URL","Company","Title","Content"]/*END*/;
+  /** "🌍 Dr. Jane Q. Example, MBA, CFA" → ["Jane Q.", "Example"]: drop emoji, honorifics, credentials and (née …). */
+  function ahoyName(p) {
+    var full = String(p.fullName || [p.firstName, p.lastName].filter(Boolean).join(' ') || '');
+    full = full.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, ' ').replace(/\([^)]*\)/g, ' ');
+    full = full.split(',')[0];
+    full = full.replace(/\b(Dr|Mr|Mrs|Ms|Prof)\.?\s+/gi, ' ').replace(/\s+(M\.?D\.?|Ph\.?D\.?|MBA|CFA|CPA|PE|Esq\.?|Jr\.?|Sr\.?)$/i, '');
+    var parts = full.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    if (!parts.length) return ['', ''];
+    if (parts.length === 1) return [parts[0], ''];
+    return [parts.slice(0, -1).join(' '), parts[parts.length - 1]];
+  }
+  /** plain "City, Country": first of several, no "(notes)", blank when the research was unsure */
+  function ahoyLocation(p) {
+    var d = dos(p), pr = prof(p);
+    var loc = String((d && d.location) || (pr && pr.region) || '').replace(/\s*\([^)]*\)?/g, '').split(';')[0].trim();
+    if (/^(unclear|unknown|not (found|stated|confirmed|known)|n\/a)/i.test(loc)) return '';
+    return loc.replace(/^(reported as|likely|probably|possibly)\s+/i, '').trim();
+  }
+  /** company name as it will appear in the Companies CSV (first part of "A; B", trimmed) */
+  function ahoyCompany(p) {
+    var d = dos(p);
+    var c = companyOf(p) || (d && d.currentCompany) || '';
+    return String(c).split(/\s*[;|]\s*/)[0].replace(/\s+/g, ' ').trim();
+  }
+  /** Ahoy note Content (markdown): fit, who they are, investments, boards, themes. '' when there's nothing to say. */
+  function ahoyNote(p, lens) {
+    var d = dos(p), sc = lens && p.scores ? p.scores[lens.id] : null, out = [];
+    if (sc) out.push('**Fit for "' + lens.goal + '": ' + sc.score + '/100** — ' + (sc.reason || ''));
+    if (d && d.oneLiner) out.push(d.oneLiner);
+    if (d && Array.isArray(d.investments) && d.investments.length) out.push('- **Investments:** ' + d.investments.filter(Boolean).join('; '));
+    if (d && Array.isArray(d.boards) && d.boards.length) out.push('- **Boards:** ' + d.boards.filter(Boolean).join('; '));
+    if (d && Array.isArray(d.recentThemes) && d.recentThemes.length) out.push('- **Talking about:** ' + d.recentThemes.filter(Boolean).join('; '));
+    if (!out.length) return '';
+    if (p.connectedOn) out.push('- **Connected on LinkedIn:** ' + p.connectedOn);
+    return out.join('\n\n');
+  }
+  /** Ahoy note Title */
+  function ahoyNoteTitle(lens) { return lens ? 'network-builder: ' + lens.goal : 'network-builder profile'; }
+  /** → { companies, contacts, notes } CSV texts (BOM + CRLF, same cells as the other presets) */
+  function ahoyFiles(rows, lens) {
+    var csv = function (cols, data) {
+      var lines = [cols.map(csvCell).join(',')];
+      data.forEach(function (r) { lines.push(r.map(csvCell).join(',')); });
+      return '﻿' + lines.join('\r\n') + '\r\n';
+    };
+    var companies = [], seen = {}, contacts = [], notes = [];
+    rows.forEach(function (p) {
+      var nm = ahoyName(p), co = ahoyCompany(p), pr = prof(p);
+      var key = co.toLowerCase();
+      if (co && !seen[key]) {
+        seen[key] = co;
+        companies.push([co, '', (pr && pr.industry) || '']);
+      }
+      var coName = co ? seen[key] : '';
+      contacts.push([nm[0], nm[1], p.email || '', (pr && pr.role) || p.title || '', coName, p.url || '', p.title || '', ahoyLocation(p)]);
+      var note = ahoyNote(p, lens);
+      if (note) notes.push([nm[0], nm[1], p.email || '', p.url || '', coName, ahoyNoteTitle(lens), note]);
+    });
+    return { companies: csv(AHOY_COMPANY_COLUMNS, companies), contacts: csv(AHOY_CONTACT_COLUMNS, contacts), notes: csv(AHOY_NOTE_COLUMNS, notes),
+      counts: { companies: companies.length, contacts: contacts.length, notes: notes.length } };
+  }
+  /** Minimal ZIP (stored, no compression, UTF-8 names): [{ name, text }] → Uint8Array. Enough for a few CSVs. */
+  var CRC_TABLE = null;
+  function crc32(bytes) {
+    if (!CRC_TABLE) {
+      CRC_TABLE = new Uint32Array(256);
+      for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC_TABLE[n] = c >>> 0; }
+    }
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zipFiles(files) {
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0, now = new Date();
+    var dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    var dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+    function hdr(size) { var b = new Uint8Array(size); return { b: b, v: new DataView(b.buffer) }; }
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+      var lh = hdr(30);
+      lh.v.setUint32(0, 0x04034b50, true); lh.v.setUint16(4, 20, true); lh.v.setUint16(6, 0x0800, true); lh.v.setUint16(8, 0, true);
+      lh.v.setUint16(10, dosTime, true); lh.v.setUint16(12, dosDate, true); lh.v.setUint32(14, crc, true);
+      lh.v.setUint32(18, data.length, true); lh.v.setUint32(22, data.length, true); lh.v.setUint16(26, name.length, true); lh.v.setUint16(28, 0, true);
+      var ch = hdr(46);
+      ch.v.setUint32(0, 0x02014b50, true); ch.v.setUint16(4, 20, true); ch.v.setUint16(6, 20, true); ch.v.setUint16(8, 0x0800, true);
+      ch.v.setUint16(10, 0, true); ch.v.setUint16(12, dosTime, true); ch.v.setUint16(14, dosDate, true); ch.v.setUint32(16, crc, true);
+      ch.v.setUint32(20, data.length, true); ch.v.setUint32(24, data.length, true); ch.v.setUint16(28, name.length, true);
+      ch.v.setUint32(42, offset, true);
+      parts.push(lh.b, name, data);
+      central.push(ch.b, name);
+      offset += 30 + name.length + data.length;
+    });
+    var cdSize = central.reduce(function (n, b) { return n + b.length; }, 0);
+    var end = hdr(22);
+    end.v.setUint32(0, 0x06054b50, true); end.v.setUint16(8, files.length, true); end.v.setUint16(10, files.length, true);
+    end.v.setUint32(12, cdSize, true); end.v.setUint32(16, offset, true);
+    var all = parts.concat(central, [end.b]), size = all.reduce(function (n, b) { return n + b.length; }, 0);
+    var out = new Uint8Array(size), pos = 0;
+    all.forEach(function (b) { out.set(b, pos); pos += b.length; });
+    return out;
+  }
+  function saveBytes(bytes, filename, type) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: type }));
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  function saveBlob(text, filename) {
+    var blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  function sortIds(ids) { return ids.map(get).filter(Boolean).sort(cmpPeople); }
+  /** `<YYYY-MM-DD_HHmmss>_<slug(name, 40)>_<N>.csv` — same as explorerExportFilename() on the server. */
+  function exportFilename(name, n, date) {
+    var d = date || new Date(), p2 = function (x) { return String(x).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '_' +
+      p2(d.getHours()) + p2(d.getMinutes()) + p2(d.getSeconds()) + '_' + slug(name, 40) + '_' + n + '.csv';
+  }
+  function downloadCsv(all) {
+    var rows = all ? people.slice().sort(cmpPeople) : view.map(get).filter(Boolean);
+    var lens = lensById(ui.lens);
+    saveBlob(buildCsv(rows, 'full'), exportFilename(all ? 'network' : (lens ? lens.goal + ' filtered' : 'network filtered'), rows.length));
+    toast('Downloaded ' + rows.length.toLocaleString() + ' rows');
+  }
+  function openExport(only, defName) {
+    if (only && !Array.isArray(only)) only = null; // called as an event handler
+    var ids = (only || Array.from(selected)).filter(function (id) { return byId.has(id); });
+    if (!ids.length) { toast(only ? 'Nobody is in this lens yet.' : 'Select people first — e.g. filter, then “＋ Add filtered”.'); return; }
+    var dlg = $('dlgEx');
+    var cur = currentList();
+    var curIds = cur ? cur.ids.filter(function (id) { return byId.has(id); }) : [];
+    var sameAsList = !only && cur && curIds.length === ids.length && curIds.every(function (id) { return selected.has(id); });
+    var lens = lensById(ui.lens);
+    $('dlgExName').value = defName || (sameAsList ? cur.name : (lens ? lens.goal : 'Selection'));
+    var shownEx = new Set(view), hiddenEx = only ? 0 : ids.filter(function (id) { return !shownEx.has(id); }).length;
+    $('dlgExBody').textContent = ids.length.toLocaleString() + ' people, in the table’s current sort order.' +
+      (hiddenEx ? ' Includes ' + hiddenEx.toLocaleString() + ' selected people the current filters hide.' : '') +
+      (lens ? ' Fit columns come from the lens “' + lens.goal + '”.' : ' No lens active — fit columns will be empty.') +
+      (LIVE ? '' : ' (Static snapshot: download only.)');
+    $('dlgExSave').hidden = !LIVE;
+    var run = function (how) {
+      var name = $('dlgExName').value.trim() || 'Selection';
+      var presetEl = document.querySelector('#dlgEx input[name=preset]:checked');
+      var preset = presetEl ? presetEl.value : 'crm';
+      var rows = sortIds(ids);
+      if (how === 'download' && preset === 'ahoy') {
+        var af = ahoyFiles(rows, lens), base = exportFilename(name, rows.length).replace(/\.csv$/, '');
+        var zf = [{ name: base + '_ahoy-companies.csv', text: af.companies }, { name: base + '_ahoy-contacts.csv', text: af.contacts }];
+        if (af.counts.notes) zf.push({ name: base + '_ahoy-notes.csv', text: af.notes });
+        saveBytes(zipFiles(zf), base + '_ahoy.zip', 'application/zip');
+        toast('Downloaded ' + base + '_ahoy.zip: ' + af.counts.companies + ' companies, ' + af.counts.contacts + ' contacts' +
+          (af.counts.notes ? ', ' + af.counts.notes + ' notes' : '') + ' (one CSV each — upload them to Ahoy separately)', 'good');
+      } else if (how === 'download') {
+        saveBlob(buildCsv(rows, preset), exportFilename(name, rows.length));
+        toast('Downloaded ' + rows.length.toLocaleString() + ' people (' + (preset === 'crm' ? 'CRM' : 'full') + ' CSV)', 'good');
+      } else if (how === 'save') {
+        var body = { name: name, ids: rows.map(function (p) { return p.id; }), preset: preset };
+        if (sameAsList && name === cur.name) body.listId = cur.id;
+        if (lens) body.lensId = lens.id;
+        api('/api/export', body).then(function (res) {
+          toast('Saved ' + ((res && res.count) || rows.length).toLocaleString() + ' people to ' + ((res && res.paths ? res.paths.join(', ') : res && res.path) || 'outputs'), 'good');
+        }).catch(function (e) { toast('Export failed: ' + e.message, 'bad'); });
+      }
+    };
+    if (typeof dlg.showModal !== 'function') { run('download'); return; }
+    dlg.returnValue = '';
+    dlg.addEventListener('close', function onClose() {
+      dlg.removeEventListener('close', onClose);
+      run(dlg.returnValue);
+    });
+    dlg.showModal();
+    $('dlgExName').focus(); $('dlgExName').select();
+  }
+
+  // ---------------------------------------------------------------- saved lists (global, stored in the database)
+  function currentList() {
+    if (!ui.listId) return null;
+    for (var i = 0; i < lists.length; i++) if (lists[i].id === ui.listId) return lists[i];
+    return null;
+  }
+  function uniqueListId(name) {
+    var base = slug(name), id = base, n = 2;
+    var taken = function (x) { return lists.some(function (l) { return l.id === x; }); };
+    while (taken(id)) id = base + '-' + (n++);
+    return id;
+  }
+  function putList(id, name, ids, create) {
+    var body = { name: name, ids: ids };
+    if (create) body.create = true; // server assigns a fresh unique id
+    if (ui.lens) body.lensId = ui.lens;
+    return api('/api/lists/' + encodeURIComponent(id), body, 'PUT').then(function (res) {
+      if (res && Array.isArray(res.lists)) lists = res.lists;
+      var saved = res && res.list ? res.list : null;
+      renderLists(); renderSelbar();
+      return saved;
+    });
+  }
+  function saveSelectionAsNew() {
+    var ids = Array.from(selected).filter(function (id) { return byId.has(id); });
+    if (!ids.length) { toast('Nothing selected to save.'); return; }
+    var lens = lensById(ui.lens);
+    promptDlg('Save list', 'Save the ' + ids.length.toLocaleString() + ' selected people as a named list' + (lens ? ' (built under the lens “' + lens.goal + '”)' : '') + '.', '', 'Save list').then(function (name) {
+      if (!name) return;
+      putList(uniqueListId(name), name, ids, true).then(function (l) {
+        if (l) { ui.listId = l.id; savePrefs(); renderLists(); renderSelbar(); }
+        toast('Saved list “' + name + '” (' + ids.length.toLocaleString() + ')', 'good');
+      }).catch(function (e) { toast('Could not save list: ' + e.message, 'bad'); });
+    });
+  }
+  function updateCurrentList() {
+    var cur = currentList();
+    if (!cur) { saveSelectionAsNew(); return; }
+    var ids = Array.from(selected).filter(function (id) { return byId.has(id); });
+    putList(cur.id, cur.name, ids).then(function () {
+      toast('Updated “' + cur.name + '” (' + ids.length.toLocaleString() + ')', 'good');
+    }).catch(function (e) { toast('Could not update list: ' + e.message, 'bad'); });
+  }
+  function loadList(l, mode) {
+    var ids = (l.ids || []).filter(function (id) { return byId.has(id); });
+    bulk((mode === 'add' ? 'Added' : 'Loaded') + ' “' + l.name + '”', function () {
+      if (mode !== 'add') selected = new Set();
+      ids.forEach(function (id) { selected.add(id); });
+    });
+    if (mode !== 'add') { ui.listId = l.id; savePrefs(); }
+    $('listsDd').open = false;
+    renderLists(); renderSelbar();
+  }
+  function renderLists() {
+    var pop = $('listsPop');
+    pop.textContent = '';
+    $('listsN').textContent = lists.length ? '(' + lists.length + ')' : '';
+    pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: LIVE ? 'Saved lists' : 'Saved lists (read-only snapshot)' })));
+    if (!lists.length) pop.appendChild(h('div', { class: 'dd-note', text: 'No saved lists yet. Build a selection, then “Save as list” — handy for CRM uploads and 1-1 outreach you want to revisit.' }));
+    lists.forEach(function (l) {
+      var n = (l.ids || []).filter(function (id) { return byId.has(id); }).length;
+      var row = h('div', { class: 'list-row' + (l.id === ui.listId ? ' cur' : '') },
+        h('span', { class: 'ln', title: l.name }, l.name + ' ', h('small', { text: '· ' + n.toLocaleString() })),
+        h('button', { class: 'btn sm', type: 'button', text: 'Load', title: 'Replace the selection with this list', on: { click: function () { loadList(l, 'replace'); } } }),
+        h('button', { class: 'btn ghost sm', type: 'button', text: '＋', title: 'Add this list to the current selection', 'aria-label': 'Add ' + l.name + ' to selection', on: { click: function () { loadList(l, 'add'); } } }),
+        LIVE ? h('button', { class: 'btn ghost sm', type: 'button', text: '✎', title: 'Rename', 'aria-label': 'Rename ' + l.name, on: { click: function () {
+          promptDlg('Rename list', '', l.name, 'Rename').then(function (name) {
+            if (!name || name === l.name) return;
+            putList(l.id, name, l.ids).then(function () { toast('Renamed to “' + name + '”'); })
+              .catch(function (e) { toast('Rename failed: ' + e.message, 'bad'); });
+          });
+        } } }) : null,
+        LIVE ? h('button', { class: 'btn ghost sm danger', type: 'button', text: '🗑', title: 'Delete list', 'aria-label': 'Delete ' + l.name, on: { click: function () {
+          confirmDlg('Delete list “' + l.name + '”?', 'This removes the saved list only — nobody is deselected and no data is deleted.', 'Delete').then(function (ok) {
+            if (!ok) return;
+            api('/api/lists/' + encodeURIComponent(l.id), undefined, 'DELETE').then(function (res) {
+              if (res && Array.isArray(res.lists)) lists = res.lists;
+              if (ui.listId === l.id) { ui.listId = ''; savePrefs(); }
+              renderLists(); renderSelbar(); toast('Deleted “' + l.name + '”');
+            }).catch(function (e) { toast('Delete failed: ' + e.message, 'bad'); });
+          });
+        } } }) : null);
+      pop.appendChild(row);
+    });
+    pop.appendChild(h('div', { class: 'dd-sep' }));
+    var nSel = selected.size;
+    var cur = currentList();
+    pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: !LIVE || !nSel,
+      title: LIVE ? '' : 'Saving lists needs the live explorer',
+      text: '＋ Save selection (' + nSel.toLocaleString() + ') as new list…',
+      on: { click: function () { $('listsDd').open = false; saveSelectionAsNew(); } } }));
+    if (cur && LIVE) {
+      pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: !nSel,
+        text: '↻ Update “' + cur.name + '” with selection (' + nSel.toLocaleString() + ')',
+        on: { click: function () { $('listsDd').open = false; updateCurrentList(); } } }));
+    }
+  }
+
+  // ---------------------------------------------------------------- filter menus (multi-select chips)
+  var msBadges = {};
+  function countBy(fn) {
+    var m = {};
+    people.forEach(function (p) { var vals = fn(p); (Array.isArray(vals) ? vals : [vals]).forEach(function (v) { m[v] = (m[v] || 0) + 1; }); });
+    return m;
+  }
+  function msDropdown(hostId, key, label, vocab, valuesOf, note) {
+    var host = $(hostId);
+    host.textContent = '';
+    var counts = countBy(valuesOf);
+    var values = vocab.filter(function (v) { return counts[v] || ui[key].indexOf(v) >= 0; });
+    Object.keys(counts).forEach(function (v) { if (values.indexOf(v) < 0) values.push(v); });
+    var badge = h('span');
+    msBadges[key] = badge;
+    var d = h('details', { class: 'dd' });
+    var sum = h('summary', { class: 'ctl' }, label, ' ', badge, ' ▾');
+    var pop = h('div', { class: 'dd-pop' });
+    var boxes = [];
+    pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: note }),
+      h('button', { class: 'btn ghost sm', type: 'button', text: 'Clear', on: { click: function () {
+        ui[key] = []; boxes.forEach(function (b) { b.checked = false; }); paintMsBadge(key); onFilter();
+      } } })));
+    if (!people.some(function (p) { return prof(p); })) {
+      pop.appendChild(h('div', { class: 'dd-note', text: 'No headline profiles yet — they are added when you import a CSV (network-builder -i <csv>).' }));
+    }
+    values.forEach(function (v) {
+      var cb = h('input', { type: 'checkbox' });
+      cb.checked = ui[key].indexOf(v) >= 0;
+      boxes.push(cb);
+      cb.addEventListener('change', function () {
+        ui[key] = ui[key].filter(function (x) { return x !== v; });
+        if (cb.checked) ui[key].push(v);
+        paintMsBadge(key); onFilter();
+      });
+      pop.appendChild(h('label', { class: 'opt' }, cb, h('span', { text: v === 'unknown' ? 'unknown / no profile' : v }), h('span', { class: 'n', text: (counts[v] || 0).toLocaleString() })));
+    });
+    append(d, [sum, pop]);
+    host.appendChild(d);
+    paintMsBadge(key);
+  }
+  function paintMsBadge(key) {
+    var b = msBadges[key];
+    if (!b) return;
+    b.className = ui[key].length ? 'badge' : '';
+    b.textContent = ui[key].length ? String(ui[key].length) : '';
+  }
+  function renderFilterMenus() {
+    msDropdown('msSen', 'sen', 'Seniority', SENIORITY, seniorityOf, 'Any of');
+    msDropdown('msFn', 'fn', 'Function', FUNCTIONS, functionOf, 'Any of');
+    msDropdown('msTags', 'tags', 'Tags', TAGS, tagsOf, 'Has any of');
+  }
+  function paintMoreBadge() {
+    var n = 0;
+    if (ui.co) n++; if (ui.past) n++; if (ui.talk) n++; if (ui.loc) n++; if (ui.ind) n++;
+    if (ui.conf !== 'any') n++; if (ui.idc !== 'any') n++; if (ui.from || ui.to) n++;
+    var b = $('moreBadge');
+    b.className = n ? 'badge' : '';
+    b.textContent = n ? String(n) : '';
+  }
+  document.addEventListener('click', function (e) {
+    var open = document.querySelectorAll('details.dd[open]');
+    for (var i = 0; i < open.length; i++) if (!open[i].contains(e.target)) open[i].open = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var open = document.querySelectorAll('details.dd[open]');
+    for (var i = 0; i < open.length; i++) { open[i].open = false; var sm = open[i].querySelector('summary'); if (sm) sm.focus(); }
+  });
+
+  // ---------------------------------------------------------------- presets
+  function renderPresets() {
+    var box = $('presets');
+    box.textContent = '';
+    append(box, h('span', { text: 'Try:' }));
+    PRESETS.forEach(function (q) {
+      append(box, h('button', { class: 'preset', type: 'button', text: q.replace(/"/g, ''), 'aria-pressed': ui.q.trim().toLowerCase() === q.toLowerCase() ? 'true' : 'false',
+        title: 'Search for ' + q,
+        on: { click: function () {
+          var on = ui.q.trim().toLowerCase() === q.toLowerCase();
+          ui.q = on ? '' : q; $('q').value = ui.q; onFilter(); renderPresets();
+        } } }));
+    });
+  }
+
+  // ---------------------------------------------------------------- static chrome
+  function renderNotice() {
+    var box = $('notice');
+    box.textContent = '';
+    if (LIVE) {
+      if (!lenses.length) {
+        append(box, h('div', { class: 'notice info' },
+          h('span', { text: 'Tip: create a lens (e.g. “potential angel investors”) to score everyone for a goal — or just search and filter your network.' })));
+      }
+      return;
+    }
+    var cmd = 'network-builder' + (state.dbPath ? ' --db "' + state.dbPath + '"' : '');
+    var copy = h('button', { class: 'btn sm', type: 'button', text: 'Copy',
+      on: { click: function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(cmd).then(function () { toast('Copied'); }, function () { toast('Copy failed — select the command manually', 'bad'); });
+        } else toast('Select the command to copy it');
+      } } });
+    append(box, h('div', { class: 'notice' },
+      h('span', { text: 'Static snapshot' + (state.generatedAt ? ' from ' + fmtDate(state.generatedAt) : '') + ' — search, filter and export work here. To build profiles or lenses, open the live explorer:' }),
+      h('code', { text: cmd }), copy));
+  }
+  function renderPaths() {
+    var box = $('paths');
+    box.textContent = '';
+    if (state.dbPath) append(box, h('div', null, 'Database ', h('code', { text: state.dbPath })));
+    if (lastSnapshot) append(box, h('div', null, 'Snapshot ', h('code', { text: lastSnapshot })));
+  }
+  var lastSnapshot = '';
+
+  function syncControls() {
+    $('q').value = ui.q;
+    $('minScore').value = String(ui.minScore);
+    $('minScoreRange').value = String(ui.minScore);
+    $('dossier').value = ui.dossier;
+    $('conf').value = ui.conf;
+    $('idc').value = ui.idc;
+    $('from').value = ui.from;
+    $('to').value = ui.to;
+    $('co').value = ui.co;
+    $('past').value = ui.past;
+    $('talk').value = ui.talk || '';
+    $('loc').value = ui.loc;
+    $('ind').value = ui.ind;
+    $('searchReasons').checked = ui.searchReasons;
+    $('pageSize').value = String(ui.pageSize);
+    paintMoreBadge();
+  }
+
+  function refresh() {
+    compute();
+    renderHead();
+    renderBody();
+    renderResultsBar();
+    renderLensWs();
+    if (focusAfterRender) {
+      var fr = $('tbody').querySelector('tr.row[data-id="' + cssEsc(focusAfterRender) + '"]');
+      focusAfterRender = null;
+      if (fr) { fr.focus({ preventScroll: true }); fr.scrollIntoView({ block: 'nearest' }); }
+    }
+    renderStats();
+    renderSelbar();
+    renderViewbar();
+  }
+
+  // ---------------------------------------------------------------- wire up
+  var onFilter = debounce(function () { page = 0; savePrefs(); paintMoreBadge(); renderPresets(); refresh(); }, 150);
+  $('q').addEventListener('input', function (e) { ui.q = e.target.value; onFilter(); });
+  function setMinScore(v) {
+    var n = Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+    ui.minScore = n; $('minScore').value = String(n); $('minScoreRange').value = String(n); onFilter();
+  }
+  $('minScore').addEventListener('input', function (e) { setMinScore(e.target.value); });
+  $('minScoreRange').addEventListener('input', function (e) { setMinScore(e.target.value); });
+  ['dossier', 'conf', 'idc', 'from', 'to'].forEach(function (k) {
+    $(k).addEventListener('change', function (e) { ui[k] = e.target.value; onFilter(); });
+  });
+  ['co', 'past', 'talk', 'loc', 'ind'].forEach(function (k) {
+    $(k).addEventListener('input', function (e) { ui[k] = e.target.value.trim(); onFilter(); });
+  });
+  $('searchReasons').addEventListener('change', function (e) { ui.searchReasons = e.target.checked; onFilter(); });
+  $('reset').addEventListener('click', function () {
+    var keep = { sortKey: ui.sortKey, sortDir: ui.sortDir, pageSize: ui.pageSize, show: ui.show, hidden: ui.hidden, listId: ui.listId, lens: ui.lens, lensView: ui.lensView };
+    ui = Object.assign(cloneDefaults(), keep);
+    syncControls(); renderFilterMenus(); renderPresets(); page = 0; savePrefs(); refresh();
+  });
+  $('pageSize').addEventListener('change', function (e) { ui.pageSize = Number(e.target.value) || 0; page = 0; savePrefs(); refresh(); });
+  $('prev').addEventListener('click', function () { if (page > 0) { page--; renderBody(); window.scrollTo({ top: 0 }); } });
+  $('next').addEventListener('click', function () { page++; compute(); renderBody(); window.scrollTo({ top: 0 }); });
+
+  // lens bar
+  $('lensSel').addEventListener('change', function (e) { setLens(e.target.value); });
+  $('lensDel').addEventListener('click', deleteLens);
+  $('lensEdit').addEventListener('click', editLens);
+  $('lensThr').addEventListener('change', function (e) { setThrLocal(e.target.value); });
+  $('lensThr').addEventListener('keydown', function (e) { if (e.key === 'Enter') setThrLocal(e.target.value); });
+  $('lensThrRange').addEventListener('input', function (e) { setThrLocal(e.target.value); });
+  Array.prototype.forEach.call(document.querySelectorAll('#lensWs [data-lv]'), function (b) {
+    b.addEventListener('click', function () { setLensView(b.getAttribute('data-lv')); });
+  });
+  $('lensBulk').addEventListener('click', lensBulk);
+  $('lensBulkDismiss').addEventListener('click', function (e) { lensBulk(e, true); });
+  $('lensExport').addEventListener('click', function () {
+    var l = lensById(ui.lens);
+    if (!l) return;
+    openExport(people.filter(function (p) { return isMember(l, p); }).map(function (p) { return p.id; }), l.goal);
+  });
+  /** "Add to lens ▾" in the selection bar: every lens, with Add / Remove for the selected people. */
+  function renderLensMenu() {
+    var pop = $('lensSelPop');
+    pop.textContent = '';
+    var ids = Array.from(selected).filter(function (id) { return byId.has(id); });
+    pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: ids.length.toLocaleString() + ' selected — add to or remove from a lens' })));
+    var ordered = lenses.slice().sort(function (a, b) { return (b.id === ui.lens) - (a.id === ui.lens); });
+    ordered.forEach(function (l) {
+      var nIn = 0, canAdd = [], canRemove = [];
+      ids.forEach(function (id) {
+        var pp = get(id);
+        if (!pp) return;
+        if (isMember(l, pp)) nIn++; else canAdd.push(id);
+        if (pinOf(l, id) !== 'out') canRemove.push(id);
+      });
+      var close = function () { $('lensSelDd').open = false; };
+      pop.appendChild(h('div', { class: 'lensmenu-row' + (l.id === ui.lens ? ' cur' : '') },
+        h('span', { class: 'g', title: l.goal, text: l.goal }),
+        h('span', { class: 'n', text: nIn === ids.length ? 'all in' : nIn ? nIn + ' in' : '' }),
+        h('button', { class: 'btn sm', type: 'button', disabled: !LIVE || !canAdd.length, text: '＋ Add' + (canAdd.length && canAdd.length !== ids.length ? ' ' + canAdd.length : ''),
+          title: canAdd.length ? 'Add to “' + l.goal + '” — they stay in whatever their score' : 'Already in this lens',
+          on: { click: function () { close(); scopeToShown(canAdd, 'Add').then(function (r) { if (r && r.length) setMembership(l.id, r, true); }); } } }),
+        h('button', { class: 'btn sm ghost danger', type: 'button', disabled: !LIVE || !canRemove.length, text: '✕ Remove',
+          title: canRemove.length ? 'Remove from “' + l.goal + '” — they move to Removed and stay out' : 'Already removed',
+          on: { click: function () { close(); scopeToShown(canRemove, 'Remove').then(function (r) { if (r && r.length) setMembership(l.id, r, false); }); } } })));
+    });
+  }
+  $('lensSelDd').addEventListener('toggle', function () { if ($('lensSelDd').open) renderLensMenu(); });
+  $('lensStale').addEventListener('click', refreshStale);
+  $('lensAll').addEventListener('click', rescoreAll);
+  $('newLensForm').addEventListener('submit', function (e) { e.preventDefault(); if (LIVE) createLens($('newLensGoal').value); });
+
+  function setShow(v) { ui.show = v; page = 0; savePrefs(); refresh(); }
+  Array.prototype.forEach.call(document.querySelectorAll('.seg button[data-show]'), function (b) {
+    b.addEventListener('click', function () { setShow(b.getAttribute('data-show')); });
+  });
+  $('viewSel').addEventListener('click', function () { setShow(ui.show === 'sel' ? 'all' : 'sel'); });
+
+  $('addFiltered').addEventListener('click', function () {
+    var ids = view.slice();
+    bulk('Added ' + ids.length.toLocaleString() + ' filtered', function () { ids.forEach(function (id) { selected.add(id); }); });
+  });
+  $('removeFiltered').addEventListener('click', function () {
+    var ids = view.slice();
+    bulk('Removed filtered', function () { ids.forEach(function (id) { selected.delete(id); }); });
+  });
+  $('invertFiltered').addEventListener('click', function () {
+    var ids = view.slice();
+    bulk('Inverted filtered', function () { ids.forEach(function (id) { if (selected.has(id)) selected.delete(id); else selected.add(id); }); });
+  });
+  $('selTop').addEventListener('click', function () {
+    var n = Math.max(1, Math.round(Number($('topN').value) || 0));
+    var ids = view.slice(0, n);
+    bulk('Selected top ' + ids.length.toLocaleString(), function () { selected = new Set(ids); });
+  });
+  $('clearSel').addEventListener('click', function () {
+    anchorId = null;
+    bulk('Cleared selection', function () { selected = new Set(); });
+  });
+
+  $('dlCsv').addEventListener('click', function (e) { downloadCsv(e.shiftKey); });
+  $('exportSel').addEventListener('click', openExport);
+  $('saveListSel').addEventListener('click', function (e) {
+    if (e.shiftKey || !currentList()) saveSelectionAsNew(); else updateCurrentList();
+  });
+  function bulkProfile(depth) {
+    var st = selectionStats();
+    var all = depth === 'deep' ? st.deep : st.light;
+    if (!all.length) return;
+    scopeToShown(all, depth === 'deep' ? 'Deep-profile' : 'Build light profiles for').then(function (ids) { if (ids && ids.length) bulkProfileIds(depth, ids); });
+  }
+  function bulkProfileIds(depth, ids) {
+    var per = depth === 'deep' ? EST.deepUsd : EST.lightUsd;
+    // the selection is also the export list, so it is kept after queueing
+    var go = function () { queueDossiers(ids, depth, false); };
+    if (ids.length > 10) {
+      confirmDlg((depth === 'deep' ? 'Deep-profile ' : 'Build light profiles for ') + ids.length + ' people?',
+        (depth === 'deep'
+          ? 'Each person gets a full goal-free web profile (career, investments, boards, sources).'
+          : 'Each person gets 1–2 quick web searches for career history, investments and boards.') +
+        ' Estimated cost ≈ ' + usd(ids.length * per) + ' (rough). Web search is rate-limited, so large batches run slowly and pause automatically — you can cancel queued people at any time.',
+        'Queue ' + ids.length).then(function (ok) { if (ok) go(); });
+    } else go();
+  }
+  $('lightSel').addEventListener('click', function () { bulkProfile('light'); });
+  $('deepSel').addEventListener('click', function () { bulkProfile('deep'); });
+  $('cancelQueued').addEventListener('click', function () {
+    var st = selectionStats();
+    if (!st.queuedSel.length) return cancel(null);
+    scopeToShown(st.queuedSel, 'Cancel the queued profiles for').then(function (ids) { if (ids && ids.length) cancel(ids); });
+  });
+  if (LIVE) {
+    var sv = $('snapNow');
+    sv.hidden = false;
+    sv.addEventListener('click', function () {
+      api('/api/snapshot', {}).then(function (res) {
+        lastSnapshot = (res && res.path) || '';
+        renderPaths(); toast('Snapshot saved' + (lastSnapshot ? ' to ' + lastSnapshot : ''), 'good');
+      }).catch(function (e) { toast('Snapshot failed: ' + e.message, 'bad'); });
+    });
+  }
+  $('listsDd').addEventListener('toggle', function () { if ($('listsDd').open) renderLists(); });
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target && e.target.tagName) || '';
+    var typing = /INPUT|SELECT|TEXTAREA/.test(tag);
+    if (e.key === '/' && !typing) { e.preventDefault(); $('q').focus(); }
+    else if (e.key === 'Escape' && e.target === $('q') && ui.q) { ui.q = ''; $('q').value = ''; onFilter(); }
+    else if ((e.key === 'j' || e.key === 'ArrowDown') && !typing && (e.target === document.body || e.target === document.documentElement)) {
+      var first = $('tbody').querySelector('tr.row');
+      if (first) { e.preventDefault(); first.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); }
+    }
+  });
+  // the rate-limit pause chip expires on its own
+  setInterval(function () { if (pausedUntil) renderStats(); }, 30000);
+
+  // ---------------------------------------------------------------- boot
+  syncControls();
+  renderFilterMenus();
+  renderColsMenu();
+  renderLists();
+  renderPresets();
+  renderNotice();
+  renderPaths();
+  renderLensBar();
+  refresh();
+  connect();
+
+  // expose for debugging in devtools / tests
+  window.__nb = { get state() { return state; }, get view() { return view; }, get ui() { return ui; }, esc: esc };
+})();
+</script>
+</body>
+</html>

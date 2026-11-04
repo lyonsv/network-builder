@@ -1,0 +1,19 @@
+node_modules
+dist
+coverage
+.cache
+*.log
+.DS_Store
+
+# local data — never commit anyone's network
+*.db
+*.db-*
+*.sqlite
+.network-builder/
+outputs/
+*.csv
+!examples/*.csv
+
+# local tooling
+.claude/
+scheduled_tasks.lock

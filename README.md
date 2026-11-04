@@ -7,14 +7,14 @@
 Find the **angel investors**, **buyers**, **hires** and **journalists** already in your network.<br>
 Describe who you're looking for and AI scores every connection. Then refine the list yourself and export it.
 
-[![npm](https://img.shields.io/npm/v/network-builder?color=6366f1&label=npm)](https://www.npmjs.com/package/network-builder)
+[![Release](https://img.shields.io/github/v/release/lyonsv/network-builder?color=6366f1)](https://github.com/lyonsv/network-builder/releases)
 [![CI](https://github.com/lyonsv/network-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/lyonsv/network-builder/actions/workflows/ci.yml)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2022.13-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runs locally](https://img.shields.io/badge/data-stays%20on%20your%20machine-0ea5e9)](#-privacy)
 
 ```bash
-npx network-builder
+npx github:lyonsv/network-builder
 ```
 
 <picture>
@@ -66,7 +66,7 @@ claude          # log in with your Claude account, then exit
 **3. Run it:**
 
 ```bash
-npx network-builder
+npx github:lyonsv/network-builder
 ```
 
 The first run walks you through setup:
@@ -90,9 +90,8 @@ The first run walks you through setup:
 └  Opening the explorer → http://127.0.0.1:47321/?t=…
 ```
 
-> Or run it straight from GitHub: `npx github:lyonsv/network-builder`.
->
-> **Needs Node.js 22.13+** (`node --version`). If you prefer a permanent install, run `npm install -g network-builder`
+> **Needs Node.js 22.13+** (`node --version`). The first `npx` run takes a minute while it downloads and builds. If you
+> prefer a permanent install, run `npm install -g github:lyonsv/network-builder`
 > and then `network-builder`.
 
 ## 📥 Getting your connections

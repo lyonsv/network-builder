@@ -2,7 +2,7 @@
 
 ## 0.1.0 — first public release
 
-- `npx network-builder`: guided first-run setup. It checks Claude Code, imports your LinkedIn connections CSV, profiles
+- `npx github:lyonsv/network-builder`: guided first-run setup. It checks Claude Code, imports your LinkedIn connections CSV, profiles
   every headline cheaply, offers a starter lens, then opens the local explorer.
 - Imports the [LinkedIn connections exporter](https://github.com/lyonsv/chrome-linkedin-connections-exporter) CSV,
   LinkedIn's official `Connections.csv`, or any CSV with name, title and URL columns. Repeat imports merge.

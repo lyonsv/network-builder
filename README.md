@@ -90,6 +90,8 @@ The first run walks you through setup:
 └  Opening the explorer → http://127.0.0.1:47321/?t=…
 ```
 
+> Or run it straight from GitHub: `npx github:lyonsv/network-builder`.
+>
 > **Needs Node.js 22.13+** (`node --version`). If you prefer a permanent install, run `npm install -g network-builder`
 > and then `network-builder`.
 

@@ -43,6 +43,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsup",
+    "prepare": "tsup",
     "start": "node dist/bin.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

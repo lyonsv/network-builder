@@ -17,8 +17,14 @@ if (!built) {
 }
 const dest = path.join('/Applications', NAME);
 
-// quit a running copy so it can be replaced
-try { execFileSync('osascript', ['-e', 'tell application "Network Builder" to quit']); } catch { /* not running */ }
+// quit a running copy (it stops its server gracefully) and wait for it to exit before replacing it
+const running = () => {
+  try { execFileSync('pgrep', ['-f', 'Network Builder.app/Contents/MacOS/Network Builder$']); return true; } catch { return false; }
+};
+if (running()) {
+  try { execFileSync('osascript', ['-e', 'tell application "Network Builder" to quit']); } catch { /* ignore */ }
+  for (let i = 0; i < 60 && running(); i++) execFileSync('sleep', ['0.5']);
+}
 rmSync(dest, { recursive: true, force: true });
 cpSync(built, dest, { recursive: true, verbatimSymlinks: true });
 // built locally, so no quarantine flag — but clear it in case the folder came from a download

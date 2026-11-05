@@ -295,6 +295,11 @@ function buildMenu(): void {
 
 // ---------------------------------------------------------------- lifecycle
 
+// Chromium keeps a cookie-encryption key in the macOS keychain ("Network Builder Safe Storage"). The app is ad-hoc
+// signed, so every rebuild has a new signature and macOS asks for keychain access again on launch. Nothing here needs
+// that key (the explorer authenticates with a per-session token, not cookies), so use Chromium's mock keychain.
+if (process.platform === 'darwin') app.commandLine.appendSwitch('use-mock-keychain');
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

@@ -110,7 +110,7 @@ Types live in `src/types.ts` (ReportMeta, ReportFile, ReportState, QueueState, C
   Search also covers role/company/industry/tags.
 - Selection is the working list for BOTH research and export. Persist the working selection in localStorage per stem.
 - Easy list-building controls:
-  - Selection bar actions: **Add all N filtered** · **Remove filtered** · **Invert within filtered** · **Clear**.
+  - Selection bar actions: **Select N filtered** · **Deselect filtered** (selection only, never a lens) · **Invert within filtered** · **Clear**; with a lens active, **✕ Remove N from lens** / **＋ Add N to lens** for the selected people (via `scopeToShown`), plus **Lenses ▾** for every lens.
   - View toggle: **All · Selected · Not selected** (works together with filters).
   - Row checkbox; shift-click range; keyboard: ↑/↓ (or j/k) move focus between rows, **x** or Space toggles selection, Enter expands.
   - In "Selected" view, each row shows a quick **✕ remove** button.

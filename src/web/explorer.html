@@ -575,8 +575,8 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
         <button type="button" data-show="sel" aria-pressed="false">Selected <b id="segSelN">0</b></button>
         <button type="button" data-show="unsel" aria-pressed="false">Not selected</button>
       </div>
-      <button class="btn sm primary" id="addFiltered" type="button" title="Add every row matching the current filters to the selection">＋ Add filtered</button>
-      <button class="btn sm" id="removeFiltered" type="button" title="Remove every row matching the current filters from the selection">− Remove filtered</button>
+      <button class="btn sm primary" id="addFiltered" type="button" title="Select every row matching the current filters (all pages)">＋ Select filtered</button>
+      <button class="btn sm" id="removeFiltered" type="button" title="Deselect every row matching the current filters (does not change any lens)">− Deselect filtered</button>
       <button class="btn sm ghost" id="invertFiltered" type="button" title="Flip selection for the rows matching the current filters">Invert</button>
       <span class="ctl">Top
         <input id="topN" type="number" min="1" step="1" value="20" aria-label="Number of top rows to select">
@@ -643,8 +643,10 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     <div class="dd-pop up" id="ahoySelPop"></div>
   </details>
   <span class="sep" id="lensSelSep"></span>
+  <button class="btn sm danger" id="lensSelRm" type="button" hidden></button>
+  <button class="btn sm" id="lensSelAdd" type="button" hidden></button>
   <details class="dd" id="lensSelDd">
-    <summary class="btn sm" id="lensSelBtn">＋ Add to lens ▾</summary>
+    <summary class="btn sm" id="lensSelBtn">Lenses ▾</summary>
     <div class="dd-pop up wide" id="lensSelPop"></div>
   </details>
   <span class="sep"></span>
@@ -1932,8 +1934,13 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
       toggleExpand(p.id);
     });
     tr.addEventListener('keydown', function (e) {
-      if (e.target !== tr || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // row shortcuts also work right after clicking the row's checkbox or a button in it (focus lands there, not on
+      // the row); Enter / Space keep their native meaning on those controls, and text fields never get shortcuts
+      var onRow = e.target === tr;
+      if (!onRow && !e.target.matches('input[type=checkbox], button')) return;
       var k = e.key;
+      if (!onRow && (k === 'Enter' || k === ' ')) return;
       if (k === 'Enter') { e.preventDefault(); toggleExpand(p.id); }
       else if (k === ' ' || k === 'x' || k === 'X') { e.preventDefault(); toggleSelect(p.id, !selected.has(p.id), e.shiftKey); }
       else if ((k === 'Delete' || k === 'Backspace') && selected.has(p.id)) { e.preventDefault(); toggleSelect(p.id, false, false); }
@@ -2236,10 +2243,10 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     var inSel = view.length - notSel;
     var add = $('addFiltered');
     add.disabled = notSel === 0;
-    add.textContent = notSel ? '＋ Add ' + notSel.toLocaleString() + ' filtered' : '＋ Add filtered';
+    add.textContent = notSel ? '＋ Select ' + notSel.toLocaleString() + ' filtered' : '＋ Select filtered';
     var rem = $('removeFiltered');
     rem.disabled = inSel === 0;
-    rem.textContent = inSel ? '− Remove ' + inSel.toLocaleString() + ' filtered' : '− Remove filtered';
+    rem.textContent = inSel ? '− Deselect ' + inSel.toLocaleString() + ' filtered' : '− Deselect filtered';
     $('invertFiltered').disabled = view.length === 0;
   }
 
@@ -2289,8 +2296,20 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     $('saveListSel').disabled = !LIVE;
     $('saveListSel').title = LIVE ? (cur ? 'Overwrite the saved list “' + cur.name + '” with this selection (shift-click: save as a new list)' : 'Save this selection as a named list') : 'Saving lists needs the live explorer';
     $('lensSelDd').hidden = $('lensSelSep').hidden = !lenses.length;
-    $('lensSelBtn').textContent = '＋ Add to lens ▾';
-    $('lensSelBtn').title = 'Add the selected people to a lens, or remove them from one';
+    $('lensSelBtn').textContent = ui.lens ? 'Other lenses ▾' : 'Add to lens ▾';
+    $('lensSelBtn').title = 'Add the selected people to any lens, or remove them from one';
+    // the active lens gets direct buttons, so removing selected people is one click
+    var curLens = ui.lens ? lensById(ui.lens) : null, sm = curLens ? lensSelSplit(curLens) : null;
+    var rmB = $('lensSelRm'), addB = $('lensSelAdd');
+    rmB.hidden = !sm || !sm.canRemove.length;
+    addB.hidden = !sm || !sm.canAdd.length;
+    if (sm) {
+      rmB.disabled = addB.disabled = !LIVE;
+      rmB.textContent = '✕ Remove ' + sm.canRemove.length.toLocaleString() + ' from lens';
+      rmB.title = 'Remove the selected people from “' + curLens.goal + '” — they move to Removed and stay out';
+      addB.textContent = '＋ Add ' + sm.canAdd.length.toLocaleString() + ' to lens';
+      addB.title = 'Add the selected people to “' + curLens.goal + '” — they stay in whatever their score';
+    }
     if ($('lensSelDd').open) renderLensMenu();
     if ($('ahoySelDd').open) renderAhoyMenu();
     $('viewSel').textContent = ui.show === 'sel' ? 'Show all' : 'Review';
@@ -3045,7 +3064,28 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     if (!l) return;
     openExport(people.filter(function (p) { return isMember(l, p); }).map(function (p) { return p.id; }), l.goal);
   });
-  /** "Add to lens ▾" in the selection bar: every lens, with Add / Remove for the selected people. */
+  /** Selected people split for one lens: who can be added (not members) / removed (not already pinned out). */
+  function lensSelSplit(l) {
+    var nIn = 0, canAdd = [], canRemove = [];
+    selected.forEach(function (id) {
+      var pp = byId.has(id) ? get(id) : null;
+      if (!pp) return;
+      if (isMember(l, pp)) nIn++; else canAdd.push(id);
+      if (pinOf(l, id) !== 'out') canRemove.push(id);
+    });
+    return { nIn: nIn, canAdd: canAdd, canRemove: canRemove };
+  }
+  $('lensSelRm').addEventListener('click', function () {
+    var l = lensById(ui.lens);
+    if (!l) return;
+    scopeToShown(lensSelSplit(l).canRemove, 'Remove').then(function (r) { if (r && r.length) setMembership(l.id, r, false); });
+  });
+  $('lensSelAdd').addEventListener('click', function () {
+    var l = lensById(ui.lens);
+    if (!l) return;
+    scopeToShown(lensSelSplit(l).canAdd, 'Add').then(function (r) { if (r && r.length) setMembership(l.id, r, true); });
+  });
+  /** "Lenses ▾" in the selection bar: every lens, with Add / Remove for the selected people. */
   function renderLensMenu() {
     var pop = $('lensSelPop');
     pop.textContent = '';
@@ -3053,13 +3093,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: ids.length.toLocaleString() + ' selected — add to or remove from a lens' })));
     var ordered = lenses.slice().sort(function (a, b) { return (b.id === ui.lens) - (a.id === ui.lens); });
     ordered.forEach(function (l) {
-      var nIn = 0, canAdd = [], canRemove = [];
-      ids.forEach(function (id) {
-        var pp = get(id);
-        if (!pp) return;
-        if (isMember(l, pp)) nIn++; else canAdd.push(id);
-        if (pinOf(l, id) !== 'out') canRemove.push(id);
-      });
+      var sp = lensSelSplit(l), nIn = sp.nIn, canAdd = sp.canAdd, canRemove = sp.canRemove;
       var close = function () { $('lensSelDd').open = false; };
       pop.appendChild(h('div', { class: 'lensmenu-row' + (l.id === ui.lens ? ' cur' : '') },
         h('span', { class: 'g', title: l.goal, text: l.goal }),
@@ -3086,11 +3120,11 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
 
   $('addFiltered').addEventListener('click', function () {
     var ids = view.slice();
-    bulk('Added ' + ids.length.toLocaleString() + ' filtered', function () { ids.forEach(function (id) { selected.add(id); }); });
+    bulk('Selected ' + ids.length.toLocaleString() + ' filtered', function () { ids.forEach(function (id) { selected.add(id); }); });
   });
   $('removeFiltered').addEventListener('click', function () {
     var ids = view.slice();
-    bulk('Removed filtered', function () { ids.forEach(function (id) { selected.delete(id); }); });
+    bulk('Deselected filtered', function () { ids.forEach(function (id) { selected.delete(id); }); });
   });
   $('invertFiltered').addEventListener('click', function () {
     var ids = view.slice();

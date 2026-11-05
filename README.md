@@ -165,8 +165,7 @@ you're done.
   - On each row, **✕** removes, **＋** adds and **↺** restores (keyboard: `r` / `a`).
   - Filter to a group, then **Remove these N** or **Add these N**.
   - People you remove stay out, even after a re-score.
-- **Add people to any lens.** Select them, then use **＋ Add to lens ▾**. It works whichever lens you're viewing, and it
-  asks before touching selected people your filters are hiding.
+- **Add people to any lens.** Select them, then use **＋ Add N to lens** / **✕ Remove N from lens** for the lens you're viewing, or **Lenses ▾** for any other. Both ask before touching selected people your filters are hiding.
 - **Research.** Select people, then click **Build light profiles** or **Deep profile**. The queue runs in the background,
   respects web-search rate limits, and resumes on its own.
 - **Export.** **⬇ Export lens**, or select people and click **Export CSV**. There are three formats:

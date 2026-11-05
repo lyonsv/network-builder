@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+- **Desktop app (macOS):** `desktop/` is an Electron shell (Network Builder.app) that runs the explorer server as a
+  utility process, shows the explorer in a native window, and picks up your login-shell PATH so Claude Code works from
+  the Dock.
+  - It handles first-run CSV import, has a File menu (import, open in browser, data/exports folders, server log), and
+    stops the server gracefully on quit.
+  - `scripts/install.mjs` copies it to /Applications and pins it to the Dock.
+- CLI: `--ready-file <path>` writes the explorer URL once it's up. `NB_FORCE_SERVE=1` serves without a TTY.
+
 ## 0.2.0
 
 - **MCP server** (`network-builder mcp`) so Claude Code and other MCP clients can use your network. It has 13 tools:

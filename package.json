@@ -1,6 +1,6 @@
 {
   "name": "network-builder",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Turn your LinkedIn connections into targeted lists: score your network for any goal (angel investors, buyers, hires) with Claude, research the people you pick, and export CRM-ready CSVs. Runs locally through Claude Code, with no API key needed.",
   "keywords": [
     "linkedin",

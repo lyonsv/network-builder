@@ -1,0 +1,40 @@
+appId: com.lyonsv.network-builder
+productName: Network Builder
+copyright: Copyright © 2026 Vincent Lyons
+directories:
+  output: release
+  buildResources: build
+# main.js is bundled by esbuild; the explorer server is a separate esbuild bundle shipped as a resource.
+files:
+  - dist/**
+  - package.json
+  - "!node_modules/**"
+npmRebuild: false
+extraResources:
+  - from: dist-server
+    to: server
+  # the CLI reads its version from ../package.json relative to server/bin.mjs
+  - from: ../package.json
+    to: package.json
+  - from: ../LICENSE
+    to: licenses/LICENSE.txt
+mac:
+  category: public.app-category.business
+  icon: build/icon.icns
+  target:
+    - target: dmg
+    - target: zip
+  # Unsigned local builds (signing needs a paid Apple account).
+  identity: null
+  hardenedRuntime: false
+  darkModeSupport: true
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
+  # Unsigned build: re-apply the ad-hoc signature so arm64 macOS will launch it.
+  resetAdHocDarwinSignature: true

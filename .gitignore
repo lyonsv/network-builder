@@ -21,3 +21,7 @@ scheduled_tasks.lock
 
 # private session hand-off notes (never commit)
 STATUS.md
+
+# desktop app build output
+desktop/dist-server/
+desktop/release/

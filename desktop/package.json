@@ -1,0 +1,24 @@
+{
+  "name": "network-builder-desktop",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Network Builder desktop app (macOS): the explorer in a native window, with its own local server.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build:main": "node scripts/build.mjs",
+    "build": "node scripts/build.mjs && electron-builder --mac --dir --config electron-builder.yml",
+    "package": "node scripts/build.mjs && electron-builder --mac --config electron-builder.yml",
+    "start": "node scripts/build.mjs && electron .",
+    "install-app": "node scripts/install.mjs",
+    "icon": "node scripts/icon.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.28.2",
+    "typescript": "~6.0.3"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#ec4899"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <radialGradient id="shine" cx="0.3" cy="0.2" r="0.9">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- macOS icon grid: 824×824 squircle-ish tile centred in 1024 -->
+  <g filter="url(#shadow)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#shine)"/>
+  </g>
+  <!-- a small network: you (centre) connected to people; one highlighted "in the lens" -->
+  <g stroke="#fff" stroke-width="26" stroke-linecap="round" stroke-opacity="0.85">
+    <line x1="512" y1="520" x2="318" y2="352"/>
+    <line x1="512" y1="520" x2="712" y2="330"/>
+    <line x1="512" y1="520" x2="300" y2="690"/>
+    <line x1="512" y1="520" x2="720" y2="700"/>
+    <line x1="318" y1="352" x2="712" y2="330" stroke-opacity="0.35"/>
+    <line x1="300" y1="690" x2="720" y2="700" stroke-opacity="0.35"/>
+  </g>
+  <g fill="#fff">
+    <circle cx="318" cy="352" r="58"/>
+    <circle cx="300" cy="690" r="52"/>
+    <circle cx="720" cy="700" r="56"/>
+    <circle cx="512" cy="520" r="92"/>
+  </g>
+  <!-- the target: a person picked out by a lens -->
+  <circle cx="712" cy="330" r="74" fill="#fde047"/>
+  <circle cx="712" cy="330" r="112" fill="none" stroke="#fde047" stroke-width="18" stroke-opacity="0.9"/>
+</svg>

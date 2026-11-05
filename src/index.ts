@@ -41,7 +41,8 @@ const explorerOptions = (cmd: Command) =>
     .option('--light-concurrency <n>', 'parallel light profiles (default 3)', positiveInt)
     .option('--rerank-top <n>', 'new lenses: re-check the top N with the research model (0 = off; default 150)', nonNegativeInt)
     .option('--no-open', "don't open the browser automatically (the URL is printed)")
-    .option('--port <n>', 'explorer port (default: a stable port for this database, else random)', positiveInt);
+    .option('--port <n>', 'explorer port (default: a stable port for this database, else random)', positiveInt)
+    .option('--ready-file <path>', 'write {url, pid, reused} JSON here once the explorer is up (used by the desktop app)');
 
 explorerOptions(
   program

@@ -52,9 +52,21 @@ export interface ExploreFlags {
   /** commander --no-open → false */
   open?: boolean;
   port?: number;
+  /**
+   * Write {url, pid, reused} JSON here once the explorer is reachable (also when another explorer already runs on this
+   * database). Used by the desktop app to find the page.
+   */
+  readyFile?: string;
   /** test hooks */
   dossierFn?: DossierFn;
   scoreFn?: ScoreFn;
+}
+
+async function writeReadyFile(file: string, info: { url: string; pid: number | null; reused: boolean }): Promise<void> {
+  const { writeFile, rename } = await import('node:fs/promises');
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, JSON.stringify(info), { mode: 0o600 });
+  await rename(tmp, file);
 }
 
 const tildify = (f: string): string => {
@@ -106,7 +118,8 @@ export async function runExplore(flags: ExploreFlags): Promise<number> {
   const dossierPath = resolvePath(flags.dossier, DEFAULT_DOSSIER_PATH);
   const researchModel = flags.researchModel ?? DEFAULTS.researchModel;
   let goal = flags.prompt?.replace(/\s+/g, ' ').trim() || undefined;
-  const serveMode = flags.serve !== false && isInteractive();
+  // NB_FORCE_SERVE=1: serve without a TTY (the desktop app runs the CLI as a child process)
+  const serveMode = flags.serve !== false && (isInteractive() || process.env.NB_FORCE_SERVE === '1');
 
   let inputPath = flags.input ? path.resolve(expandHome(flags.input)) : undefined;
 
@@ -305,6 +318,7 @@ export async function runExplore(flags: ExploreFlags): Promise<number> {
           (url ? `\nOpen it: ${pc.cyan(url)}${selectedLens ? pc.dim(`  (reload to see “${selectedLens.goal}”)`) : ''}` : ''),
       );
       if (url && flags.open !== false) openInBrowser(selectedLens ? `${url}&lens=${encodeURIComponent(selectedLens.id)}` : url);
+      if (url && flags.readyFile) await writeReadyFile(flags.readyFile, { url, pid: lock.pid ?? null, reused: true });
       p.outro('Using the running explorer.');
       return 0;
     }
@@ -336,6 +350,7 @@ export async function runExplore(flags: ExploreFlags): Promise<number> {
       return 1;
     }
     store.setMeta('explorer_url', server.url);
+    if (flags.readyFile) await writeReadyFile(flags.readyFile, { url: server.url, pid: process.pid, reused: false });
     const openUrl = selectedLens ? `${server.url}&lens=${encodeURIComponent(selectedLens.id)}` : server.url;
 
     const snap = await server.snapshot().catch(() => '');

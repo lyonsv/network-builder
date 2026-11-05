@@ -47,6 +47,7 @@ outrank a partner at a fund. Then you curate the list in a fast local web app an
   researched unless you ask.
 - ✂️ **Curate fast.** In lens / Candidates / Removed tabs, a score cut-off slider, one-click add and remove, keyboard
   shortcuts (`j` `k` `x` `r` `a`), bulk actions on whatever you've filtered, and undo everywhere.
+- 🖥️ **A Mac app for your Dock.** The explorer in a native window, with its own server. [Details →](#️-desktop-app-macos)
 - 🤖 **Use it from Claude Code (MCP).** Ask about your network ("who could intro me to Stripe?"), curate lenses and
   lists, and export, from any Claude Code session. [Setup →](docs/MCP.md)
 - 🔗 **Ahoy CRM, live.** See who's already in your CRM, pick the right record when several match, and send new people
@@ -176,6 +177,24 @@ you're done.
 
   **Save as list** keeps a named list for later.
 - **Reword a lens.** **✎ Edit** re-scores it with your new description and keeps your manual adds and removes.
+
+## 🖥️ Desktop app (macOS)
+
+Prefer an app in your Dock to a terminal? **Network Builder.app** runs the same explorer in a native window and
+starts and stops its own local server. It uses the same data folder and finds your Claude Code login automatically.
+
+- **Download:** grab the `.dmg` (Apple silicon) from the [latest release](https://github.com/lyonsv/network-builder/releases/latest).
+  The app is unsigned, so the first time you open it, right-click it and choose **Open** (or use **System Settings →
+  Privacy & Security → Open Anyway**).
+- **Or build it yourself:**
+  ```bash
+  cd desktop && pnpm install && pnpm build
+  node scripts/install.mjs --open     # copies it to /Applications, pins it to the Dock and opens it
+  ```
+
+On first launch with no data, it asks for your connections CSV and imports it. Use **File → Import Connections CSV…**
+to add more later. Links (LinkedIn, sources, Ahoy proposals) open in your browser. **File → Open in Browser** gives you
+the explorer in a tab too. Closing the window keeps it running; quit with ⌘Q.
 
 ## 🤖 Use your network from Claude Code (MCP)
 

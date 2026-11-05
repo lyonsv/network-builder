@@ -1,0 +1,5 @@
+# The desktop app is its own pnpm root (so installing the CLI never downloads Electron).
+allowBuilds:
+  electron: true
+  esbuild: true
+  electron-winstaller: false

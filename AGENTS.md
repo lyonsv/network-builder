@@ -22,6 +22,7 @@ child env). Data is one local SQLite file.
 | `src/io/` | `csv.ts` (any CSV; LinkedIn exports incl. "Notes:" preamble), `explorer-export.ts` (CRM / full / Ahoy files — mirrored in the page) |
 | `src/web/` | `explorer.html` (single-file vanilla UI, no deps), `explorer-server.ts` (node:http API + SSE), `http-common.ts` (security), `CONTRACT.md` (**the API/data-model spec — update it with every change**) |
 | `src/mcp/` | stdio MCP server (`network-builder mcp`): 13 `network_*` tools + 2 prompts; see `docs/MCP.md` |
+| `desktop/` | macOS Electron shell (own pnpm root + lockfile, so CLI installs never pull Electron): `src/main.ts`, `scripts/build.mjs` (main + fully-bundled server `dist-server/bin.mjs`), `scripts/icon.mjs`, `scripts/install.mjs` (→ /Applications + Dock), `electron-builder.yml` (unsigned, ad-hoc) |
 | `test/` | vitest; `test/fixtures/*.csv` are fictional |
 
 ## Commands
@@ -73,6 +74,17 @@ CI (`.github/workflows/ci.yml`) runs install --frozen-lockfile, typecheck, test,
   the user's live explorer or database. pty tests need a real window size (TIOCSWINSZ) or clack renders 1 column.
 - **Costs:** web search is rate-limited; light profiles ≈ $0.02 (8 parallel is fine, 16 trips limits), deep ≈ $0.17,
   lens ≈ $0.30/1,000 + $0.50/100 re-checked, Ahoy check ≈ $0.005/person. Two searches rarely identify junior people.
+
+## Desktop app
+
+- The server runs as an Electron **utilityProcess** (Electron 45's Node has `node:sqlite`) from `resources/server/bin.mjs`,
+  started with `--no-open --ready-file <tmp>` and `NB_FORCE_SERVE=1`; the window loads the URL from that file. If an
+  explorer already runs on the database, the CLI writes `{reused:true}` with its URL and exits.
+- Dock-launched apps get a minimal PATH: `main.ts` reads the login shell's PATH (`$SHELL -ilc`) so `claude` is found.
+- Smoke test without touching real data: `NETWORK_BUILDER_HOME=<copy> NB_DESKTOP_SMOKE=1 "release/mac-arm64/Network
+  Builder.app/Contents/MacOS/Network Builder"` prints `NB_SMOKE_OK <url>` and quits. Logs: `~/Library/Application
+  Support/Network Builder/logs/server.log`.
+- Rebuild after changing `src/` (the app bundles the CLI): `cd desktop && pnpm build && node scripts/install.mjs`.
 
 ## Privacy (the repo is public)
 

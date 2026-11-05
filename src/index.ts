@@ -142,6 +142,7 @@ dbOptions(
     .description('re-score a lens with the current scoring rules (everyone, or only stale people with --stale)')
     .argument('<id|goal>', 'lens id or goal')
     .option('--stale', 'only people whose info changed since they were scored')
+    .option('--goal <text>', 'reword the lens first (same id; pins and threshold kept; re-scores everyone)')
     .option('--rerank-top <n>', 'change how many top people the rerank model re-checks (saved on the lens)', (v: string) => Number.parseInt(v, 10))
     .option('-y, --yes', 'skip the cost confirmation'),
 ).action(async (idOrGoal: string, opts: LensRescoreFlags) => {

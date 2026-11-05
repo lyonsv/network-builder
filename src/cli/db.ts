@@ -259,17 +259,40 @@ export interface LensRescoreFlags extends DbFlags {
   stale?: boolean;
   /** new rerank band size, saved on the lens */
   rerankTop?: number;
+  /** reword the lens first (id, pins and threshold kept; everyone is re-scored) */
+  goal?: string;
   /** test hook */
   scoreFn?: typeof scoreLens;
 }
 
-/** `network-builder lens rescore <id|goal> [--stale] [-y]` — re-score a lens with the current rules. */
+/** `network-builder lens rescore <id|goal> [--goal <new goal>] [--stale] [-y]` — re-score a lens with the current rules. */
 export async function runLensRescore(idOrGoal: string, flags: LensRescoreFlags): Promise<number> {
   return withStore(flags, async (store) => {
     let lens = findLens(store, idOrGoal);
     if (!lens) {
       console.error(pc.red(`No lens "${idOrGoal}". See: network-builder lens list`));
       return 1;
+    }
+    // same rules as the explorer's "✎ Edit" (PUT /api/lenses/:id { goal, rescore: true })
+    const newGoal = flags.goal === undefined ? undefined : flags.goal.replace(/\s+/g, ' ').trim();
+    if (newGoal !== undefined) {
+      if (!newGoal) {
+        console.error(pc.red('--goal must not be empty'));
+        return 1;
+      }
+      if (newGoal.length > 300) {
+        console.error(pc.red(`--goal is too long (${newGoal.length} chars, max 300)`));
+        return 1;
+      }
+      if (flags.stale) {
+        console.error(pc.red('--goal re-scores everyone; drop --stale'));
+        return 1;
+      }
+      const clash = findLens(store, newGoal);
+      if (clash && clash.id !== lens.id) {
+        console.error(pc.red(`Another lens already has that goal (“${clash.goal}”, ${clash.id}).`));
+        return 1;
+      }
     }
     if (flags.rerankTop !== undefined) {
       if (!Number.isFinite(flags.rerankTop) || flags.rerankTop < 0) {
@@ -286,7 +309,7 @@ export async function runLensRescore(idOrGoal: string, flags: LensRescoreFlags):
       return 0;
     }
     const est = estimateLensUsd(ids.size, lens.rerankModel ? lens.rerankTop : 0);
-    const what = `${ids.size.toLocaleString()} people for “${lens.goal}”` +
+    const what = `${ids.size.toLocaleString()} people for “${newGoal ?? lens.goal}”` +
       (lens.rerankTop && lens.rerankModel ? ` (top ${lens.rerankTop} re-checked with ${lens.rerankModel})` : '');
     if (!flags.yes) {
       if (!process.stdin.isTTY) {
@@ -306,6 +329,12 @@ export async function runLensRescore(idOrGoal: string, flags: LensRescoreFlags):
     if (!store.acquireLensLock(lens.id)) {
       console.error(pc.red(`“${lens.goal}” is being scored by another network-builder process (e.g. the open explorer) — try again when it finishes.`));
       return 1;
+    }
+    if (newGoal !== undefined && newGoal !== lens.goal) {
+      const old = lens.goal;
+      store.setLensGoal(lens.id, newGoal);
+      lens = store.getLens(lens.id) ?? lens;
+      console.log(`${pc.green('✓')} Reworded “${old}” → “${lens.goal}” (pins and threshold kept).`);
     }
     const lockBeat = setInterval(() => store.touchLensLock(lens.id), 30_000);
     lockBeat.unref?.();

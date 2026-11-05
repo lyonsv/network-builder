@@ -328,7 +328,7 @@ export function startExplorerServer(opts: {
   row's score and on every lens in the detail panel; "Add N to lens" / "Remove N from lens" for the selection (with Undo).
 - `PUT /api/lenses/:id` also takes `{ goal, rescore?: true }`: rewords the lens in place (id, pins, threshold kept; all scores marked
   stale; `rescore` re-scores everyone; 409 while that lens or — with rescore — any lens is scoring, or if another lens has that goal).
-  Explorer: "✎ Edit" in the lens bar.
+  Explorer: "✎ Edit" in the lens bar. CLI: `lens rescore <id|goal> --goal "<new goal>"` (same checks; rewords once it holds the lens lock).
 
 ## v6.4 — lens workspace UX
 

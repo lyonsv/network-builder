@@ -280,7 +280,7 @@ field names.
 | `network-builder lists` | Show saved lists |
 | `network-builder export --list <name> [--preset crm\|full\|ahoy] [-o file.csv]` | Export a saved list to CSV (`ahoy` writes companies, contacts and notes files) |
 | `network-builder lens list` | Lenses with scored and stale counts |
-| `network-builder lens rescore <id\|goal> [--stale] [--rerank-top N] [-y]` | Re-score a lens |
+| `network-builder lens rescore <id\|goal> [--goal "<new goal>"] [--stale] [--rerank-top N] [-y]` | Re-score a lens (`--goal` rewords it first, keeping pins and threshold) |
 | `network-builder lens rm <id\|goal>` | Delete a lens and its scores |
 | `network-builder db` | Database stats and total spend |
 | `network-builder mcp [--db path] [-o dir]` | Run the MCP server over stdio for Claude Code and other MCP clients |

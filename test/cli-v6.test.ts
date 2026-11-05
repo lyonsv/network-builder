@@ -133,4 +133,29 @@ describe('lens rescore', () => {
     expect(store.listExplorerPeople().find((p) => p.id === 'aaa')!.scores[lensId]!.reason).toBe('rescored');
     store.close();
   });
+
+  it('--goal rewords the lens in place (same id, pins and threshold kept) and re-scores everyone', async () => {
+    const { dbPath, lensId } = seed();
+    let s = Store.open(dbPath);
+    s.setLensThreshold(lensId, 65);
+    s.setLensPins(lensId, ['bbb'], 'out');
+    s.close();
+    const goals: string[] = [];
+    const scoreFn = (async (o: any) => {
+      goals.push(o.lens.goal);
+      return [];
+    }) as any;
+    expect(await runLensRescore(lensId, { db: dbPath, scoreFn, yes: true, goal: '   ' })).toBe(1);
+    expect(await runLensRescore(lensId, { db: dbPath, scoreFn, yes: true, goal: 'x'.repeat(301) })).toBe(1);
+    expect(await runLensRescore(lensId, { db: dbPath, scoreFn, yes: true, stale: true, goal: 'buyers' })).toBe(1);
+    expect(goals).toEqual([]);
+    expect(await runLensRescore(lensId, { db: dbPath, scoreFn, yes: true, goal: '  content   buyers ' })).toBe(0);
+    expect(goals).toEqual(['content buyers']);
+    s = Store.open(dbPath);
+    const lens = s.getLens(lensId)!;
+    expect(lens.goal).toBe('content buyers');
+    expect(lens.threshold).toBe(65);
+    expect(lens.pinnedOut).toEqual(['bbb']);
+    s.close();
+  });
 });

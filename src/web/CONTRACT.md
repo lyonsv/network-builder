@@ -350,3 +350,21 @@ export function startExplorerServer(opts: {
   Headers are Ahoy schema labels; no "Summary" column (notes are a separate file). Domain is blank: reconcile against the
   live CRM (search_crm / get_crm_object) before importing. `/api/export` returns `{ path, paths, count }`.
 - Page `ahoyName / ahoyLocation / ahoyCompany / ahoyNote / ahoyFiles` mirror `src/io/explorer-export.ts`; parity tested.
+
+## v7 — Ahoy CRM integration (through the user's Ahoy MCP connector in Claude Code)
+
+- `claude -p` calls may now use MCP tools: `ClaudeCallOptions.mcpTools` → no `--strict-mcp-config`, `--disallowedTools`
+  for every built-in, `--allowedTools` = exactly those MCP tools (`mcp__claude_ai_Ahoy__*`; override the prefix with
+  `NB_AHOY_TOOL_PREFIX` for a `claude mcp add`-style server name).
+- Migration 5: `crm_matches(person_id PK, record_json, updated_at)`; `ExplorerPerson.crm?: CrmMatch`
+  (status in_crm|new|ambiguous|error, contact/company ids+names+domain, companyStatus in_crm|no_domain|new|none,
+  linkedToCompany, candidates, reason, checkedAt, resolvedByHand, sent{proposalId,url,at,title}).
+- `src/llm/ahoy.ts`: `checkAhoy` (read-only: search_crm / get_crm_object / get_associations; Haiku, 8 people per call,
+  4 parallel), `planAhoySend` (deterministic: new companies once, new contacts + ahoy_contact_to_company, a note +
+  ahoy_note_to_contact for everyone; ≤50 ops per proposal; skips unchecked/ambiguous/error/already sent),
+  `sendAhoyProposal` (create_proposal ONLY, never execute_crm_operations; verifies the op count; no retries).
+- API: `POST /api/ahoy/check {ids}`, `/api/ahoy/resolve {id, contactId|"new"}`, `/api/ahoy/plan {ids, lensId?}`,
+  `/api/ahoy/send {ids, lensId?}`; one Ahoy job at a time (409); queue state `ahoyJob {kind, done, total}`;
+  SSE `crm {updates:[{id, crm}], costs}`; cost stage `ahoy`.
+- UI: Ahoy column (✓ Ahoy / New / Pick / Failed + ⚠ no-domain / not-linked + ↗ proposal), More filters → Ahoy CRM,
+  selection bar "Ahoy ▾" (Check / Send…), detail-panel "Ahoy CRM" section with candidate picking and Re-check.

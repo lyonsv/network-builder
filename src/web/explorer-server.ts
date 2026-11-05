@@ -10,9 +10,11 @@ import { createCostTracker } from '../llm/costs';
 import { errorCost } from '../llm/claude';
 import { buildDossier, DOSSIER_ESTIMATES } from '../llm/dossier';
 import { LENS_RERANK_USD_PER_100, LENS_USD_PER_1000, scoreLens } from '../llm/lens';
+import { AHOY_CHECK_USD_PER_PERSON, AHOY_SEND_USD_PER_PROPOSAL, checkAhoy, planAhoySend, sendAhoyProposal } from '../llm/ahoy';
 import { withLedger } from '../db/store';
 import type {
   CostTracker,
+  CrmMatch,
   DossierDepth,
   DossierRecord,
   ExplorerCosts,
@@ -39,6 +41,8 @@ import { renderExplorerHtml } from './template';
 
 export type DossierFn = typeof buildDossier;
 export type ScoreFn = typeof scoreLens;
+export type AhoyCheckFn = typeof checkAhoy;
+export type AhoyProposalFn = typeof sendAhoyProposal;
 
 export interface ExplorerServerOptions {
   store: Store;
@@ -55,6 +59,9 @@ export interface ExplorerServerOptions {
   concurrency?: { light: number; deep: number };
   dossierFn?: DossierFn;
   scoreFn?: ScoreFn;
+  /** Ahoy hooks (tests) */
+  ahoyCheckFn?: AhoyCheckFn;
+  ahoyProposalFn?: AhoyProposalFn;
   /** model for light dossiers (default haiku) */
   lightModel?: string;
   /** first-pass lens model (default haiku) */
@@ -153,6 +160,8 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
 
   // ---- lens job (one at a time) ----
   let lensJob: JobQueueState['lensJob'] = null;
+  let ahoyJob: JobQueueState['ahoyJob'] = null;
+  let ahoyPromise: Promise<void> | null = null;
   let lensPromise: Promise<void> | null = null;
 
   const queueState = (): JobQueueState => ({
@@ -161,6 +170,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     pausedUntil: pausedUntil && pausedUntil > Date.now() ? new Date(pausedUntil).toISOString() : null,
     pausedManual,
     lensJob: lensJob ? { ...lensJob } : null,
+    ahoyJob: ahoyJob ? { ...ahoyJob } : null,
     seq,
   });
   const bump = () => {
@@ -197,6 +207,8 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       deepUsd: DOSSIER_ESTIMATES.deepUsd,
       lensUsdPer1000: LENS_USD_PER_1000,
       lensRerankUsdPer100: LENS_RERANK_USD_PER_100,
+      ahoyCheckUsdPerPerson: AHOY_CHECK_USD_PER_PERSON,
+      ahoySendUsdPerProposal: AHOY_SEND_USD_PER_PROPOSAL,
     },
     dbPath: opts.dbPath,
   });
@@ -543,6 +555,113 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     return { lens: lenses.find((l) => l.id === id), lenses, scoring };
   };
 
+  // ---- Ahoy CRM (v7): read-only check, manual resolve, send as proposals ----
+  const ahoyCheckFn = opts.ahoyCheckFn ?? checkAhoy;
+  const ahoyProposalFn = opts.ahoyProposalFn ?? sendAhoyProposal;
+  const applyCrm = (updates: { id: string; crm: CrmMatch | null }[]) => {
+    const known = updates.filter((u) => people.has(u.id));
+    if (!known.length) return;
+    store.setCrmMatches(known);
+    for (const u of known) {
+      const p = people.get(u.id)!;
+      if (u.crm) p.crm = u.crm;
+      else delete p.crm;
+    }
+    emit({ type: 'crm', updates: known, costs: costSnapshot() });
+  };
+  const ahoyBusy = () => {
+    if (ahoyPromise) throw new HttpError(409, 'an Ahoy check or send is already running — wait for it to finish');
+  };
+  const runAhoyJob = (kind: 'check' | 'send', total: number, work: () => Promise<void>) => {
+    ahoyJob = { kind, done: 0, total };
+    emitQueue();
+    ahoyPromise = (async () => {
+      try {
+        await work();
+      } catch (e) {
+        if (!(isAbortError(e) || controller.signal.aborted)) {
+          emit({ type: 'notice', level: 'error', message: `Ahoy ${kind} failed: ${(e as Error)?.message ?? e}` });
+        }
+      } finally {
+        ahoyJob = null;
+        ahoyPromise = null;
+        if (!controller.signal.aborted) emitQueue();
+      }
+    })();
+  };
+  const ahoyCheck = (body: Record<string, unknown>) => {
+    ahoyBusy();
+    const targets = parseIds(body.ids, true)!.map((id) => people.get(id)).filter((p): p is ExplorerPerson => Boolean(p));
+    if (!targets.length) throw new HttpError(400, 'no known people in `ids`');
+    runAhoyJob('check', targets.length, async () => {
+      await ahoyCheckFn({
+        people: targets,
+        costs,
+        signal: controller.signal,
+        onResults: (u) => applyCrm(u),
+        onProgress: (done, total) => {
+          ahoyJob = { kind: 'check', done, total };
+          emitQueue();
+        },
+      });
+      const r = targets.map((p) => people.get(p.id)?.crm?.status);
+      const n = (s: string) => r.filter((x) => x === s).length;
+      emit({ type: 'notice', level: n('error') ? 'warn' : 'info', message:
+        `Ahoy check done: ${n('in_crm')} already in Ahoy, ${n('new')} new, ${n('ambiguous')} to pick${n('error') ? `, ${n('error')} failed` : ''}.` });
+    });
+    return { checking: targets.length, queue: queueState() };
+  };
+  const ahoyResolve = (body: Record<string, unknown>) => {
+    const id = typeof body.id === 'string' ? body.id : '';
+    const p = people.get(id);
+    if (!p) throw new HttpError(404, 'no such person');
+    if (!p.crm) throw new HttpError(400, 'check this person against Ahoy first');
+    const choice = body.contactId;
+    const base = { ...p.crm, resolvedByHand: true, checkedAt: new Date().toISOString() };
+    let next: CrmMatch;
+    if (choice === null || choice === 'new') {
+      next = { ...base, status: 'new', reason: 'You marked this person as not in Ahoy.' };
+      delete next.contactId; delete next.contactName; delete next.contactEmail; delete next.linkedToCompany;
+    } else if (typeof choice === 'string') {
+      const cand = (p.crm.candidates ?? []).find((c) => c.id === choice);
+      if (!cand) throw new HttpError(400, '`contactId` must be one of the candidates (or "new")');
+      next = { ...base, status: 'in_crm', contactId: cand.id, contactName: cand.name, linkedToCompany: 'unknown', reason: `You picked ${cand.name} (${cand.detail}).` };
+    } else throw new HttpError(400, '`contactId` must be a candidate id or "new"');
+    delete next.candidates;
+    applyCrm([{ id, crm: next }]);
+    return { crm: next };
+  };
+  const ahoyPlan = (body: Record<string, unknown>) => {
+    const targets = parseIds(body.ids, true)!.map((id) => people.get(id)).filter((p): p is ExplorerPerson => Boolean(p));
+    const lensId = parseLensId(body.lensId);
+    const lens = lensId ? store.getLens(lensId) : undefined;
+    return { plan: planAhoySend(targets, lens), lens: lens ? { id: lens.id, goal: lens.goal } : null };
+  };
+  const ahoySend = (body: Record<string, unknown>) => {
+    ahoyBusy();
+    const { plan, lens } = ahoyPlan(body);
+    if (!plan.proposals.length) throw new HttpError(400, 'nothing to send — check these people against Ahoy first');
+    runAhoyJob('send', plan.proposals.length, async () => {
+      let done = 0;
+      const urls: string[] = [];
+      for (const pr of plan.proposals) {
+        if (controller.signal.aborted) return;
+        const res = await ahoyProposalFn(pr, { costs, signal: controller.signal });
+        const at = new Date().toISOString();
+        applyCrm(pr.personIds.filter((id) => people.get(id)?.crm).map((id) => ({
+          id,
+          crm: { ...people.get(id)!.crm!, sent: { at, proposalId: res.proposalId, url: res.url, title: pr.title } },
+        })));
+        if (res.url) urls.push(res.url);
+        ahoyJob = { kind: 'send', done: ++done, total: plan.proposals.length };
+        emitQueue();
+      }
+      emit({ type: 'notice', level: 'info', message:
+        `Sent ${plan.proposals.length} proposal${plan.proposals.length > 1 ? 's' : ''} to Ahoy${lens ? ` for “${lens.goal}”` : ''} — approve ${plan.proposals.length > 1 ? 'them' : 'it'} in Ahoy: ${urls.join(' ')}` });
+    });
+    return { proposals: plan.proposals.length, summary: plan.summary, skipped: plan.skipped.length, queue: queueState() };
+  };
+
   // ---- lists (global, in the store) ----
   const parseName = (v: unknown): string => {
     const name = typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '';
@@ -673,6 +792,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       'POST /api/lenses', 'POST /api/lenses/:id/refresh', 'PUT /api/lenses/:id', 'DELETE /api/lenses/:id',
       'GET /api/lists', 'PUT /api/lists/:id', 'DELETE /api/lists/:id',
       'POST /api/export', 'POST /api/snapshot',
+      'POST /api/ahoy/check', 'POST /api/ahoy/resolve', 'POST /api/ahoy/plan', 'POST /api/ahoy/send',
     ];
     if (!known.includes(route)) {
       if (known.some((k) => k.endsWith(` ${routePath}`))) throw new HttpError(405, 'method not allowed');
@@ -742,6 +862,20 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
         const body = await readJsonBody(req);
         return sendJson(res, 200, await exportCsv(body));
       }
+      case 'POST /api/ahoy/check': {
+        const body = await readJsonBody(req);
+        if (closing) throw new HttpError(503, 'server is shutting down');
+        return sendJson(res, 200, ahoyCheck(body));
+      }
+      case 'POST /api/ahoy/resolve':
+        return sendJson(res, 200, ahoyResolve(await readJsonBody(req)));
+      case 'POST /api/ahoy/plan':
+        return sendJson(res, 200, ahoyPlan(await readJsonBody(req)));
+      case 'POST /api/ahoy/send': {
+        const body = await readJsonBody(req);
+        if (closing) throw new HttpError(503, 'server is shutting down');
+        return sendJson(res, 200, ahoySend(body));
+      }
       case 'POST /api/snapshot':
         await readJsonBody(req);
         return sendJson(res, 200, { path: await snapshot() });
@@ -786,7 +920,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       cancelDossiers();
       if (pauseTimer) clearTimeout(pauseTimer);
       controller.abort();
-      await Promise.allSettled([...inflight, ...(lensPromise ? [lensPromise] : [])]);
+      await Promise.allSettled([...inflight, ...(lensPromise ? [lensPromise] : []), ...(ahoyPromise ? [ahoyPromise] : [])]);
       let snap = '';
       try {
         snap = await snapshot();

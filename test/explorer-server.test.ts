@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Store } from '../src/db/store';
 import { inputHash } from '../src/db/hash';
 import { stablePortFor } from '../src/web/http-common';
-import { startExplorerServer, type DossierFn, type ExplorerServer, type ScoreFn } from '../src/web/explorer-server';
+import { startExplorerServer, type AhoyCheckFn, type AhoyProposalFn, type DossierFn, type ExplorerServer, type ScoreFn } from '../src/web/explorer-server';
 import type { DossierRecord, ExplorerEvent, LensScore, Person } from '../src/types';
 
 const TEMPLATE = '<!doctype html><title>__NB_TITLE__</title><script id="nb-data" type="application/json">__NB_DATA__</script>';
@@ -76,7 +76,7 @@ afterEach(async () => {
   dir = '';
 });
 
-async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; backoffMs?: number[]; concurrency?: { light: number; deep: number }; heartbeatMs?: number } = {}) {
+async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; ahoyCheckFn?: AhoyCheckFn; ahoyProposalFn?: AhoyProposalFn; backoffMs?: number[]; concurrency?: { light: number; deep: number }; heartbeatMs?: number } = {}) {
   dir = mkdtempSync(path.join(os.tmpdir(), 'nb-explorer-'));
   store = Store.open(path.join(dir, 'network.db'));
   store.upsertPeople(
@@ -93,6 +93,8 @@ async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; backoffMs?: 
     htmlTemplate: TEMPLATE,
     dossierFn: o.dossierFn ?? (async (p, { depth }) => okDossier(p.id, depth)),
     scoreFn: o.scoreFn,
+    ahoyCheckFn: o.ahoyCheckFn,
+    ahoyProposalFn: o.ahoyProposalFn,
     backoffMs: o.backoffMs,
     concurrency: o.concurrency,
     heartbeatMs: o.heartbeatMs,
@@ -447,5 +449,75 @@ describe('external writes', () => {
     other.close();
     const st = (await req('GET', `${base}/api/state`, { token })).json;
     expect(st.people.some((x: any) => x.id === 'eee')).toBe(true);
+  });
+});
+
+describe('Ahoy CRM endpoints', () => {
+  const at = new Date().toISOString();
+  const checkStub: AhoyCheckFn = async ({ people, onResults, onProgress }) => {
+    const out = people.map((p) => ({
+      id: p.id,
+      crm:
+        p.id === 'aaa'
+          ? { status: 'in_crm' as const, contactId: 'c-aaa', contactName: p.fullName, companyId: 'co-1', companyName: 'Fund', companyStatus: 'no_domain' as const, linkedToCompany: 'yes' as const, reason: 'linkedin match', checkedAt: at }
+          : p.id === 'bbb'
+            ? { status: 'ambiguous' as const, companyStatus: 'new' as const, companyName: 'Recruit Co', candidates: [{ id: 'k1', name: 'Bob Builder', detail: 'Recruiter' }, { id: 'k2', name: 'Bob Builder', detail: 'Plumber' }], reason: 'two Bobs', checkedAt: at }
+            : { status: 'new' as const, companyStatus: 'new' as const, companyName: 'Board Co', reason: 'no match', checkedAt: at },
+    }));
+    onResults?.(out);
+    onProgress?.(people.length, people.length);
+    return out;
+  };
+  const sent: unknown[] = [];
+  const proposalStub: AhoyProposalFn = async (plan) => {
+    sent.push(plan);
+    return { proposalId: String(sent.length), url: `https://app.ahoy.ai/proposals/${sent.length}` };
+  };
+
+  it('checks (read-only), persists, lets you resolve ambiguity, plans and sends proposals, and marks people sent', async () => {
+    const { base, token, events } = await setup({ ahoyCheckFn: checkStub, ahoyProposalFn: proposalStub });
+    const ids = ['aaa', 'bbb', 'ccc'];
+    const r = await req('POST', `${base}/api/ahoy/check`, { token, body: { ids } });
+    expect(r.status).toBe(200);
+    await until(() => events.some((e) => e.type === 'crm'));
+    await until(() => !store!.listExplorerPeople().every((p) => !p.crm) && events.some((e) => e.type === 'notice'));
+    const crm = store!.crmMatches();
+    expect(crm.get('aaa')).toMatchObject({ status: 'in_crm', companyStatus: 'no_domain' });
+    expect(crm.get('bbb')?.status).toBe('ambiguous');
+
+    // ambiguous people are skipped until resolved
+    let plan = (await req('POST', `${base}/api/ahoy/plan`, { token, body: { ids } })).json.plan;
+    expect(plan.skipped.map((s: { id: string }) => s.id)).toEqual(['bbb']);
+    expect((await req('POST', `${base}/api/ahoy/resolve`, { token, body: { id: 'bbb', contactId: 'nope' } })).status).toBe(400);
+    const res = await req('POST', `${base}/api/ahoy/resolve`, { token, body: { id: 'bbb', contactId: 'k1' } });
+    expect(res.json.crm).toMatchObject({ status: 'in_crm', contactId: 'k1', resolvedByHand: true });
+    plan = (await req('POST', `${base}/api/ahoy/plan`, { token, body: { ids } })).json.plan;
+    expect(plan.skipped).toEqual([]);
+    expect(plan.summary).toMatchObject({ newContacts: 1, existingContacts: 2 });
+
+    const send = await req('POST', `${base}/api/ahoy/send`, { token, body: { ids } });
+    expect(send.json.proposals).toBe(1);
+    await until(() => [...store!.crmMatches().values()].every((m) => m.sent));
+    expect(store!.crmMatches().get('ccc')?.sent).toMatchObject({ proposalId: '1', url: 'https://app.ahoy.ai/proposals/1' });
+    // already-sent people are not sent twice
+    await until(() => !store!.listExplorerPeople().some(() => false));
+    const again = await req('POST', `${base}/api/ahoy/send`, { token, body: { ids } });
+    expect(again.status).toBe(400);
+    expect(sent).toHaveLength(1);
+    // state carries crm for the UI
+    const st = (await req('GET', `${base}/api/state`, { token })).json;
+    expect(st.people.find((p: { id: string }) => p.id === 'aaa').crm.status).toBe('in_crm');
+    expect(st.estimates.ahoyCheckUsdPerPerson).toBeGreaterThan(0);
+  });
+
+  it('one Ahoy job at a time; bad input is rejected', async () => {
+    let release!: () => void;
+    const slow: AhoyCheckFn = (o) => new Promise((r) => { release = () => r(checkStub(o)); });
+    const { base, token } = await setup({ ahoyCheckFn: slow, ahoyProposalFn: proposalStub });
+    expect((await req('POST', `${base}/api/ahoy/check`, { token, body: { ids: ['aaa'] } })).status).toBe(200);
+    expect((await req('POST', `${base}/api/ahoy/check`, { token, body: { ids: ['bbb'] } })).status).toBe(409);
+    release();
+    expect((await req('POST', `${base}/api/ahoy/check`, { token, body: { ids: ['zzz'] } })).status).toBe(400);
+    expect((await req('POST', `${base}/api/ahoy/resolve`, { token, body: { id: 'ccc', contactId: 'new' } })).status).toBe(400);
   });
 });

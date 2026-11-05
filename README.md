@@ -47,6 +47,10 @@ outrank a partner at a fund. Then you curate the list in a fast local web app an
   researched unless you ask.
 - ✂️ **Curate fast.** In lens / Candidates / Removed tabs, a score cut-off slider, one-click add and remove, keyboard
   shortcuts (`j` `k` `x` `r` `a`), bulk actions on whatever you've filtered, and undo everywhere.
+- 🤖 **Use it from Claude Code (MCP).** Ask about your network ("who could intro me to Stripe?"), curate lenses and
+  lists, and export, from any Claude Code session. [Setup →](docs/MCP.md)
+- 🔗 **Ahoy CRM, live.** See who's already in your CRM, pick the right record when several match, and send new people
+  plus research notes to Ahoy as proposals you approve.
 - 📤 **Export to your CRM.** HubSpot/Salesforce-friendly CSVs, an **Ahoy** import bundle (companies, contacts and
   notes), or every field. Save named lists to revisit later.
 - 🔐 **Local-first.** One SQLite file on your machine. The web app runs on `127.0.0.1` with a per-session token.
@@ -173,6 +177,60 @@ you're done.
   **Save as list** keeps a named list for later.
 - **Reword a lens.** **✎ Edit** re-scores it with your new description and keeps your manual adds and removes.
 
+## 🤖 Use your network from Claude Code (MCP)
+
+network-builder includes an [MCP](https://modelcontextprotocol.io) server, so Claude Code (or any MCP client) can
+search and work with your network directly:
+
+```bash
+npm install -g github:lyonsv/network-builder
+claude mcp add -s user network-builder -- network-builder mcp
+```
+
+Then ask Claude Code things like:
+- *"Who in my network could introduce me to someone at Stripe?"*
+- *"List my angel-investor lens members in London that have deep profiles."*
+- *"Save the top 20 as 'Q4 outreach' and export it for Ahoy."*
+
+It has 13 tools:
+- search, people, past and current companies, lenses, lists and stats;
+- adding and removing people from lenses, the score cut-off, saving lists and exporting;
+- two prompts (`warm_intro`, `lens_shortlist`).
+
+It reads your local database live, so it works alongside the explorer. Anything that costs AI money (web profiles,
+scoring a lens, Ahoy calls) stays in the explorer, where you start it yourself. Full reference:
+**[docs/MCP.md](docs/MCP.md)**.
+
+## 🔗 Ahoy CRM integration
+
+If [Ahoy](https://ahoy.ai) is connected to your Claude Code, as a claude.ai connector or via `claude mcp add`, the
+explorer can work with your live CRM. It uses the same Claude login, so there are no extra keys. Check that Ahoy shows
+as connected:
+
+```bash
+claude mcp list        # look for "Ahoy … ✔ Connected"
+```
+
+1. **Check against Ahoy (read-only).** Select people (a whole lens works), then choose **Ahoy ▾ → Check in Ahoy**.
+   - Each person is matched to an Ahoy contact by LinkedIn URL, email, then name plus company.
+   - Each company is matched by name variants, and its domain is fetched.
+   - The **Ahoy** column shows **✓ Ahoy**, **New**, **Pick** (several possible matches) or **Failed**.
+   - ⚠ flags companies that are in Ahoy with no domain (Ahoy's CSV import would duplicate them) and contacts linked to
+     a different company.
+   - Filter by any of these under **More filters → Ahoy CRM**. Cost is about $0.005 per person.
+2. **Pick the right record.** Open a row marked **Pick**. The Ahoy CRM panel lists the candidates: choose **This is
+   them**, or **None of these — new contact**.
+3. **Send to Ahoy as a proposal.** Choose **Ahoy ▾ → Send to Ahoy**. network-builder builds the changes itself:
+   - new companies (once each);
+   - new contacts, linked to their company;
+   - a note on every contact with the fit score and research.
+
+   People already in Ahoy only get a note. Nothing changes in your CRM until you **approve the proposal in the Ahoy
+   app**. Each proposal holds at most 50 changes. Sent people show a link to their proposal and are never sent twice.
+
+Prefer files? **Export CSV → Ahoy CRM import** downloads a zip of Companies, Contacts and Notes CSVs using Ahoy's
+field names.
+
 ## 🔐 Privacy
 
 - **Your data stays on your computer**, in `~/.network-builder/`:
@@ -180,8 +238,11 @@ you're done.
   - `outputs/` (exports)
   - `dossier.md` (what web profiles capture, which you can edit)
 - To keep data somewhere else, set `NETWORK_BUILDER_HOME`.
-- **What leaves your machine:** only the AI calls Claude Code makes on your behalf. Headlines go to Claude for scoring,
-  and names, titles and companies go into web searches for the profiles **you** start.
+- **What leaves your machine:** only the AI calls Claude Code makes on your behalf.
+  - Headlines go to Claude for scoring.
+  - Names, titles and companies go into web searches for the profiles **you** start.
+  - If you use the Ahoy integration, the people you select are looked up in (and, as approved proposals, written to)
+    your own Ahoy CRM.
 - The local server listens on `127.0.0.1` only, checks Host and Origin, and needs a per-session token. Other websites
   can't trigger paid work.
 - Your connections are personal data. Use exports responsibly and in line with LinkedIn's terms and your local privacy
@@ -203,6 +264,7 @@ you're done.
 | `network-builder lens rescore <id\|goal> [--stale] [--rerank-top N] [-y]` | Re-score a lens |
 | `network-builder lens rm <id\|goal>` | Delete a lens and its scores |
 | `network-builder db` | Database stats and total spend |
+| `network-builder mcp [--db path] [-o dir]` | Run the MCP server over stdio for Claude Code and other MCP clients |
 
 </details>
 

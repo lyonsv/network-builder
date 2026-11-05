@@ -1,7 +1,7 @@
 import type { CostStage, CostTracker } from '../types';
 
 export function createCostTracker(): CostTracker {
-  const totals: Record<CostStage, number> = { enrich: 0, rank: 0, research: 0, dossier: 0, lens: 0 };
+  const totals: Record<CostStage, number> = { enrich: 0, rank: 0, research: 0, dossier: 0, lens: 0, ahoy: 0 };
   let incomplete = false;
   return {
     add(stage, usd) {

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0
+
+- **MCP server** (`network-builder mcp`) so Claude Code and other MCP clients can use your network. It has 13 tools:
+  search, people, connections at a company, lenses, lens membership and cut-off, lists, stats and export, plus two
+  prompts. It reads the database live and exposes no paid actions. See [docs/MCP.md](docs/MCP.md).
+- **Ahoy CRM integration** through your Ahoy connector in Claude Code:
+  - a read-only check of who's already in Ahoy, with company domains and association checks;
+  - picking the right record when several match;
+  - sending new people, companies and research notes as proposals you approve in Ahoy.
+
+  The explorer gains an Ahoy column, filter, menu and panel.
+
 ## 0.1.0 — first public release
 
 - `npx github:lyonsv/network-builder`: guided first-run setup. It checks Claude Code, imports your LinkedIn connections CSV, profiles

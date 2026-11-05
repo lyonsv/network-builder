@@ -371,6 +371,19 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 .lensbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 0 12px; }
 .lensbar .lbl { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .lensbar select { max-width: 360px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--panel); font-size: 13px; }
+.crm { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
+td.crmcell { white-space: nowrap; }
+.crm.in { background: var(--good-soft); color: var(--good); }
+.crm.new { background: var(--info-soft); color: var(--info); }
+.crm.amb { background: var(--warn-soft); color: var(--warn); }
+.crm.err { background: var(--bad-soft); color: var(--bad); }
+.crm.sent { background: var(--accent-soft); color: var(--accent); margin-left: 4px; }
+.crm.flag { background: var(--warn-soft); color: var(--warn); margin-left: 4px; font-weight: 600; }
+.crmbox .cands { display: grid; gap: 6px; margin: 8px 0; }
+.crmbox .cand { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; }
+.crmbox .cand .who { flex: 1; min-width: 0; }
+.crmbox .cand .who small { display: block; color: var(--muted); }
+.crmbox .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .starters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; width: 100%; font-size: 12.5px; color: var(--muted); }
 .lensws { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; margin: -4px 0 12px; border: 1px solid var(--accent-soft); background: color-mix(in srgb, var(--accent-soft) 45%, var(--panel)); border-radius: 10px; }
 .lensws[hidden] { display: none; }
@@ -529,6 +542,18 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
               <option value="low">Low</option>
             </select>
           </label>
+          <label class="ctl">Ahoy CRM
+            <select id="crmf">
+              <option value="any">Any</option>
+              <option value="unchecked">Not checked</option>
+              <option value="in_crm">Already in Ahoy</option>
+              <option value="new">New to Ahoy</option>
+              <option value="ambiguous">Needs a pick</option>
+              <option value="error">Check failed</option>
+              <option value="sent">Sent (proposal)</option>
+              <option value="unsent">Not sent yet</option>
+            </select>
+          </label>
           <label class="ctl">Identity
             <select id="idc">
               <option value="any">Any</option>
@@ -613,6 +638,10 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   <button class="btn sm" id="lightSel" type="button">Build light profiles</button>
   <button class="btn sm" id="deepSel" type="button">Deep profile</button>
   <button class="btn sm" id="cancelQueued" type="button">Cancel queued</button>
+  <details class="dd" id="ahoySelDd">
+    <summary class="btn sm" id="ahoySelBtn">Ahoy ▾</summary>
+    <div class="dd-pop up" id="ahoySelPop"></div>
+  </details>
   <span class="sep" id="lensSelSep"></span>
   <details class="dd" id="lensSelDd">
     <summary class="btn sm" id="lensSelBtn">＋ Add to lens ▾</summary>
@@ -774,7 +803,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   var byId = new Map();
   // Queue state comes ONLY from server snapshots (SSE events, POST responses, /api/state), ordered by seq.
   var qmap = new Map(), rmap = new Map();
-  var pausedUntil = null, pausedManual = false, lensJob = null;
+  var pausedUntil = null, pausedManual = false, lensJob = null, ahoyJob = null;
   var lastSeq = -1;
   var costs = state.costs;
   var connected = LIVE ? 'connecting' : 'static';
@@ -785,6 +814,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     pausedUntil = q.pausedUntil || null;
     pausedManual = !!q.pausedManual;
     lensJob = q.lensJob || null;
+    ahoyJob = q.ahoyJob || null;
     lastSeq = typeof q.seq === 'number' ? q.seq : lastSeq;
   }
   setQueueMaps(state.queue);
@@ -799,7 +829,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   var STORE_ID = state.dbPath || 'default';
   var PREF_KEY = 'nbx-prefs:' + STORE_ID;
   var DEFAULT_UI = {
-    q: '', searchReasons: false, minScore: 0, dossier: 'any', conf: 'any', idc: 'any', from: '', to: '',
+    q: '', searchReasons: false, minScore: 0, dossier: 'any', conf: 'any', idc: 'any', crmf: 'any', from: '', to: '',
     co: '', past: '', talk: '', loc: '', ind: '', sen: [], fn: [], tags: [], lens: '',
     sortKey: 'name', sortDir: 1, pageSize: 100, show: 'all', hidden: [], listId: '', lensView: 'in'
   };
@@ -1060,6 +1090,10 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     if (ui.dossier === 'active' && !job) return false;
     var d = dos(p);
     if (ui.conf !== 'any' && (!d || d.confidence !== ui.conf)) return false;
+    if (ui.crmf && ui.crmf !== 'any') {
+      var cm = p.crm;
+      if (ui.crmf === 'unchecked' ? cm : ui.crmf === 'sent' ? !(cm && cm.sent) : ui.crmf === 'unsent' ? !(cm && !cm.sent) : !(cm && cm.status === ui.crmf)) return false;
+    }
     if (ui.idc === 'yes' && (!d || !d.identityConfirmed)) return false;
     if (ui.idc === 'no' && (!d || d.identityConfirmed)) return false;
     if (ui.from || ui.to) {
@@ -1090,6 +1124,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
       case 'connected': return isoDate(p.connectedOn) || undefined;
       case 'reason': { var s2 = scoreOf(p, ui.lens); return s2 && s2.reason ? String(s2.reason).toLowerCase() : undefined; }
       case 'profile': return PROFILE_ORDER[profileState(p)];
+      case 'crm': return p.crm ? ({ ambiguous: 0, error: 1, 'new': 2, in_crm: 3 })[p.crm.status] + (p.crm.sent ? 0.5 : 0) : undefined;
       default: return undefined;
     }
   }
@@ -1146,6 +1181,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     { id: 'connected', key: 'connected', label: 'Connected', hideable: true },
     { id: 'reason', key: 'reason', label: 'Why (lens)', hideable: true, lensOnly: true },
     { id: 'profile', key: 'profile', label: 'Web profile', hideable: true },
+    { id: 'crm', key: 'crm', label: 'Ahoy', hideable: true, title: 'Status in your Ahoy CRM (select people → Ahoy ▾ → Check)' },
     { id: 'act', label: '', cls: 'act' }
   ];
   function visibleCols() {
@@ -1235,6 +1271,10 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     append(box, chip('people', total.toLocaleString()));
     if (withProfile < total) append(box, chip('profiled', withProfile.toLocaleString() + '/' + total.toLocaleString(), null, 'People with a parsed headline profile (company, seniority, function, tags)'));
     append(box, chip('web profiles', (light + deep).toLocaleString(), null, light.toLocaleString() + ' light · ' + deep.toLocaleString() + ' deep'));
+    if (ahoyJob) {
+      append(box, h('span', { class: 'chip', title: 'Ahoy CRM job (through your Ahoy connector in Claude Code)' }, h('span', { class: 'spin', 'aria-hidden': 'true' }),
+        ' Ahoy ' + (ahoyJob.kind === 'send' ? 'send ' : 'check ') + (Number(ahoyJob.done) || 0).toLocaleString() + '/' + (Number(ahoyJob.total) || 0).toLocaleString()));
+    }
     if (rmap.size || qmap.size || pausedActive() || pausedManual) {
       var txt = (rmap.size ? rmap.size + ' running' : '') + (rmap.size && qmap.size ? ' · ' : '') + (qmap.size ? qmap.size + ' queued' : '');
       if (pausedManual) {
@@ -1247,7 +1287,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
       } else append(box, h('span', { class: 'chip', text: txt }));
     }
     append(box, h('span', { class: 'chip', title: 'Total spend recorded in the database · profiles ' + usd(costs.enrich) + ' · web profiles ' + usd(costs.dossier) +
-      ' · lenses (incl. earlier ranking) ' + usd(costs.lens) + ' · legacy research ' + usd(costs.research) + (costs.incomplete ? ' (lower bound: some calls were cut off)' : '') },
+      ' · lenses (incl. earlier ranking) ' + usd(costs.lens) + ' · legacy research ' + usd(costs.research) + (costs.ahoy ? ' · Ahoy ' + usd(costs.ahoy) : '') + (costs.incomplete ? ' (lower bound: some calls were cut off)' : '') },
       h('b', { text: (costs.incomplete ? '≥ ' : '') + usd(costs.total) }), ' spent'));
     if (LIVE) {
       var label = connected === 'live' ? 'live' : connected === 'connecting' ? 'connecting…' : 'reconnecting…';
@@ -1625,6 +1665,8 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     if (ui.dossier !== 'any') add(DOS[ui.dossier] || ui.dossier, function () { ui.dossier = 'any'; });
     if (ui.conf !== 'any') add('Confidence: ' + ui.conf, function () { ui.conf = 'any'; });
     if (ui.idc !== 'any') add(ui.idc === 'yes' ? 'Identity confirmed' : 'Identity unconfirmed', function () { ui.idc = 'any'; });
+    var CRMF = { unchecked: 'Not checked in Ahoy', in_crm: 'Already in Ahoy', 'new': 'New to Ahoy', ambiguous: 'Ahoy: needs a pick', error: 'Ahoy check failed', sent: 'Sent to Ahoy', unsent: 'Not sent to Ahoy' };
+    if (ui.crmf && ui.crmf !== 'any') add(CRMF[ui.crmf] || ui.crmf, function () { ui.crmf = 'any'; });
     if (ui.from || ui.to) add('Connected ' + (ui.from || '…') + ' – ' + (ui.to || '…'), function () { ui.from = ''; ui.to = ''; });
     if (ui.show === 'sel') add('Selected only', function () { ui.show = 'all'; });
     if (ui.show === 'unsel') add('Not selected only', function () { ui.show = 'all'; });
@@ -1653,6 +1695,125 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     if (view.length && inSel < view.length) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: 'Select these ' + view.length.toLocaleString(),
       on: { click: function () { $('addFiltered').click(); } } }));
     if (inSel) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: 'Deselect these', on: { click: function () { $('removeFiltered').click(); } } }));
+  }
+
+  // ---------------------------------------------------------------- Ahoy CRM
+  function crmChip(p) {
+    var c = p.crm;
+    if (!c) return h('span', { class: 's-none', text: '–', title: 'Not checked against Ahoy yet' });
+    var S = { in_crm: ['in', '✓ Ahoy'], 'new': ['new', 'New'], ambiguous: ['amb', 'Pick'], error: ['err', 'Failed'] }[c.status] || ['err', c.status];
+    var tip = c.reason || '';
+    if (c.companyName) tip += '\nCompany: ' + c.companyName + (c.companyStatus === 'no_domain' ? ' (in Ahoy, no domain)' : c.companyStatus === 'in_crm' ? ' (' + (c.companyDomain || 'in Ahoy') + ')' : c.companyStatus === 'new' ? ' (new to Ahoy)' : '');
+    return h('span', null, h('span', { class: 'crm ' + S[0], text: S[1], title: tip }),
+      c.status === 'in_crm' && c.linkedToCompany === 'no' ? h('span', { class: 'crm flag', text: '⚠', title: 'In Ahoy, but not linked to ' + (c.companyName || 'this company') }) : null,
+      c.companyStatus === 'no_domain' ? h('span', { class: 'crm flag', text: '⚠', title: (c.companyName || 'The company') + ' is in Ahoy without a domain — CSV imports match companies by domain and would create a duplicate (proposals link by id, so they are fine)' }) : null,
+      c.sent ? h('a', { class: 'crm sent', href: c.sent.url, target: '_blank', rel: 'noopener noreferrer', text: '↗', title: 'Sent to Ahoy as proposal ' + c.sent.proposalId + ' (' + fmtDate(c.sent.at) + ') — open to approve', on: { click: function (e) { e.stopPropagation(); } } }) : null);
+  }
+  function crmSection(p) {
+    var c = p.crm;
+    var box = h('div', { class: 'crmbox' });
+    if (!c) {
+      append(box, h('p', { class: 'empty-detail', text: 'Not checked against your Ahoy CRM yet.' }));
+      if (LIVE) append(box, h('div', { class: 'row' }, h('button', { class: 'btn sm', type: 'button', text: 'Check in Ahoy', on: { click: function () { ahoyCheck([p.id]); } } })));
+      return box;
+    }
+    append(box, h('p', null, crmChip(p), ' ', c.reason || ''));
+    var facts = [];
+    if (c.contactName) facts.push('Contact: ' + c.contactName + (c.contactEmail ? ' · ' + c.contactEmail : ''));
+    if (c.companyName) facts.push('Company: ' + c.companyName + (c.companyDomain ? ' · ' + c.companyDomain : '') +
+      (c.companyStatus === 'new' ? ' (new to Ahoy)' : c.companyStatus === 'no_domain' ? ' (in Ahoy, no domain)' : ''));
+    if (c.status === 'in_crm' && c.linkedToCompany) facts.push('Linked to that company in Ahoy: ' + c.linkedToCompany);
+    facts.push('Checked ' + fmtDate(c.checkedAt) + (c.resolvedByHand ? ' · picked by you' : ''));
+    append(box, h('ul', null, facts.map(function (f) { return h('li', { text: f }); })));
+    if (c.status === 'ambiguous' && Array.isArray(c.candidates)) {
+      append(box, h('p', { text: 'Several Ahoy contacts could be this person — pick one, or mark them as new:' }));
+      var cands = h('div', { class: 'cands' });
+      c.candidates.forEach(function (cd) {
+        append(cands, h('div', { class: 'cand' }, h('div', { class: 'who' }, cd.name, h('small', { text: cd.detail })),
+          LIVE ? h('button', { class: 'btn sm', type: 'button', text: 'This is them', on: { click: function () { ahoyResolve(p.id, cd.id); } } }) : null));
+      });
+      append(box, cands);
+    }
+    var row = h('div', { class: 'row' });
+    if (LIVE && c.status === 'ambiguous') append(row, h('button', { class: 'btn sm', type: 'button', text: 'None of these — new contact', on: { click: function () { ahoyResolve(p.id, 'new'); } } }));
+    if (LIVE && c.status === 'in_crm' && c.resolvedByHand) append(row, h('button', { class: 'btn sm ghost', type: 'button', text: 'Not them — mark as new', on: { click: function () { ahoyResolve(p.id, 'new'); } } }));
+    if (LIVE) append(row, h('button', { class: 'btn sm ghost', type: 'button', text: 'Re-check', on: { click: function () { ahoyCheck([p.id]); } } }));
+    if (c.sent) append(row, h('a', { class: 'btn sm ghost', href: c.sent.url, target: '_blank', rel: 'noopener noreferrer', text: 'Open proposal in Ahoy ↗' }));
+    append(box, row);
+    return box;
+  }
+  function ahoyCheck(ids) {
+    if (!ids.length) return;
+    var est = (Number(EST.ahoyCheckUsdPerPerson) || 0.005) * ids.length;
+    var go = function () {
+      api('/api/ahoy/check', { ids: ids }).then(function (res) {
+        if (res && res.queue) applyQueue(res.queue, true);
+        renderStats();
+        toast('Checking ' + ids.length.toLocaleString() + ' ' + (ids.length === 1 ? 'person' : 'people') + ' against Ahoy (read-only)…', 'good');
+      }).catch(function (e) { toast(/409/.test(e.message) || /already/.test(e.message) ? 'An Ahoy check or send is already running.' : 'Ahoy check failed: ' + e.message, 'bad'); });
+    };
+    if (ids.length <= 10) return go();
+    confirmDlg('Check ' + ids.length.toLocaleString() + ' people against Ahoy?',
+      'Read-only: each person is looked up in your Ahoy CRM (contact by LinkedIn URL / email / name, company by name, plus its domain), through your Ahoy connector in Claude Code. Nothing is changed in Ahoy. Estimated ≈ ' + usd(est) + '.',
+      'Check').then(function (ok) { if (ok) go(); });
+  }
+  function ahoyResolve(id, contactId) {
+    api('/api/ahoy/resolve', { id: id, contactId: contactId }).catch(function (e) { toast('Could not save: ' + e.message, 'bad'); });
+  }
+  function ahoySend(ids) {
+    var lens = lensById(ui.lens);
+    api('/api/ahoy/plan', { ids: ids, lensId: lens ? lens.id : undefined }).then(function (res) {
+      var plan = res && res.plan;
+      if (!plan) return;
+      var sm = plan.summary, sk = plan.skipped || [];
+      var why = {};
+      sk.forEach(function (x) { why[x.why] = (why[x.why] || 0) + 1; });
+      var skipTxt = Object.keys(why).map(function (k) { return why[k] + ' ' + k; }).join('; ');
+      if (!plan.proposals.length) { toast('Nothing to send' + (skipTxt ? ': ' + skipTxt : '') + '.', 'bad'); return; }
+      var n = plan.proposals.length;
+      confirmDlg('Send ' + (sm.newContacts + sm.existingContacts).toLocaleString() + ' people to Ahoy?',
+        'Creates ' + n + ' proposal' + (n > 1 ? 's' : '') + ' in Ahoy — nothing changes in your CRM until you approve ' + (n > 1 ? 'them' : 'it') + ' in the Ahoy app. ' +
+        'They would create ' + sm.newContacts + ' new contact' + (sm.newContacts === 1 ? '' : 's') + ' and ' + sm.newCompanies + ' new compan' + (sm.newCompanies === 1 ? 'y' : 'ies') +
+        ', link ' + sm.linkedCompanies + ' contact' + (sm.linkedCompanies === 1 ? '' : 's') + ' to their company, and add ' + sm.notes + ' note' + (sm.notes === 1 ? '' : 's') +
+        (lens ? ' with the “' + lens.goal + '” fit and research' : ' with their research') + '. ' +
+        (sm.existingContacts ? sm.existingContacts + ' already in Ahoy only get a note. ' : '') +
+        (skipTxt ? 'Skipped: ' + skipTxt + '. ' : '') + 'Estimated ≈ ' + usd(n * (Number(EST.ahoySendUsdPerProposal) || 0.02)) + '.',
+        'Send ' + n + ' proposal' + (n > 1 ? 's' : '')).then(function (ok) {
+        if (!ok) return;
+        api('/api/ahoy/send', { ids: ids, lensId: lens ? lens.id : undefined }).then(function (r) {
+          if (r && r.queue) applyQueue(r.queue, true);
+          renderStats();
+          toast('Sending ' + n + ' proposal' + (n > 1 ? 's' : '') + ' to Ahoy…', 'good');
+        }).catch(function (e) { toast('Send failed: ' + e.message, 'bad'); });
+      });
+    }).catch(function (e) { toast('Could not plan the send: ' + e.message, 'bad'); });
+  }
+  function renderAhoyMenu() {
+    var pop = $('ahoySelPop');
+    pop.textContent = '';
+    var ids = Array.from(selected).filter(function (id) { return byId.has(id); });
+    var unchecked = 0, ready = 0, amb = 0, sent = 0;
+    ids.forEach(function (id) {
+      var c = get(id).crm;
+      if (!c) unchecked++;
+      else if (c.sent) sent++;
+      else if (c.status === 'ambiguous') amb++;
+      else if (c.status === 'in_crm' || c.status === 'new') ready++;
+    });
+    var close = function () { $('ahoySelDd').open = false; };
+    pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: 'Ahoy CRM · ' + ids.length.toLocaleString() + ' selected' })));
+    pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: !LIVE || !ids.length || !!ahoyJob,
+      text: (unchecked ? 'Check ' + ids.length.toLocaleString() : 'Re-check ' + ids.length.toLocaleString()) + ' in Ahoy (read-only)',
+      on: { click: function () { close(); scopeToShown(ids, 'Check').then(function (r) { if (r && r.length) ahoyCheck(r); }); } } }));
+    pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: !LIVE || !ready || !!ahoyJob,
+      text: 'Send ' + ready.toLocaleString() + ' to Ahoy as proposal…',
+      title: 'You approve proposals in the Ahoy app before anything is created',
+      on: { click: function () { close(); scopeToShown(ids, 'Send').then(function (r) { if (r && r.length) ahoySend(r); }); } } }));
+    var bits = [];
+    if (unchecked) bits.push(unchecked + ' not checked');
+    if (amb) bits.push(amb + ' need a pick (open the row)');
+    if (sent) bits.push(sent + ' already sent');
+    if (bits.length) pop.appendChild(h('div', { class: 'dd-note', text: bits.join(' · ') }));
   }
 
   // ---------------------------------------------------------------- rows
@@ -1749,6 +1910,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
       case 'connected': return h('td', { class: 'date', text: p.connectedOn || '' });
       case 'reason': { var s2 = scoreOf(p, ui.lens); return h('td', { class: 'why', title: s2 ? s2.reason || '' : '', text: s2 ? s2.reason || '' : '' }); }
       case 'profile': return h('td', null, profileCell(p));
+      case 'crm': return h('td', { class: 'crmcell' }, crmChip(p));
       case 'act': {
         var rm = ui.show === 'sel' && selected.has(p.id)
           ? h('button', { class: 'rm', type: 'button', title: 'Remove from selection (x)', 'aria-label': 'Remove ' + (p.fullName || 'row') + ' from selection', text: '✕',
@@ -1893,6 +2055,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
       });
       append(left, sec('Lens scores', tb));
     }
+    append(left, sec('Ahoy CRM', crmSection(p)));
 
     var facts = h('dl', { class: 'facts' });
     function fact(k, v) { if (v === undefined || v === null || v === '') return; append(facts, [h('dt', { text: k }), h('dd', null, v)]); }
@@ -2129,6 +2292,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     $('lensSelBtn').textContent = '＋ Add to lens ▾';
     $('lensSelBtn').title = 'Add the selected people to a lens, or remove them from one';
     if ($('lensSelDd').open) renderLensMenu();
+    if ($('ahoySelDd').open) renderAhoyMenu();
     $('viewSel').textContent = ui.show === 'sel' ? 'Show all' : 'Review';
     $('viewSel').title = ui.show === 'sel' ? 'Back to all rows' : 'Show only the selected people';
     $('selEst').textContent = st.light.length || st.deep.length
@@ -2198,6 +2362,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     function diff(a, b) { a.forEach(function (v, id) { if (b.get(id) !== v) changed.push(id); }); }
     diff(oq, qmap); diff(qmap, oq); diff(or, rmap); diff(rmap, or);
     if (JSON.stringify(oldJob) !== JSON.stringify(lensJob)) renderLensBar();
+    renderStats();
     return changed;
   }
   function uniq(a) { return Array.from(new Set(a)); }
@@ -2296,6 +2461,18 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     on('reload', function () {
       // another process changed the database (e.g. `network-builder lens rescore`): pull fresh state
       api('/api/state').then(applyState).catch(function () { /* next event will fix */ });
+    });
+    on('crm', function (d) {
+      if (!d || !Array.isArray(d.updates)) return;
+      if (d.costs) costs = d.costs;
+      d.updates.forEach(function (u) {
+        var p = get(u.id);
+        if (!p) return;
+        if (u.crm) p.crm = u.crm; else delete p.crm;
+        updateRow(u.id);
+      });
+      renderStats(); renderSelbar();
+      if (ui.crmf && ui.crmf !== 'any') heavyRefresh();
     });
     on('notice', function (d) {
       if (d && d.message) toast(d.message, d.level === 'error' ? 'bad' : d.level === 'warn' ? null : 'good');
@@ -2730,7 +2907,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   function paintMoreBadge() {
     var n = 0;
     if (ui.co) n++; if (ui.past) n++; if (ui.talk) n++; if (ui.loc) n++; if (ui.ind) n++;
-    if (ui.conf !== 'any') n++; if (ui.idc !== 'any') n++; if (ui.from || ui.to) n++;
+    if (ui.conf !== 'any') n++; if (ui.idc !== 'any') n++; if (ui.crmf && ui.crmf !== 'any') n++; if (ui.from || ui.to) n++;
     var b = $('moreBadge');
     b.className = n ? 'badge' : '';
     b.textContent = n ? String(n) : '';
@@ -2797,6 +2974,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     $('dossier').value = ui.dossier;
     $('conf').value = ui.conf;
     $('idc').value = ui.idc;
+    $('crmf').value = ui.crmf || 'any';
     $('from').value = ui.from;
     $('to').value = ui.to;
     $('co').value = ui.co;
@@ -2834,7 +3012,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   }
   $('minScore').addEventListener('input', function (e) { setMinScore(e.target.value); });
   $('minScoreRange').addEventListener('input', function (e) { setMinScore(e.target.value); });
-  ['dossier', 'conf', 'idc', 'from', 'to'].forEach(function (k) {
+  ['dossier', 'conf', 'idc', 'crmf', 'from', 'to'].forEach(function (k) {
     $(k).addEventListener('change', function (e) { ui[k] = e.target.value; onFilter(); });
   });
   ['co', 'past', 'talk', 'loc', 'ind'].forEach(function (k) {
@@ -2895,6 +3073,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     });
   }
   $('lensSelDd').addEventListener('toggle', function () { if ($('lensSelDd').open) renderLensMenu(); });
+  $('ahoySelDd').addEventListener('toggle', function () { if ($('ahoySelDd').open) renderAhoyMenu(); });
   $('lensStale').addEventListener('click', refreshStale);
   $('lensAll').addEventListener('click', rescoreAll);
   $('newLensForm').addEventListener('submit', function (e) { e.preventDefault(); if (LIVE) createLens($('newLensGoal').value); });

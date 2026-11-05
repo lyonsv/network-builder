@@ -165,6 +165,14 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (lens_id, person_id)
   );
   `,
+  // 5: Ahoy CRM reconciliation per person (CrmMatch JSON)
+  `
+  CREATE TABLE crm_matches (
+    person_id   TEXT PRIMARY KEY,
+    record_json TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

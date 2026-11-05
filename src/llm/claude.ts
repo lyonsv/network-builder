@@ -61,17 +61,26 @@ export async function checkClaudeLogin(): Promise<{ loggedIn?: boolean; method?:
   }
 }
 
-function buildArgs(opts: ClaudeCallOptions): string[] {
-  const { model, jsonSchema, tools, appendSystemPrompt } = opts;
-  return [
+/** built-in tools that MCP-only calls must never use */
+const BUILTIN_TOOLS = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch', 'Task', 'TodoWrite'];
+
+export function buildArgs(opts: ClaudeCallOptions): string[] {
+  const { model, jsonSchema, tools, mcpTools, appendSystemPrompt } = opts;
+  const base = [
     '-p',
     '--model', model,
     '--output-format', 'json',
     '--json-schema', JSON.stringify(jsonSchema),
     '--no-session-persistence',
-    '--strict-mcp-config',
     '--permission-mode', 'dontAsk',
     ...(appendSystemPrompt ? ['--append-system-prompt', appendSystemPrompt] : []),
+  ];
+  // MCP calls (e.g. the user's Ahoy connector): load their MCP config, allow only the named tools, no built-ins.
+  // (`--tools ""` would hide MCP tools too, and --strict-mcp-config would hide claude.ai connectors.)
+  if (mcpTools?.length) return [...base, '--disallowedTools', ...BUILTIN_TOOLS, '--allowedTools', ...mcpTools];
+  return [
+    ...base,
+    '--strict-mcp-config',
     // variadic flags LAST so they can't swallow other args
     ...(tools?.length ? ['--allowedTools', ...tools, '--tools', tools.join(',')] : ['--tools', '']),
   ];

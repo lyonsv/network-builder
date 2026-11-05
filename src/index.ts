@@ -152,6 +152,16 @@ dbOptions(lens.command('rm').description('delete a lens and its scores').argumen
   },
 );
 
+program
+  .command('mcp')
+  .description('run an MCP server (stdio) so Claude Code and other MCP clients can search and curate your network')
+  .option('--db <path>', `SQLite database (default ${tildify(DEFAULT_DB_PATH)})`)
+  .option('-o, --out-dir <path>', `where exports go (default ${tildify(DEFAULT_OUT_DIR)})`)
+  .action(async (opts: { db?: string; outDir?: string }) => {
+    const { runMcpServer } = await import('./mcp/server');
+    await runMcpServer(withRoot(opts));
+  });
+
 // `pnpm start -- …` / `pnpm dev -- …` pass a literal "--" through; drop it so options still parse.
 const argv = process.argv[2] === '--' ? [...process.argv.slice(0, 2), ...process.argv.slice(3)] : process.argv;
 

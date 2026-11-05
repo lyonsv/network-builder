@@ -211,6 +211,11 @@ export interface ClaudeCallOptions {
   jsonSchema: Record<string, unknown>;
   /** built-in tool names; [] or undefined => --tools "" */
   tools?: string[];
+  /**
+   * MCP tool names (e.g. mcp__claude_ai_Ahoy__search_crm). When set, the user's MCP servers / claude.ai connectors
+   * load (no --strict-mcp-config) and ONLY these tools are allowed; built-in tools are disallowed.
+   */
+  mcpTools?: string[];
   appendSystemPrompt?: string;
   timeoutMs?: number;
   retries?: number;
@@ -238,7 +243,7 @@ export interface ClaudeCliJson {
   num_turns?: number;
 }
 
-export type CostStage = 'rank' | 'research' | 'enrich' | 'dossier' | 'lens';
+export type CostStage = 'rank' | 'research' | 'enrich' | 'dossier' | 'lens' | 'ahoy';
 
 export interface CostTracker {
   add(stage: CostStage, usd: number): void;
@@ -581,6 +586,40 @@ export interface ExplorerPerson extends Person {
   /** best available dossier (deep preferred over light; newest first) */
   dossier?: DossierRecord;
   scores: Record<string, { score: number; reason: string; basis: EvidenceBasis; stale: boolean }>;
+  /** Ahoy CRM reconciliation (v7), when checked */
+  crm?: CrmMatch;
+}
+
+// ---------- v7: Ahoy CRM ----------
+/** in_crm: the contact exists · new: no such contact · ambiguous: several candidates, you pick · error: the check failed */
+export type CrmStatus = 'in_crm' | 'new' | 'ambiguous' | 'error';
+/** in_crm: company exists with a domain · no_domain: exists without one · new: not in the CRM · none: no company known */
+export type CrmCompanyStatus = 'in_crm' | 'no_domain' | 'new' | 'none';
+export interface CrmCandidate {
+  id: string;
+  name: string;
+  /** title / company / email — enough to tell candidates apart */
+  detail: string;
+}
+export interface CrmMatch {
+  status: CrmStatus;
+  contactId?: string;
+  contactName?: string;
+  contactEmail?: string;
+  companyId?: string;
+  /** the company name as it is (or will be) in the CRM */
+  companyName?: string;
+  companyDomain?: string;
+  companyStatus: CrmCompanyStatus;
+  /** for matched contacts: is the contact linked (ahoy_contact_to_company) to the company found? */
+  linkedToCompany?: 'yes' | 'no' | 'unknown';
+  candidates?: CrmCandidate[];
+  reason: string;
+  checkedAt: string;
+  /** you picked a candidate or "new" in the explorer */
+  resolvedByHand?: boolean;
+  /** sent to Ahoy as a proposal (awaiting / after approval in the Ahoy app) */
+  sent?: { at: string; proposalId: string; url: string; title: string };
 }
 
 export type JobKind = 'dossier' | 'lens';
@@ -595,6 +634,8 @@ export interface JobQueueState {
   pausedManual?: boolean;
   /** lens scoring in progress */
   lensJob: { lensId: string; phase: 'score' | 'rerank'; done: number; total: number } | null;
+  /** Ahoy check / send in progress */
+  ahoyJob?: { kind: 'check' | 'send'; done: number; total: number } | null;
   seq: number;
 }
 
@@ -604,6 +645,8 @@ export interface ExplorerCosts {
   lens: number;
   /** legacy goal-specific research spend */
   research: number;
+  /** Ahoy CRM checks and sends */
+  ahoy?: number;
   total: number;
   incomplete: boolean;
 }
@@ -620,7 +663,14 @@ export interface ExplorerState {
   queue: JobQueueState;
   costs: ExplorerCosts;
   /** lens estimate = n/1000 × lensUsdPer1000 + min(rerankTop, n)/100 × lensRerankUsdPer100 */
-  estimates: { lightUsd: number; deepUsd: number; lensUsdPer1000: number; lensRerankUsdPer100: number };
+  estimates: {
+    lightUsd: number;
+    deepUsd: number;
+    lensUsdPer1000: number;
+    lensRerankUsdPer100: number;
+    ahoyCheckUsdPerPerson?: number;
+    ahoySendUsdPerProposal?: number;
+  };
   dbPath: string;
 }
 
@@ -631,6 +681,8 @@ export type ExplorerEvent =
   | { type: 'lens'; lens: Lens; scores?: { personId: string; score: number; reason: string; basis: EvidenceBasis }[]; costs: ExplorerCosts }
   | { type: 'lenses'; lenses: Lens[] }
   | { type: 'lists'; lists: SavedList[] }
+  /** Ahoy reconciliation results / sent markers for some people */
+  | { type: 'crm'; updates: { id: string; crm: CrmMatch | null }[]; costs: ExplorerCosts }
   | { type: 'notice'; level: 'info' | 'warn' | 'error'; message: string }
   /** another process changed the database: clients should refetch GET /api/state */
   | { type: 'reload'; reason: string };

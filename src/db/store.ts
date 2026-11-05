@@ -5,6 +5,7 @@ import { slugify } from '../io/output';
 import type {
   CostStage,
   CostTracker,
+  CrmMatch,
   DossierRecord,
   EvidenceBasis,
   ExplorerCosts,
@@ -407,12 +408,12 @@ export class Store {
       updatedAt: str(r.updated_at),
     }));
     const spendRows = this.db.prepare('SELECT stage, SUM(usd) AS usd FROM cost_ledger GROUP BY stage').all() as Row[];
-    const spend = { enrich: 0, rank: 0, research: 0, dossier: 0, lens: 0, total: 0 };
+    const spend = { enrich: 0, rank: 0, research: 0, dossier: 0, lens: 0, ahoy: 0, total: 0 };
     for (const r of spendRows) {
       const stage = str(r.stage) as CostStage;
       if (stage in spend) spend[stage] = Number(r.usd ?? 0);
     }
-    spend.total = spend.enrich + spend.rank + spend.research + spend.dossier + spend.lens;
+    spend.total = spend.enrich + spend.rank + spend.research + spend.dossier + spend.lens + spend.ahoy;
     return {
       path: this.path,
       people: n('SELECT COUNT(*) AS n FROM people'),
@@ -519,6 +520,7 @@ export class Store {
   private buildExplorerPeople(where = '', args: string[] = []): ExplorerPerson[] {
     const profiles = this.latestProfiles();
     const dossiers = this.bestDossiers();
+    const crm = this.crmMatches();
     const rows = this.db.prepare(`SELECT * FROM people ${where} ORDER BY full_name COLLATE NOCASE, id`).all(...args) as Row[];
     const scoreRows = this.db
       .prepare(`SELECT lens_id, person_id, score, reason, basis, input_hash FROM lens_scores ${where ? 'WHERE person_id = ?' : ''}`)
@@ -536,6 +538,8 @@ export class Store {
       const out: ExplorerPerson = { ...person, scores: {} };
       if (profile) out.profile = profile;
       if (dossier) out.dossier = dossier;
+      const cm = crm.get(person.id);
+      if (cm) out.crm = cm;
       for (const sr of scores.get(person.id) ?? []) {
         out.scores[str(sr.lens_id)] = {
           score: Number(sr.score),
@@ -545,6 +549,33 @@ export class Store {
         };
       }
       return out;
+    });
+  }
+
+  // ---------- v7: Ahoy CRM reconciliation ----------
+  crmMatches(): Map<string, CrmMatch> {
+    const out = new Map<string, CrmMatch>();
+    for (const r of this.db.prepare('SELECT person_id, record_json FROM crm_matches').all() as Row[]) {
+      try {
+        out.set(str(r.person_id), JSON.parse(str(r.record_json)) as CrmMatch);
+      } catch {
+        /* corrupt row: treat as unchecked */
+      }
+    }
+    return out;
+  }
+
+  /** upsert (match) or clear (null) reconciliation results, one transaction */
+  setCrmMatches(updates: { id: string; crm: CrmMatch | null }[]): void {
+    if (!updates.length) return;
+    const put = this.db.prepare(`INSERT INTO crm_matches (person_id, record_json, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(person_id) DO UPDATE SET record_json = excluded.record_json, updated_at = excluded.updated_at`);
+    const del = this.db.prepare('DELETE FROM crm_matches WHERE person_id = ?');
+    this.tx(() => {
+      for (const u of updates) {
+        if (u.crm) put.run(u.id, JSON.stringify(u.crm), now());
+        else del.run(u.id);
+      }
     });
   }
 
@@ -745,7 +776,7 @@ export class Store {
 
   /** cumulative spend from the ledger, grouped for the explorer ('rank' is legacy lens scoring) */
   explorerCosts(): ExplorerCosts {
-    const spend = { enrich: 0, dossier: 0, lens: 0, research: 0 };
+    const spend = { enrich: 0, dossier: 0, lens: 0, research: 0, ahoy: 0 };
     for (const r of this.db.prepare('SELECT stage, SUM(usd) AS usd FROM cost_ledger GROUP BY stage').all() as Row[]) {
       const usd = Number(r.usd ?? 0);
       const stage = str(r.stage);
@@ -753,8 +784,9 @@ export class Store {
       else if (stage === 'dossier') spend.dossier += usd;
       else if (stage === 'lens' || stage === 'rank') spend.lens += usd;
       else if (stage === 'research') spend.research += usd;
+      else if (stage === 'ahoy') spend.ahoy += usd;
     }
-    return { ...spend, total: spend.enrich + spend.dossier + spend.lens + spend.research, incomplete: false };
+    return { ...spend, total: spend.enrich + spend.dossier + spend.lens + spend.research + spend.ahoy, incomplete: false };
   }
 }
 

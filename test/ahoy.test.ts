@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AHOY_PROPOSAL_TOOL, AHOY_READ_TOOLS, normalizeMatch, planAhoySend } from '../src/llm/ahoy';
+import { AHOY_PROPOSAL_TOOL, AHOY_READ_TOOLS, normalizeMatch, planAhoySend, sendAhoyProposal } from '../src/llm/ahoy';
+import { createCostTracker } from '../src/llm/costs';
 import { buildArgs } from '../src/llm/claude';
 import type { CrmMatch, ExplorerPerson } from '../src/types';
 
@@ -51,6 +52,33 @@ describe('normalizeMatch', () => {
 });
 
 describe('planAhoySend', () => {
+  it('keeps proposal titles short (long goals are cut) and numbered', () => {
+    const long = { id: 'l', goal: 'Buyers at Ledgerly-style scale-ups: ' + 'senior content and brand budget owners, '.repeat(8) };
+    const many = Array.from({ length: 30 }, (_, i) => person(`p${i}`, `Per Son${i}`, { status: 'new', companyName: `Co ${i}` }));
+    const plan = planAhoySend(many, long);
+    expect(plan.proposals.length).toBeGreaterThan(1);
+    for (const [i, pr] of plan.proposals.entries()) {
+      expect(pr.title.length).toBeLessThanOrEqual(130);
+      expect(pr.title).toContain('…');
+      expect(pr.title.endsWith(`(${i + 1}/${plan.proposals.length})`)).toBe(true);
+    }
+    expect(plan.proposals[0]!.description).toContain(long.goal);
+    const notes = plan.proposals.flatMap((p) => p.operations).filter((o) => o.object_type === 'ahoy_note');
+    for (const n of notes) expect(String(n.properties!.ahoy_title).length).toBeLessThanOrEqual(120);
+  });
+
+  it('reuses a company id found for one person for everyone else at that company (never creates it twice)', () => {
+    const plan = planAhoySend([
+      person('g1', 'Gee One', { status: 'new', companyId: 'ledgerly-uuid', companyName: 'Ledgerly', companyStatus: 'no_domain' }),
+      person('g2', 'Gee Two', { status: 'new', companyName: 'Ledgerly', companyStatus: 'new' }),
+      person('g3', 'Gee Three', { status: 'new', companyName: 'ledgerly', companyStatus: 'new' }),
+    ], lens);
+    const ops = plan.proposals.flatMap((p) => p.operations);
+    expect(ops.filter((o) => o.object_type === 'ahoy_company')).toHaveLength(0);
+    expect(ops.filter((o) => o.association_type === 'ahoy_contact_to_company').map((o) => o.target_entity_id)).toEqual(['ledgerly-uuid', 'ledgerly-uuid', 'ledgerly-uuid']);
+    expect(plan.summary.newCompanies).toBe(0);
+  });
+
   it('skips unchecked / ambiguous / errored / already-sent people with reasons', () => {
     const plan = planAhoySend([
       person('u', 'Un Checked'),
@@ -104,5 +132,34 @@ describe('planAhoySend', () => {
   it('only uses the proposal tool for writes', () => {
     expect(AHOY_PROPOSAL_TOOL).toMatch(/create_proposal$/);
     expect(AHOY_READ_TOOLS.join(' ')).not.toMatch(/execute|create|update|delete/);
+  });
+});
+
+describe('sendAhoyProposal', () => {
+  const plan = { title: 't', description: 'd', operations: [{ operation: 'create' as const, object_type: 'ahoy_note', properties: {} }], personIds: ['a'] };
+  const fake = (outs: Record<string, unknown>[]) => {
+    let i = 0;
+    const calls: number[] = [];
+    const run = (async () => { calls.push(i); return { data: outs[i++], costUsd: 0.001 }; }) as any;
+    return { run, calls };
+  };
+  it('retries only when the Ahoy tool never loaded (nothing can have been written)', async () => {
+    const { run, calls } = fake([
+      { proposalId: '', url: '', operationCount: 0, toolMissing: true },
+      { proposalId: '', url: '', operationCount: 0, error: 'create_proposal is not available: the ahoy MCP server is not connected' },
+      { proposalId: '42', url: 'https://app.ahoy.ai/p/42', operationCount: 1 },
+    ]);
+    expect(await sendAhoyProposal(plan, { costs: createCostTracker(), run, retryDelayMs: 1 })).toEqual({ proposalId: '42', url: 'https://app.ahoy.ai/p/42' });
+    expect(calls).toHaveLength(3);
+  });
+  it('never retries any other failure', async () => {
+    const { run, calls } = fake([{ proposalId: '', url: '', operationCount: 0, error: 'title: String should have at most 255 characters' }]);
+    await expect(sendAhoyProposal(plan, { costs: createCostTracker(), run, retryDelayMs: 1 })).rejects.toThrow(/255/);
+    expect(calls).toHaveLength(1);
+  });
+  it('gives up after a few tool-missing attempts', async () => {
+    const { run, calls } = fake(Array.from({ length: 9 }, () => ({ proposalId: '', url: '', operationCount: 0, toolMissing: true })));
+    await expect(sendAhoyProposal(plan, { costs: createCostTracker(), run, retryDelayMs: 1 })).rejects.toThrow();
+    expect(calls).toHaveLength(4);
   });
 });

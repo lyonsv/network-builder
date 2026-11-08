@@ -2629,7 +2629,11 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     return out.join('\n\n');
   }
   /** Ahoy note Title */
-  function ahoyNoteTitle(lens) { return lens ? 'network-builder: ' + lens.goal : 'network-builder profile'; }
+  function ahoyNoteTitle(lens) {
+    if (!lens) return 'network-builder profile';
+    var g = Array.from(lens.goal.trim());
+    return 'network-builder: ' + (g.length > 100 ? g.slice(0, 99).join('').trimEnd() + '…' : g.join(''));
+  }
   /** → { companies, contacts, notes } CSV texts (BOM + CRLF, same cells as the other presets) */
   function ahoyFiles(rows, lens) {
     var csv = function (cols, data) {

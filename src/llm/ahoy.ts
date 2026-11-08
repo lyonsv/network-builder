@@ -241,16 +241,24 @@ export function planAhoySend(people: ExplorerPerson[], lens?: Pick<Lens, 'id' | 
   // group by company: new companies are created once and referenced by temp_id within one proposal
   type Unit = { key: string; createCompany: AhoyOperation | null; companyRef: string | null; people: ExplorerPerson[] };
   const units = new Map<string, Unit>();
+  // the per-person check sometimes finds a company but returns its id for only some of the people who work there:
+  // reuse any id seen for the same company name, so an existing company is never created a second time
+  const knownCompanyIds = new Map<string, string>();
+  for (const p of ready) {
+    const c = p.crm!;
+    if (c.companyId && c.companyName?.trim()) knownCompanyIds.set(c.companyName.trim().toLowerCase(), c.companyId);
+  }
   let tc = 0;
   for (const p of ready) {
     const c = p.crm!;
     const coName = (c.companyName || ahoyCompany(p)).trim();
-    const key = c.companyId ? `id:${c.companyId}` : coName ? `new:${coName.toLowerCase()}` : `solo:${p.id}`;
+    const companyId = c.companyId || (coName ? knownCompanyIds.get(coName.toLowerCase()) : undefined);
+    const key = companyId ? `id:${companyId}` : coName ? `new:${coName.toLowerCase()}` : `solo:${p.id}`;
     let u = units.get(key);
     if (!u) {
       let createCompany: AhoyOperation | null = null;
       let companyRef: string | null = null;
-      if (c.companyId) companyRef = c.companyId;
+      if (companyId) companyRef = companyId;
       else if (coName && c.status === 'new') {
         companyRef = `company_${++tc}`;
         const props: Record<string, unknown> = { ahoy_name: coName };
@@ -300,7 +308,10 @@ export function planAhoySend(people: ExplorerPerson[], lens?: Pick<Lens, 'id' | 
   }
   const n = proposals.length;
   proposals.forEach((pr, i) => {
-    pr.title = `${label}: ${lens ? lens.goal : 'contacts'}${n > 1 ? ` (${i + 1}/${n})` : ''}`.slice(0, 255);
+    // Ahoy caps titles at 255 chars; keep well under it (the full goal is in the description) and keep the (i/n) suffix
+    const goal = lens ? lens.goal.trim() : 'contacts';
+    const short = [...goal].length > 100 ? `${[...goal].slice(0, 99).join('').trimEnd()}…` : goal;
+    pr.title = `${label}: ${short}${n > 1 ? ` (${i + 1}/${n})` : ''}`;
     pr.description =
       `From network-builder${lens ? ` (lens “${lens.goal}”)` : ''}: ${pr.personIds.length} people. Creates new contacts and companies ` +
       'that were not found in Ahoy, links contacts to their companies, and adds a note with the fit score and research to each contact. ' +
@@ -339,6 +350,15 @@ function personOps(p: ExplorerPerson, companyRef: string | null, lens: Pick<Lens
   return ops;
 }
 
+const TOOL_MISSING_RE = /not (available|connected|loaded)|requires? OAuth|no such tool|tool .*(missing|unavailable)/i;
+const TOOL_MISSING_ATTEMPTS = 4;
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => { clearTimeout(t); reject(signal.reason); }, { once: true });
+  });
+
 const PROPOSAL_SCHEMA = {
   type: 'object',
   properties: {
@@ -346,6 +366,10 @@ const PROPOSAL_SCHEMA = {
     url: { type: 'string', description: 'the proposal url create_proposal returned' },
     operationCount: { type: 'integer', description: 'how many operations you sent' },
     error: { type: 'string', description: 'only if create_proposal failed: its error message' },
+    toolMissing: {
+      type: 'boolean',
+      description: 'true ONLY if create_proposal was not among your tools, so you could not call it at all',
+    },
   },
   required: ['proposalId', 'url', 'operationCount'],
 } as const;
@@ -353,7 +377,7 @@ const PROPOSAL_SCHEMA = {
 /** Create ONE Ahoy proposal with exactly these operations (Haiku passes them through verbatim). */
 export async function sendAhoyProposal(
   plan: AhoyProposalPlan,
-  o: { costs: CostTracker; signal?: AbortSignal; model?: string },
+  o: { costs: CostTracker; signal?: AbortSignal; model?: string; run?: typeof runClaude; retryDelayMs?: number },
 ): Promise<{ proposalId: string; url: string }> {
   const args = { title: plan.title, description: plan.description, operations: plan.operations };
   const prompt = `Call the Ahoy create_proposal tool EXACTLY ONCE with these arguments, copied verbatim — do not add,
@@ -364,18 +388,29 @@ ${JSON.stringify(args)}
 
 Then return the proposal id and url from the tool result, and operationCount = ${plan.operations.length} if you sent
 all operations. If the tool returned an error, return proposalId "" and url "" with the error message.`;
-  const res = await runClaude<{ proposalId: string | number; url: string; operationCount: number; error?: string }>({
-    prompt,
-    model: o.model ?? 'haiku',
-    jsonSchema: PROPOSAL_SCHEMA as unknown as Record<string, unknown>,
-    mcpTools: [AHOY_PROPOSAL_TOOL],
-    timeoutMs: 5 * 60_000,
-    // never retry a write blindly: a retry after a timeout could create a duplicate proposal
-    retries: 0,
-    signal: o.signal,
-  });
-  o.costs.add('ahoy', res.costUsd);
-  const d = res.data;
+  type Out = { proposalId: string | number; url: string; operationCount: number; error?: string; toolMissing?: boolean };
+  // claude.ai connectors load asynchronously in `claude -p`, so a session sometimes starts without the Ahoy tool. That
+  // is the ONE case we retry: without the tool nothing can have been written. Any other failure (timeout, tool error,
+  // wrong op count) is never retried — a retry could create a duplicate proposal.
+  const missing = (d: Out) => !String(d.proposalId ?? '').trim() && (d.toolMissing === true || TOOL_MISSING_RE.test(d.error || ''));
+  let d: Out | null = null;
+  for (let attempt = 0; attempt < TOOL_MISSING_ATTEMPTS; attempt++) {
+    if (attempt) await sleep((o.retryDelayMs ?? 4000) * attempt, o.signal);
+    const res = await (o.run ?? runClaude)<Out>({
+      prompt,
+      model: o.model ?? 'haiku',
+      jsonSchema: PROPOSAL_SCHEMA as unknown as Record<string, unknown>,
+      mcpTools: [AHOY_PROPOSAL_TOOL],
+      timeoutMs: 5 * 60_000,
+      retries: 0,
+      signal: o.signal,
+    });
+    o.costs.add('ahoy', res.costUsd);
+    d = res.data;
+    if (!missing(d)) break;
+  }
+  d = d!;
+  if (missing(d)) throw new Error(`the Ahoy connector didn't load in the background Claude session (${TOOL_MISSING_ATTEMPTS} tries) — nothing was sent; try again`);
   if (d.error || !String(d.proposalId ?? '').trim()) throw new Error(d.error || 'create_proposal returned no proposal id');
   if (Number(d.operationCount) !== plan.operations.length) {
     throw new Error(`proposal ${d.proposalId} was created with ${d.operationCount} of ${plan.operations.length} operations — review or reject it in Ahoy`);

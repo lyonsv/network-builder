@@ -181,7 +181,12 @@ export function ahoyNote(p: ExplorerPerson, lens?: LensRef | null): string {
 }
 
 /** Ahoy note Title */
-export const ahoyNoteTitle = (lens?: LensRef | null): string => (lens ? `network-builder: ${lens.goal}` : 'network-builder profile');
+/** Ahoy rejects long titles in proposals: cut the goal to 100 characters (the note body has the full goal). */
+export const ahoyNoteTitle = (lens?: LensRef | null): string => {
+  if (!lens) return 'network-builder profile';
+  const g = Array.from(lens.goal.trim());
+  return 'network-builder: ' + (g.length > 100 ? g.slice(0, 99).join('').trimEnd() + '…' : g.join(''));
+};
 
 export interface AhoyFiles {
   companies: string;

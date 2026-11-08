@@ -173,6 +173,59 @@ export const MIGRATIONS: string[] = [
     updated_at  TEXT NOT NULL
   );
   `,
+  // 6: accounts (ABX) — target companies, people captured from LinkedIn (kept OUT of the people table so the network
+  //    stays your connections only) and account membership with org-chart placement and buying-committee role
+  `
+  CREATE TABLE accounts (
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    domain       TEXT NOT NULL DEFAULT '',
+    linkedin_url TEXT NOT NULL DEFAULT '',
+    aliases_json TEXT NOT NULL DEFAULT '[]',
+    status       TEXT NOT NULL DEFAULT 'target',
+    brief        TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+  );
+
+  -- latest capture per person; id = personId(url), equal to people.id when they're a connection
+  CREATE TABLE contacts (
+    id            TEXT PRIMARY KEY,
+    url           TEXT NOT NULL,
+    full_name     TEXT NOT NULL DEFAULT '',
+    headline      TEXT NOT NULL DEFAULT '',
+    title         TEXT NOT NULL DEFAULT '',
+    company       TEXT NOT NULL DEFAULT '',
+    location      TEXT NOT NULL DEFAULT '',
+    profile_json  TEXT NOT NULL,
+    captured_at   TEXT NOT NULL,
+    capture_count INTEGER NOT NULL DEFAULT 1
+  );
+
+  -- every capture, so a re-capture (new job, edited profile) never loses the earlier one
+  CREATE TABLE contact_captures (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    contact_id   TEXT NOT NULL,
+    profile_json TEXT NOT NULL,
+    captured_at  TEXT NOT NULL
+  );
+  CREATE INDEX contact_captures_contact ON contact_captures(contact_id, captured_at);
+
+  -- person_id is a contacts.id and/or a people.id (connections can be added without a capture)
+  CREATE TABLE account_members (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    person_id  TEXT NOT NULL,
+    department TEXT NOT NULL DEFAULT '',
+    tier       TEXT NOT NULL DEFAULT '',
+    role       TEXT NOT NULL DEFAULT '',
+    reports_to TEXT NOT NULL DEFAULT '',
+    notes      TEXT NOT NULL DEFAULT '',
+    added_at   TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (account_id, person_id)
+  );
+  CREATE INDEX account_members_person ON account_members(person_id);
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

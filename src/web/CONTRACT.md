@@ -368,3 +368,42 @@ export function startExplorerServer(opts: {
   SSE `crm {updates:[{id, crm}], costs}`; cost stage `ahoy`.
 - UI: Ahoy column (✓ Ahoy / New / Pick / Failed + ⚠ no-domain / not-linked + ↗ proposal), More filters → Ahoy CRM,
   selection bar "Ahoy ▾" (Check / Send…), detail-panel "Ahoy CRM" section with candidate picking and Re-check.
+
+## v8 — Accounts (ABX) + Chrome extension
+
+- Migration (array index 5, comment "6"): `accounts(id slug PK, name, domain, linkedin_url, aliases_json, status
+  target|engaged|customer|paused, brief markdown, created_at, updated_at)`, `contacts(id = personId(canonical URL) PK —
+  equal to people.id for connections, url, full_name, headline, title, company, location, profile_json CapturedProfile,
+  captured_at, capture_count)`, `contact_captures(id, contact_id, profile_json, captured_at)` (history),
+  `account_members(account_id FK cascade, person_id, department, tier, role, reports_to, notes, added_at, updated_at;
+  PK account+person)`. `''` department/tier = automatic from the title (`src/accounts/classify.ts`).
+- **Captured people never go in `people`.** Membership may reference a connection (`people.id`), a capture
+  (`contacts.id`) or both (same id). Validation: role ∈ decision-maker|champion|influencer|user|gatekeeper|blocker|'',
+  department/tier from `src/accounts/types.ts`, `reports_to` must be another member of the same account with no
+  cycles; removing a member clears reporting lines that pointed at them.
+- `ExplorerState.accounts?: AccountSummary[]` `{id, name, status, domain, memberIds, memberCount, captured,
+  connections, roles: {role: n}, updatedAt}`. SSE `accounts {accounts, changed?, notice?}` after every account change
+  (page reloads the open account; `notice` = a capture from the extension → toast with "Open").
+- Page API (session token): `GET/POST /api/accounts`, `GET/PUT/DELETE /api/accounts/:id` (`GET` → AccountView
+  `{account, members: AccountMember[], warmPaths, gaps}`; `PUT` body any of name, domain, linkedinUrl, aliases[],
+  status, brief → `{view, accounts}`), `GET /api/accounts/:id/brief?detail=full|summary` → `{markdown}`
+  (`src/accounts/brief.ts`, same as MCP `network_get_account`), `POST /api/accounts/:id/members {ids, role?}` →
+  `{added, already, unknown, view, accounts}`, `PUT|DELETE /api/accounts/:id/members/:pid` (PUT body any of role,
+  department, tier, reportsTo, notes). Validation errors are 400, unknown account 404.
+- Pairing: `POST /api/ext/pair {rotate?}` → `{code: "nb1." + base64url(JSON {v:1, u:"http://127.0.0.1:<port>", t}),
+  port, extensionDir}`. The capture token lives in meta `ext_token` (survives restarts; `rotate` revokes it).
+- Extension API `/ext/*`: header `X-NB-Capture: <token>` (never the page token); Origin absent or
+  `chrome-extension://[a-p]{32}`; Host must be ours. `GET /ext/ping`, `GET /ext/accounts` (id, name, status,
+  memberCount), `GET /ext/lookup?url&company&companyUrl` → `{id, isConnection, capturedAt, accounts:[{id,name,role}],
+  suggested}`, `POST /ext/capture {profile: CapturePayload, accountId? | accountName?, role?, notes?}` →
+  `{account, person, createdAccount, addedToAccount, isConnection, firstCapture}`. Account resolution: accountId → name
+  or alias match → LinkedIn company URL / company name match → create. Notes append; re-capture refreshes the profile
+  and keeps history. 401 = re-pair, 400 = bad capture (not retried by the extension).
+- CapturePayload: `{url, fullName, headline, location, currentCompany, about, sections: {<anchor id>: {heading, items:
+  [{lines, sub?, companyUrl?}]}}, rawText ≤ 60k}`. All interpretation is server-side (`parseCapture`): grouped
+  roles, nested descriptions, employment type, dates/current, location, and a raw-text section fallback.
+- UI: header switch People | Accounts (persisted in localStorage `nb.mode` / `nb.account`). Accounts view = account list
+  + header fields + autosaving brief + buying committee & gaps + warm paths (＋ Add) + org chart (department columns →
+  tier rows, cards with role, connection, ↳ manager) + person drawer (role, department, level, reports to, notes,
+  captured profile, remove). Selection bar gains "Add to account ▾" (uses `scopeToShown`). Person detail shows
+  "Accounts" chips. The "Chrome extension…" dialog shows the extension folder, the pairing code (copy) and Reset.

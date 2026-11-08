@@ -80,6 +80,18 @@ export function checkHostAndOrigin(req: IncomingMessage, port: number): void {
   if (origin && !allowed.has(origin.replace(/^http:\/\//, ''))) throw new HttpError(403, 'foreign origin');
 }
 
+/**
+ * Requests from the Chrome extension (its background service worker): Host must be ours; the Origin, if sent, must be
+ * a chrome-extension:// origin. Authorisation is the long-lived capture token (checked by the caller), never the
+ * per-session page token.
+ */
+export function checkExtensionRequest(req: IncomingMessage, port: number): void {
+  const allowed = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+  if (!allowed.has(req.headers.host ?? '')) throw new HttpError(403, 'bad host');
+  const origin = req.headers.origin;
+  if (origin && !/^chrome-extension:\/\/[a-p]{32}$/.test(origin)) throw new HttpError(403, 'foreign origin');
+}
+
 /** Listen on 127.0.0.1: exact `port`, else `preferredPort` falling back to a random free port. */
 export async function listenLocal(server: http.Server, opts: { port?: number; preferredPort?: number }): Promise<number> {
   const listen = (p: number) =>

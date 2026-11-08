@@ -1,3 +1,4 @@
+import type { AccountSummary } from './accounts/types';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -672,6 +673,8 @@ export interface ExplorerState {
     ahoySendUsdPerProposal?: number;
   };
   dbPath: string;
+  /** accounts (ABX) — summaries only; GET /api/accounts/:id for the full view */
+  accounts?: AccountSummary[];
 }
 
 export type ExplorerEvent =
@@ -684,5 +687,7 @@ export type ExplorerEvent =
   /** Ahoy reconciliation results / sent markers for some people */
   | { type: 'crm'; updates: { id: string; crm: CrmMatch | null }[]; costs: ExplorerCosts }
   | { type: 'notice'; level: 'info' | 'warn' | 'error'; message: string }
+  /** accounts changed (`changed` = the account touched; `notice` = e.g. a capture from the Chrome extension) */
+  | { type: 'accounts'; accounts: AccountSummary[]; changed?: string; notice?: string }
   /** another process changed the database: clients should refetch GET /api/state */
   | { type: 'reload'; reason: string };

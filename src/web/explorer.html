@@ -453,6 +453,101 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .notice.info { background: var(--info-soft); color: var(--info); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
 .paused { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+
+/* ---------- accounts (ABX) ---------- */
+.modesw { flex: none; }
+.modesw button { padding: 6px 14px; font-size: 13px; font-weight: 600; }
+.modesw b { font-weight: 600; margin-left: 4px; opacity: .75; }
+body.mode-accounts .top .wrap > :not(.head) { display: none !important; }
+body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !important; }
+.acc { padding-top: 16px; padding-bottom: 60px; }
+.acc-grid { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .acc-grid { grid-template-columns: 1fr; } .acc-side { position: static !important; max-height: none !important; } }
+.acc-side { position: sticky; top: 84px; display: flex; flex-direction: column; max-height: calc(100vh - 104px); }
+.acc-side-head { display: flex; gap: 6px; padding: 10px; border-bottom: 1px solid var(--border); }
+.acc-side-head input { flex: 1; min-width: 0; padding: 5px 9px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--bg); }
+.acc-list { overflow: auto; padding: 6px; flex: 1; }
+.acc-item { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 8px; cursor: pointer; color: var(--text); }
+.acc-item:hover { background: var(--panel-2); }
+.acc-item.cur { background: var(--accent-soft); }
+.acc-item .n { font-weight: 600; display: flex; gap: 6px; align-items: center; justify-content: space-between; }
+.acc-item .m { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.acc-side-foot { border-top: 1px solid var(--border); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.acc-side-foot .btn { justify-content: flex-start; }
+.st { font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 999px; line-height: 18px; background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+.st-target { background: var(--accent-soft); color: var(--accent); }
+.st-engaged { background: var(--info-soft); color: var(--info); }
+.st-customer { background: var(--good-soft); color: var(--good); }
+.st-paused { background: var(--warn-soft); color: var(--warn); }
+.acc-head { padding: 14px 16px 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.acc-head h2 { margin: 0; font-size: 20px; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.acc-head select { padding: 4px 8px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--panel); }
+.acc-sub { padding: 0 16px; color: var(--muted); font-size: 12.5px; }
+.acc-fields { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 16px 14px; }
+.acc-fields label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--muted); flex: 1 1 180px; }
+.acc-fields input, .acc-drawer select, .acc-drawer textarea, .acc-drawer input {
+  padding: 6px 9px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); font-size: 13px; }
+.acc-row { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+@media (max-width: 1100px) { .acc-row { grid-template-columns: 1fr; } }
+.acc-sec { margin-top: 16px; }
+.acc-card-h { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-weight: 600; flex-wrap: wrap; }
+.acc-card-h .sub { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.acc-card-h .sp { flex: 1; }
+.acc-brief textarea { display: block; width: 100%; min-height: 240px; border: 0; background: transparent; color: var(--text); padding: 12px 14px; font: 13px/1.55 var(--mono); resize: vertical; }
+.acc-brief textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--accent-soft); }
+.savestate { font-size: 12px; color: var(--muted); font-weight: 400; }
+.acc-committee { padding: 10px 14px 14px; }
+.role-row { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; font-size: 13px; }
+.role-row .rl { flex: 0 0 140px; }
+.role-row .who { color: var(--text); }
+.role-row .who.none { color: var(--faint); }
+.gaps { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 12.5px; }
+.gaps ul { margin: 4px 0 0; padding-left: 18px; }
+.org { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; padding: 12px; }
+.dept { background: var(--panel-2); border-radius: 10px; padding: 8px; }
+.dept h4 { margin: 2px 4px 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; justify-content: space-between; }
+.tier-l { font-size: 11px; color: var(--faint); margin: 8px 4px 4px; }
+.pcard { display: block; width: 100%; text-align: left; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; cursor: pointer; color: var(--text); }
+.pcard:hover { border-color: var(--accent); }
+.pcard.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.pcard .n { font-weight: 600; font-size: 13.5px; }
+.pcard .t { font-size: 12.5px; color: var(--muted); }
+.pcard .c { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.pcard .rep { font-size: 11.5px; color: var(--muted); }
+.role { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 0 7px; line-height: 18px; white-space: nowrap; }
+.r-decision-maker { background: var(--accent); color: var(--accent-text); }
+.r-champion { background: var(--good-soft); color: var(--good); }
+.r-influencer { background: var(--info-soft); color: var(--info); }
+.r-user { background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+.r-gatekeeper { background: var(--warn-soft); color: var(--warn); }
+.r-blocker { background: var(--bad-soft); color: var(--bad); }
+.r-none { color: var(--faint); border: 1px dashed var(--border-strong); }
+.warm { padding: 4px 14px 10px; }
+.warm h5 { margin: 10px 0 4px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.warm-row { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.warm-row:last-child { border-bottom: 0; }
+.warm-row .w { flex: 1; min-width: 0; }
+.warm-row .w .t { font-size: 12.5px; color: var(--muted); }
+.acc-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100vw); background: var(--panel); border-left: 1px solid var(--border); box-shadow: var(--shadow); z-index: 40; overflow: auto; padding: 16px 18px 40px; }
+.acc-drawer .x { position: absolute; top: 10px; right: 12px; }
+.acc-drawer h3 { margin: 0 0 2px; font-size: 18px; padding-right: 40px; }
+.acc-drawer .who-t { color: var(--muted); }
+.acc-drawer .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.acc-drawer label { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--muted); }
+.acc-drawer label.full { grid-column: 1 / -1; }
+.acc-drawer textarea { width: 100%; min-height: 72px; resize: vertical; font-family: inherit; }
+.acc-drawer .sec { margin-top: 16px; }
+.exp { margin: 0; padding: 0; list-style: none; }
+.exp li { padding: 7px 0; border-bottom: 1px solid var(--border); }
+.exp li:last-child { border-bottom: 0; }
+.exp .d { font-size: 12px; color: var(--muted); }
+.exp .x2 { font-size: 12.5px; white-space: pre-wrap; margin-top: 3px; }
+.acc-empty { padding: 44px 24px; text-align: center; color: var(--muted); }
+.acc-empty h3 { color: var(--text); margin: 0 0 8px; font-size: 17px; }
+.acc-empty ol { text-align: left; display: inline-block; margin: 8px 0 14px; line-height: 1.7; }
+.ext-code { width: 100%; font: 12px var(--mono); padding: 8px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
+#dlgExt ol { padding-left: 18px; line-height: 1.6; margin: 8px 0; }
+#dlgExt code { font: 12px var(--mono); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -465,6 +560,10 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
           <div class="app">network-builder · explorer</div>
           <div class="goal" id="goal">Your network</div>
         </div>
+      </div>
+      <div class="seg modesw" id="modeSw" role="group" aria-label="View">
+        <button type="button" data-mode="people" aria-pressed="true" title="Your LinkedIn connections, lenses and lists">People</button>
+        <button type="button" data-mode="accounts" aria-pressed="false" title="Target accounts: key people by org chart, buying committee and your ABX brief">Accounts<b id="acctN"></b></button>
       </div>
       <div class="stats" id="stats" aria-live="polite"></div>
     </div>
@@ -628,6 +727,23 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   <div class="paths" id="paths"></div>
 </main>
 
+<section class="wrap acc" id="accView" hidden aria-label="Accounts">
+  <div class="acc-grid">
+    <aside class="card acc-side">
+      <div class="acc-side-head">
+        <input id="accQ" type="search" placeholder="Find an account" autocomplete="off" aria-label="Find an account">
+        <button class="btn sm primary" id="accNew" type="button" title="Create a target account">＋ New</button>
+      </div>
+      <div class="acc-list" id="accList"></div>
+      <div class="acc-side-foot">
+        <button class="btn sm ghost" id="accExt" type="button" title="Add people to accounts straight from LinkedIn">🧩 Chrome extension…</button>
+      </div>
+    </aside>
+    <div id="accMain"></div>
+  </div>
+</section>
+<div id="accDrawer"></div>
+
 <div class="selbar" id="selbar" role="region" aria-label="Selection actions">
   <span class="count" id="selCount"></span>
   <button class="btn primary sm" id="exportSel" type="button">⬇ Export CSV</button>
@@ -648,6 +764,10 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   <details class="dd" id="lensSelDd">
     <summary class="btn sm" id="lensSelBtn">Lenses ▾</summary>
     <div class="dd-pop up wide" id="lensSelPop"></div>
+  </details>
+  <details class="dd" id="acctSelDd">
+    <summary class="btn sm" id="acctSelBtn" title="Put the selected people on a target account">Add to account ▾</summary>
+    <div class="dd-pop up wide" id="acctSelPop"></div>
   </details>
   <span class="sep"></span>
   <button class="btn ghost sm" id="clearSel" type="button">Clear</button>
@@ -690,6 +810,23 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
       <button class="btn" value="cancel" type="submit">Cancel</button>
       <button class="btn" value="save" type="submit" id="dlgExSave" title="Write the CSV into the outputs folder">Save to outputs</button>
       <button class="btn primary" value="download" type="submit" id="dlgExDl">Download</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="dlgExt" style="width:min(520px, calc(100vw - 32px))">
+  <form method="dialog" class="dlg">
+    <h3>Add people from LinkedIn</h3>
+    <p>The Network Builder Chrome extension puts a <b>＋ Network Builder</b> button on LinkedIn profiles. One click files the person — with their full profile — under an account here. It only reads the profile you’re viewing, when you click.</p>
+    <ol>
+      <li>Install it once: open <code>chrome://extensions</code>, turn on <b>Developer mode</b>, click <b>Load unpacked</b> and choose <span id="extDir"></span>.</li>
+      <li>Click the extension’s icon (pin it from the 🧩 menu) and paste this pairing code:</li>
+    </ol>
+    <textarea class="ext-code" id="extCode" rows="3" readonly></textarea>
+    <p class="hint" id="extNote" style="font-size:12.5px;margin:6px 0 14px">Keep this explorer (or the Network Builder app) running while you browse LinkedIn. If it isn’t running, the extension saves profiles and sends them when it is.</p>
+    <div class="row-btns">
+      <button class="btn ghost danger" value="cancel" type="button" id="extReset" title="Make a new code — the extension stops working until you paste the new one">Reset pairing</button>
+      <button class="btn" value="cancel" type="submit">Close</button>
+      <button class="btn primary" type="button" id="extCopy">Copy pairing code</button>
     </div>
   </form>
 </dialog>
@@ -1356,8 +1493,10 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     $('newLensBtn').title = LIVE ? (lensJob ? 'Another lens is being scored — wait for it to finish' : '') : 'Creating lenses needs the live explorer';
     $('minScoreCtl').style.opacity = ui.lens ? '' : '.45';
     $('minScore').disabled = !ui.lens; $('minScoreRange').disabled = !ui.lens;
-    $('goal').textContent = cur ? 'Lens: ' + cur.goal : 'Your network';
-    $('goal').title = cur ? cur.goal : 'Exploring everyone — pick or create a lens to score people for a goal';
+    if (mode !== 'accounts') {
+      $('goal').textContent = cur ? 'Lens: ' + cur.goal : 'Your network';
+      $('goal').title = cur ? cur.goal : 'Exploring everyone — pick or create a lens to score people for a goal';
+    }
   }
   /** first pass over n people + rerank of min(rerankTop, n) (lens = existing lens, or null for a new one: top 150) */
   function lensCost(n, lens) {
@@ -2090,6 +2229,11 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     }
     var ms = memberships(p.id);
     if (ms.length) fact('In lists', h('span', { class: 'chips' }, ms.map(function (l) { return h('span', { class: 'tag', text: l.name }); })));
+    var accs = accountsOf(p.id);
+    if (accs.length) fact('Accounts', h('span', { class: 'chips' }, accs.map(function (a) {
+      return h('button', { class: 'tag', type: 'button', text: a.name, title: 'Open the account', style: 'cursor:pointer',
+        on: { click: function () { acc.cur = a.id; acc.view = null; acc.open = p.id; setMode('accounts'); } } });
+    })));
     fact('In selection', selected.has(p.id) ? 'Yes' : '');
     append(right, sec('Details', facts));
     if (d) append(right, sec('Sources', sourcesEl(d.sources)));
@@ -2312,6 +2456,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     }
     if ($('lensSelDd').open) renderLensMenu();
     if ($('ahoySelDd').open) renderAhoyMenu();
+    if ($('acctSelDd').open) renderAcctMenu();
     $('viewSel').textContent = ui.show === 'sel' ? 'Show all' : 'Review';
     $('viewSel').title = ui.show === 'sel' ? 'Back to all rows' : 'Show only the selected people';
     $('selEst').textContent = st.light.length || st.deep.length
@@ -2392,6 +2537,7 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
     if (s.estimates) EST = s.estimates;
     if (Array.isArray(s.lenses)) lenses = s.lenses;
     if (Array.isArray(s.lists)) lists = s.lists;
+    if (Array.isArray(s.accounts)) accountsUpdated(s.accounts);
     applyQueue(s.queue, true);
     reindex();
     selected.forEach(function (id) { if (!byId.has(id)) selected.delete(id); });
@@ -2492,6 +2638,9 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
       });
       renderStats(); renderSelbar();
       if (ui.crmf && ui.crmf !== 'any') heavyRefresh();
+    });
+    on('accounts', function (d) {
+      if (d && Array.isArray(d.accounts)) accountsUpdated(d.accounts, d.changed, d.notice);
     });
     on('notice', function (d) {
       if (d && d.message) toast(d.message, d.level === 'error' ? 'bad' : d.level === 'warn' ? null : 'good');
@@ -3199,6 +3348,476 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   // the rate-limit pause chip expires on its own
   setInterval(function () { if (pausedUntil) renderStats(); }, 30000);
 
+  // ---------------------------------------------------------------- accounts (ABX)
+  // Vocab mirrors src/accounts/types.ts.
+  var DEPTS = ['executive', 'engineering', 'it-security', 'data-ai', 'product', 'design', 'sales', 'customer', 'marketing',
+    'finance', 'people', 'legal', 'operations', 'board', 'other'];
+  var DEPT_LABELS = { executive: 'Executive', engineering: 'Engineering', 'it-security': 'IT & Security', 'data-ai': 'Data & AI',
+    product: 'Product', design: 'Design', sales: 'Sales & Partnerships', customer: 'Customer', marketing: 'Marketing',
+    finance: 'Finance & Procurement', people: 'People / HR', legal: 'Legal & Compliance', operations: 'Operations & Strategy',
+    board: 'Board & Advisors', other: 'Other' };
+  var TIERS = ['exec', 'vp', 'director', 'manager', 'ic', 'board', 'unknown'];
+  var TIER_LABELS = { exec: 'C-level & founders', vp: 'VP', director: 'Director / Head of', manager: 'Manager / Lead',
+    ic: 'Individual contributor', board: 'Board & advisors', unknown: 'Unknown level' };
+  var ROLES = ['decision-maker', 'champion', 'influencer', 'user', 'gatekeeper', 'blocker'];
+  var ROLE_LABELS = { 'decision-maker': 'Decision maker', champion: 'Champion', influencer: 'Influencer', user: 'End user',
+    gatekeeper: 'Gatekeeper / procurement', blocker: 'Blocker' };
+  var STATUSES = ['target', 'engaged', 'customer', 'paused'];
+
+  var accounts = Array.isArray(state.accounts) ? state.accounts : [];
+  var acc = { cur: '', view: null, open: '', q: '', seq: 0 };
+  var mode = 'people';
+  try {
+    mode = localStorage.getItem('nb.mode') === 'accounts' ? 'accounts' : 'people';
+    acc.cur = localStorage.getItem('nb.account') || '';
+  } catch (e) { /* storage blocked */ }
+
+  function accById(id) { for (var i = 0; i < accounts.length; i++) if (accounts[i].id === id) return accounts[i]; return null; }
+  function accountsOf(pid) { return accounts.filter(function (a) { return (a.memberIds || []).indexOf(pid) >= 0; }); }
+  function enc(s) { return encodeURIComponent(s); }
+  function roleChip(r) {
+    return r ? h('span', { class: 'role r-' + r, text: ROLE_LABELS[r] || r }) : h('span', { class: 'role r-none', text: 'no role' });
+  }
+  function statusChip(st) { return h('span', { class: 'st st-' + st, text: st }); }
+  function remember() {
+    try { localStorage.setItem('nb.mode', mode); localStorage.setItem('nb.account', acc.cur || ''); } catch (e) { /* ignore */ }
+  }
+
+  function setMode(m) {
+    mode = m === 'accounts' ? 'accounts' : 'people';
+    document.body.classList.toggle('mode-accounts', mode === 'accounts');
+    $('accView').hidden = mode !== 'accounts';
+    Array.prototype.forEach.call(document.querySelectorAll('#modeSw button'), function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === mode));
+    });
+    if (mode === 'accounts') { $('goal').textContent = 'Accounts'; $('goal').title = 'Target accounts and their key people'; }
+    else renderLensBar();
+    remember();
+    if (mode === 'accounts') {
+      if ((!acc.cur || !accById(acc.cur)) && accounts.length) acc.cur = accounts[0].id;
+      renderAccList();
+      if (acc.cur && (!acc.view || acc.view.account.id !== acc.cur)) loadAccount(); else renderAccMain();
+    } else closeDrawer();
+  }
+  function renderModeSw() { $('acctN').textContent = accounts.length ? ' ' + accounts.length : ''; }
+
+  function renderAccList() {
+    renderModeSw();
+    var box = $('accList');
+    box.textContent = '';
+    var q = acc.q.trim().toLowerCase();
+    var rows = accounts.filter(function (a) { return !q || a.name.toLowerCase().indexOf(q) >= 0 || (a.domain || '').indexOf(q) >= 0; });
+    if (!accounts.length) { box.appendChild(h('div', { class: 'dd-note', text: 'No accounts yet.' })); return; }
+    if (!rows.length) { box.appendChild(h('div', { class: 'dd-note', text: 'No account matches “' + acc.q + '”.' })); return; }
+    rows.forEach(function (a) {
+      var roles = a.roles || {};
+      var bits = [a.memberCount + (a.memberCount === 1 ? ' person' : ' people')];
+      if (a.connections) bits.push(a.connections + ' connection' + (a.connections === 1 ? '' : 's'));
+      if (!roles['decision-maker'] && a.memberCount) bits.push('no decision maker');
+      box.appendChild(h('button', { class: 'acc-item' + (a.id === acc.cur ? ' cur' : ''), type: 'button',
+        on: { click: function () { selectAccount(a.id); } } },
+        h('div', { class: 'n' }, h('span', { text: a.name }), statusChip(a.status)),
+        h('div', { class: 'm', text: bits.join(' · ') })));
+    });
+  }
+
+  function selectAccount(id) {
+    acc.cur = id; acc.open = ''; acc.view = null;
+    remember(); renderAccList(); closeDrawer(); loadAccount();
+  }
+  function loadAccount() {
+    if (!LIVE) { renderAccMain(); return; }
+    if (!acc.cur) { renderAccMain(); return; }
+    var seq = ++acc.seq, id = acc.cur;
+    api('/api/accounts/' + enc(id)).then(function (v) {
+      if (seq !== acc.seq || id !== acc.cur) return;
+      acc.view = v;
+      renderAccMain();
+      if (acc.open) renderDrawer();
+    }).catch(function (e) {
+      if (seq !== acc.seq) return;
+      if (/no such account/.test(e.message)) { acc.cur = ''; acc.view = null; remember(); renderAccList(); renderAccMain(); return; }
+      toast('Couldn’t load the account: ' + e.message, 'bad');
+    });
+  }
+  function applyAccountRes(res) {
+    if (!res) return;
+    if (Array.isArray(res.accounts)) { accounts = res.accounts; renderAccList(); renderSelbar(); }
+    if (res.view) { acc.view = res.view; renderAccMain(); if (acc.open) renderDrawer(); }
+  }
+
+  function newAccount(thenAdd) {
+    return promptDlg('New account', 'The company you’re targeting. People captured from LinkedIn are matched to it by name.', '', 'Create', 120).then(function (name) {
+      if (!name) return null;
+      return api('/api/accounts', { name: name }).then(function (res) {
+        accounts = res.accounts || accounts;
+        toast('Created account “' + res.account.name + '”', 'good');
+        if (thenAdd) return res.account;
+        selectAccount(res.account.id);
+        return res.account;
+      }).catch(function (e) { toast('Couldn’t create the account: ' + e.message, 'bad'); return null; });
+    });
+  }
+  function saveAccount(patch, quiet) {
+    var id = acc.cur;
+    return api('/api/accounts/' + enc(id), patch, 'PUT').then(function (res) {
+      if (id !== acc.cur) return true;
+      accounts = res.accounts || accounts;
+      renderAccList();
+      // keep the brief editor (and its cursor) while typing: only swap the data
+      if (res.view) acc.view = res.view;
+      if (!quiet) renderAccMain();
+      return true;
+    }).catch(function (e) { toast('Not saved: ' + e.message, 'bad'); return false; });
+  }
+  function deleteAccount() {
+    var a = acc.view && acc.view.account;
+    if (!a) return;
+    confirmDlg('Delete “' + a.name + '”?', 'Removes the account, its brief and who’s on it. Captured LinkedIn profiles and your network are kept, so people can be added to another account.', 'Delete account').then(function (ok) {
+      if (!ok) return;
+      api('/api/accounts/' + enc(a.id), {}, 'DELETE').then(function (res) {
+        accounts = res.accounts || [];
+        acc.cur = accounts.length ? accounts[0].id : ''; acc.view = null; acc.open = '';
+        remember(); renderAccList(); closeDrawer(); loadAccount();
+        toast('Deleted “' + a.name + '”', 'good');
+      }).catch(function (e) { toast('Delete failed: ' + e.message, 'bad'); });
+    });
+  }
+  function addToAccount(accountId, ids, quiet) {
+    return api('/api/accounts/' + enc(accountId) + '/members', { ids: ids }).then(function (res) {
+      accounts = res.accounts || accounts;
+      if (accountId === acc.cur) applyAccountRes(res); else { renderAccList(); renderSelbar(); }
+      var a = accById(accountId);
+      if (!quiet) toast('Added ' + res.added.length + ' to ' + (a ? a.name : 'the account') + (res.already.length ? ' · ' + res.already.length + ' already on it' : ''), 'good',
+        mode === 'people' ? { label: 'Open account', fn: function () { acc.cur = accountId; acc.view = null; setMode('accounts'); } } : null);
+      return res;
+    }).catch(function (e) { toast('Couldn’t add: ' + e.message, 'bad'); });
+  }
+  function updMember(pid, patch) {
+    return api('/api/accounts/' + enc(acc.cur) + '/members/' + enc(pid), patch, 'PUT').then(applyAccountRes)
+      .catch(function (e) { toast('Not saved: ' + e.message, 'bad'); if (acc.open) renderDrawer(); });
+  }
+  function rmMember(m) {
+    confirmDlg('Remove ' + m.fullName + ' from ' + acc.view.account.name + '?', 'Their captured profile is kept — adding them back later restores it instantly.', 'Remove').then(function (ok) {
+      if (!ok) return;
+      api('/api/accounts/' + enc(acc.cur) + '/members/' + enc(m.id), {}, 'DELETE').then(function (res) {
+        acc.open = ''; closeDrawer(); applyAccountRes(res);
+        toast('Removed ' + m.fullName, 'good');
+      }).catch(function (e) { toast('Remove failed: ' + e.message, 'bad'); });
+    });
+  }
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    var ta = h('textarea', { style: 'position:fixed;opacity:0' });
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { /* ignore */ }
+    ta.remove();
+    return ok ? Promise.resolve() : Promise.reject(new Error('clipboard unavailable'));
+  }
+  function copyBrief() {
+    api('/api/accounts/' + enc(acc.cur) + '/brief').then(function (res) {
+      return copyText(res.markdown).then(function () {
+        toast('Copied the account context (' + Math.round(res.markdown.length / 1000) + 'k chars) — paste it into Claude, or ask Claude to use network_get_account.', 'good');
+      });
+    }).catch(function (e) { toast('Copy failed: ' + e.message, 'bad'); });
+  }
+
+  // ---- main panel
+  function accEmpty() {
+    return h('div', { class: 'card acc-empty' },
+      h('h3', { text: accounts.length ? 'Pick an account' : 'Focus on the accounts that matter' }),
+      h('div', { text: 'An account is a company you’re targeting: its key people grouped by org chart, their role in the buying committee, and your ABX brief — all available to Claude through the network-builder MCP tools.' }),
+      h('ol', null,
+        h('li', null, 'Create an account, or let the Chrome extension create it from a LinkedIn profile.'),
+        h('li', null, 'On LinkedIn, click ＋ Network Builder on a decision maker’s profile.'),
+        h('li', null, 'Or select connections in People → “Add to account”.'),
+        h('li', null, 'Ask Claude: “plan an ABX campaign for <company>” (uses network_get_account).')),
+      h('div', { class: 'row-btns', style: 'justify-content:center;display:flex;gap:8px' },
+        h('button', { class: 'btn primary', type: 'button', text: '＋ New account', disabled: !LIVE, on: { click: function () { newAccount(); } } }),
+        h('button', { class: 'btn', type: 'button', text: '🧩 Set up the Chrome extension', disabled: !LIVE, on: { click: openExtDialog } })));
+  }
+
+  function renderAccMain() {
+    var box = $('accMain');
+    box.textContent = '';
+    if (!LIVE) { box.appendChild(h('div', { class: 'card acc-empty' }, h('h3', { text: 'Accounts need the live explorer' }), h('div', { text: 'This is a read-only snapshot. Run network-builder to open the live explorer.' }))); return; }
+    if (!acc.cur) { box.appendChild(accEmpty()); return; }
+    var v = acc.view;
+    if (!v) { box.appendChild(h('div', { class: 'card acc-empty', text: 'Loading…' })); return; }
+    var a = v.account, ms = v.members;
+    var byId = {}; ms.forEach(function (m) { byId[m.id] = m; });
+
+    // header
+    var stSel = h('select', { 'aria-label': 'Account status', on: { change: function () { saveAccount({ status: stSel.value }); } } },
+      STATUSES.map(function (s) { return h('option', { value: s, text: s, selected: s === a.status }); }));
+    function field(label, key, value, ph, toValue) {
+      var inp = h('input', { type: 'text', value: value, placeholder: ph, autocomplete: 'off' });
+      inp.addEventListener('change', function () {
+        var p = {}; p[key] = toValue ? toValue(inp.value) : inp.value;
+        saveAccount(p).then(function (ok) { if (ok) toast('Saved', 'good'); });
+      });
+      return h('label', null, label, inp);
+    }
+    var head = h('div', { class: 'card' },
+      h('div', { class: 'acc-head' },
+        h('h2', { title: a.name, text: a.name }),
+        h('button', { class: 'btn sm ghost', type: 'button', text: '✎ Rename', on: { click: function () {
+          promptDlg('Rename account', '', a.name, 'Rename', 120).then(function (n) { if (n && n !== a.name) saveAccount({ name: n }); });
+        } } }),
+        stSel,
+        h('button', { class: 'btn sm primary', type: 'button', text: '⧉ Copy for AI', title: 'Copy the whole account (brief, committee, org chart, full profiles, warm paths) as markdown for Claude', on: { click: copyBrief } }),
+        h('button', { class: 'btn sm ghost danger', type: 'button', text: '🗑', title: 'Delete this account', on: { click: deleteAccount } })),
+      h('div', { class: 'acc-sub', text: ms.length + (ms.length === 1 ? ' key person' : ' key people') + ' · ' +
+        ms.filter(function (m) { return m.isConnection; }).length + ' your connections · ' +
+        ms.filter(function (m) { return m.capturedAt; }).length + ' captured from LinkedIn · MCP: network_get_account "' + a.name + '"' }),
+      h('div', { class: 'acc-fields' },
+        field('Website domain', 'domain', a.domain, 'example.com'),
+        field('LinkedIn company page', 'linkedinUrl', a.linkedinUrl, 'https://www.linkedin.com/company/…'),
+        field('Also known as (comma-separated)', 'aliases', (a.aliases || []).join(', '), 'Other names it goes by', function (x) {
+          return x.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        })));
+
+    // brief
+    var saveState = h('span', { class: 'savestate' });
+    var ta = h('textarea', { placeholder: 'Why this account, why now · their pains and priorities · triggers (funding, new exec, expansion…) · your offer and angle · the plan · notes from conversations. Markdown is fine — this is the context Claude gets.', 'aria-label': 'ABX brief' });
+    ta.value = a.brief || '';
+    var briefTimer = null, lastSaved = a.brief || '';
+    function saveBrief() {
+      clearTimeout(briefTimer);
+      if (ta.value === lastSaved) return;
+      var val = ta.value;
+      saveState.textContent = 'Saving…';
+      saveAccount({ brief: val }, true).then(function (ok) {
+        if (ok) { lastSaved = val; saveState.textContent = 'Saved ' + fmtTime(new Date().toISOString()); }
+        else saveState.textContent = 'Not saved — will retry when you stop typing';
+      });
+    }
+    ta.addEventListener('input', function () { saveState.textContent = 'Editing…'; clearTimeout(briefTimer); briefTimer = setTimeout(saveBrief, 1200); });
+    ta.addEventListener('blur', saveBrief);
+    var brief = h('div', { class: 'card acc-brief' },
+      h('div', { class: 'acc-card-h' }, 'ABX brief', h('span', { class: 'sub', text: 'markdown · autosaves' }), h('span', { class: 'sp' }), saveState), ta);
+
+    // committee
+    var committee = h('div', { class: 'acc-committee' });
+    ROLES.forEach(function (r) {
+      var who = ms.filter(function (m) { return m.role === r; });
+      committee.appendChild(h('div', { class: 'role-row' }, h('span', { class: 'rl' }, roleChip(r)),
+        h('span', { class: 'who' + (who.length ? '' : ' none') }, who.length ? who.map(function (m, i) {
+          return [i ? ', ' : '', h('a', { href: '#', text: m.fullName, on: { click: function (e) { e.preventDefault(); openPerson(m.id); } } })];
+        }) : '—')));
+    });
+    var unset = ms.filter(function (m) { return !m.role; }).length;
+    if (unset) committee.appendChild(h('div', { class: 'role-row' }, h('span', { class: 'rl' }, roleChip('')), h('span', { class: 'who', text: unset + (unset === 1 ? ' person' : ' people') })));
+    if (v.gaps && v.gaps.length) committee.appendChild(h('div', { class: 'gaps' }, h('b', { text: 'Gaps' }), h('ul', null, v.gaps.map(function (g) { return h('li', { text: g }); }))));
+    var comm = h('div', { class: 'card' }, h('div', { class: 'acc-card-h' }, 'Buying committee'), committee);
+
+    // org chart
+    var org = h('div', { class: 'org' });
+    DEPTS.forEach(function (d) {
+      var inD = ms.filter(function (m) { return m.department === d; });
+      if (!inD.length) return;
+      var col = h('div', { class: 'dept' }, h('h4', null, h('span', { text: DEPT_LABELS[d] }), h('span', { text: String(inD.length) })));
+      TIERS.forEach(function (t) {
+        var inT = inD.filter(function (m) { return m.tier === t; });
+        if (!inT.length) return;
+        col.appendChild(h('div', { class: 'tier-l', text: TIER_LABELS[t] }));
+        inT.forEach(function (m) {
+          var mgr = m.reportsTo && byId[m.reportsTo];
+          col.appendChild(h('button', { class: 'pcard' + (acc.open === m.id ? ' cur' : ''), type: 'button', 'data-pid': m.id,
+            title: 'Open ' + m.fullName, on: { click: function () { openPerson(m.id); } } },
+            h('div', { class: 'n', text: m.fullName }),
+            h('div', { class: 't', text: m.title || m.headline || '—' }),
+            h('div', { class: 'c' }, roleChip(m.role),
+              m.isConnection ? h('span', { class: 'tag t-founder', text: 'connection', title: 'In your LinkedIn connections' }) : null,
+              !m.capturedAt && !m.isConnection ? h('span', { class: 'tag', text: 'no profile' }) : null,
+              mgr ? h('span', { class: 'rep', text: '↳ ' + mgr.fullName }) : null)));
+        });
+      });
+      org.appendChild(col);
+    });
+    var orgCard = h('div', { class: 'card acc-sec' },
+      h('div', { class: 'acc-card-h' }, 'Org chart', h('span', { class: 'sub', text: 'department → seniority · placed from job titles; click a person to correct it, set their role or who they report to' })),
+      ms.length ? org : h('div', { class: 'acc-empty', style: 'padding:24px' },
+        h('div', { text: 'Nobody on this account yet. Add people from LinkedIn with the Chrome extension, or add your connections who work there (below).' }),
+        h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn sm', type: 'button', text: '🧩 Set up the Chrome extension', on: { click: openExtDialog } }))));
+
+    // warm paths
+    var cur = v.warmPaths.filter(function (w) { return w.relation === 'current'; });
+    var past = v.warmPaths.filter(function (w) { return w.relation === 'past'; });
+    function warmRow(w) {
+      return h('div', { class: 'warm-row' },
+        h('div', { class: 'w' }, w.url ? h('a', { href: w.url, target: '_blank', rel: 'noopener', text: w.fullName }) : w.fullName,
+          h('div', { class: 't', text: w.relation === 'past' ? 'Now: ' + (w.title || '—') + ' · was ' + w.detail : (w.title || w.detail || '') })),
+        w.relation === 'current' ? h('button', { class: 'btn sm', type: 'button', text: '＋ Add', title: 'Put ' + w.fullName + ' on this account',
+          on: { click: function () { addToAccount(acc.cur, [w.id]); } } }) : null);
+    }
+    var warm = h('div', { class: 'warm' });
+    if (!v.warmPaths.length) warm.appendChild(h('div', { class: 'dd-note', style: 'padding:8px 0', text: 'None of your connections work there (by headline), and no researched connection has it in their career. Add aliases above if the company goes by other names.' }));
+    if (cur.length) { warm.appendChild(h('h5', { text: 'Work there now (' + cur.length + ')' })); cur.forEach(function (w) { warm.appendChild(warmRow(w)); }); }
+    if (past.length) { warm.appendChild(h('h5', { text: 'Used to work there (' + past.length + ')' })); past.forEach(function (w) { warm.appendChild(warmRow(w)); }); }
+    var warmCard = h('div', { class: 'card' }, h('div', { class: 'acc-card-h' }, 'Your warm paths in', h('span', { class: 'sub', text: 'your connections at ' + a.name })), warm);
+
+    box.appendChild(head);
+    box.appendChild(h('div', { class: 'acc-row' }, brief, h('div', null, comm, h('div', { style: 'height:16px' }), warmCard)));
+    box.appendChild(orgCard);
+  }
+
+  // ---- person drawer
+  function closeDrawer() { acc.open = ''; $('accDrawer').textContent = ''; markOpenCard(); }
+  function markOpenCard() {
+    Array.prototype.forEach.call(document.querySelectorAll('.pcard'), function (c) { c.classList.toggle('cur', c.getAttribute('data-pid') === acc.open); });
+  }
+  function openPerson(id) { acc.open = id; renderDrawer(); markOpenCard(); }
+  function renderDrawer() {
+    var box = $('accDrawer');
+    box.textContent = '';
+    var v = acc.view;
+    var m = v && v.members.filter(function (x) { return x.id === acc.open; })[0];
+    if (!m) { acc.open = ''; return; }
+    var others = v.members.filter(function (x) { return x.id !== m.id; });
+    function sel(label, key, opts, value, cls) {
+      var s = h('select', { on: { change: function () { var p = {}; p[key] = s.value; updMember(m.id, p); } } },
+        opts.map(function (o) { return h('option', { value: o[0], text: o[1], selected: o[0] === value }); }));
+      return h('label', { class: cls || '' }, label, s);
+    }
+    var notes = h('textarea', { placeholder: 'What matters to them, history with you, next step…' });
+    notes.value = m.notes || '';
+    notes.addEventListener('change', function () { updMember(m.id, { notes: notes.value }); });
+    var p = m.profile;
+    function sec(t, body) { return body ? h('div', { class: 'sec' }, h('h4', { text: t }), body) : null; }
+    var exp = p && p.experience && p.experience.length ? h('ul', { class: 'exp' }, p.experience.map(function (e) {
+      return h('li', null, h('div', null, h('b', { text: e.title }), e.company ? ' · ' + e.company : ''),
+        h('div', { class: 'd', text: [e.dates, e.location].filter(Boolean).join(' · ') }),
+        e.description ? h('div', { class: 'x2', text: e.description }) : null);
+    })) : null;
+    var edu = p && p.education && p.education.length ? h('ul', { class: 'exp' }, p.education.map(function (e) {
+      return h('li', null, h('b', { text: e.school }), e.detail ? h('div', { class: 'd', text: e.detail }) : null);
+    })) : null;
+    var other = p && p.other ? Object.keys(p.other).filter(function (k) { return p.other[k] && p.other[k].length; }).map(function (k) {
+      return sec(k, h('div', { class: 'chips' }, p.other[k].slice(0, 30).map(function (x) { return h('span', { class: 'tag', text: x }); })));
+    }) : [];
+    var autoD = m.autoDepartment ? 'Auto: ' + DEPT_LABELS[m.department] : 'Automatic';
+    var autoT = m.autoTier ? 'Auto: ' + TIER_LABELS[m.tier] : 'Automatic';
+    var facts = [];
+    if (m.company) facts.push(m.company);
+    if (m.location) facts.push(m.location);
+    facts.push(m.isConnection ? 'Your connection' + (m.connectedOn ? ' since ' + fmtDate(m.connectedOn) : '') : 'Not a connection');
+    if (m.capturedAt) facts.push('Captured ' + fmtDate(m.capturedAt));
+    var dr = h('aside', { class: 'acc-drawer', role: 'dialog', 'aria-label': m.fullName },
+      h('button', { class: 'btn sm ghost x', type: 'button', text: '✕', title: 'Close (Esc)', on: { click: closeDrawer } }),
+      h('h3', { text: m.fullName }),
+      h('div', { class: 'who-t', text: m.title || m.headline || '' }),
+      h('div', { class: 'dd-note', style: 'padding:4px 0', text: facts.join(' · ') }),
+      h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' },
+        m.url ? h('a', { href: m.url, target: '_blank', rel: 'noopener', text: 'LinkedIn ↗' }) : null,
+        m.isConnection ? h('a', { href: '#', text: 'Open in People', on: { click: function (e) {
+          e.preventDefault(); setMode('people'); ui.q = m.fullName; $('q').value = m.fullName; onFilter();
+        } } }) : null),
+      m.otherAccounts && m.otherAccounts.length ? h('div', { class: 'dd-note', style: 'padding:4px 0', text: 'Also on: ' + m.otherAccounts.join(', ') }) : null,
+      h('div', { class: 'grid2' },
+        sel('Buying-committee role', 'role', [['', '— not set —']].concat(ROLES.map(function (r) { return [r, ROLE_LABELS[r]]; })), m.role, 'full'),
+        sel('Department', 'department', [['', autoD]].concat(DEPTS.map(function (d) { return [d, DEPT_LABELS[d]]; })), m.autoDepartment ? '' : m.department),
+        sel('Level', 'tier', [['', autoT]].concat(TIERS.map(function (t) { return [t, TIER_LABELS[t]]; })), m.autoTier ? '' : m.tier),
+        sel('Reports to', 'reportsTo', [['', '— unknown —']].concat(others.map(function (o) { return [o.id, o.fullName + (o.title ? ' (' + o.title + ')' : '')]; })), m.reportsTo, 'full'),
+        h('label', { class: 'full' }, 'Your notes', notes)),
+      m.webSummary ? sec('Web profile', h('p', { text: m.webSummary })) : null,
+      p && p.headline && p.headline !== m.title ? sec('Headline', h('p', { text: p.headline })) : null,
+      p && p.about ? sec('About', h('p', { text: p.about })) : null,
+      sec('Experience', exp),
+      sec('Education', edu),
+      other,
+      !p ? sec('Profile', h('p', { class: 'dd-note', style: 'padding:0', text: m.isConnection
+        ? 'No LinkedIn capture yet. Open their profile on LinkedIn and click ＋ Network Builder to save the full profile.'
+        : 'No profile captured.' })) : null,
+      h('div', { class: 'sec' }, h('button', { class: 'btn sm danger', type: 'button', text: 'Remove from ' + v.account.name, on: { click: function () { rmMember(m); } } })));
+    box.appendChild(dr);
+  }
+
+  // ---- Chrome extension pairing
+  function openExtDialog() {
+    if (!LIVE) return;
+    var dlg = $('dlgExt');
+    $('extCode').value = 'Loading…';
+    api('/api/ext/pair', {}).then(function (res) {
+      $('extCode').value = res.code;
+      var d = $('extDir'); d.textContent = '';
+      if (res.extensionDir) append(d, h('code', { text: res.extensionDir }));
+      else append(d, ['the ', h('code', { text: 'extension' }), ' folder of the network-builder repository (', h('a', { href: 'https://github.com/lyonsv/network-builder/tree/main/extension', target: '_blank', rel: 'noopener', text: 'GitHub' }), ')']);
+    }).catch(function (e) { $('extCode').value = 'Couldn’t get a pairing code: ' + e.message; });
+    if (typeof dlg.showModal === 'function') dlg.showModal();
+  }
+  $('extCopy').addEventListener('click', function () {
+    copyText($('extCode').value).then(function () { toast('Pairing code copied — paste it into the extension', 'good'); },
+      function () { $('extCode').select(); toast('Select the code and copy it (⌘C)', null); });
+  });
+  $('extReset').addEventListener('click', function () {
+    confirmDlg('Reset the pairing?', 'The extension stops sending until you paste the new code into it. Use this if a code leaked or you want to unpair a browser.', 'Reset').then(function (ok) {
+      if (!ok) return;
+      api('/api/ext/pair', { rotate: true }).then(function (res) { $('extCode').value = res.code; toast('New pairing code — paste it into the extension', 'good'); })
+        .catch(function (e) { toast('Reset failed: ' + e.message, 'bad'); });
+      if (!$('dlgExt').open && typeof $('dlgExt').showModal === 'function') $('dlgExt').showModal();
+    });
+  });
+
+  // ---- People view: "Add to account" on the selection bar
+  function renderAcctMenu() {
+    var pop = $('acctSelPop');
+    pop.textContent = '';
+    var ids = Array.from(selected).filter(function (id) { return byId.has(id); });
+    var close = function () { $('acctSelDd').open = false; };
+    pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: 'Accounts · ' + ids.length.toLocaleString() + ' selected' })));
+    accounts.forEach(function (a) {
+      var mem = new Set(a.memberIds || []);
+      var add = ids.filter(function (id) { return !mem.has(id); });
+      pop.appendChild(h('div', { class: 'lensmenu-row' },
+        h('span', { class: 'g', title: a.name, text: a.name }),
+        h('span', { class: 'n', text: add.length === ids.length ? '' : add.length ? (ids.length - add.length) + ' on it' : 'all on it' }),
+        h('button', { class: 'btn sm', type: 'button', disabled: !LIVE || !add.length, text: '＋ Add' + (add.length && add.length !== ids.length ? ' ' + add.length : ''),
+          on: { click: function () { close(); scopeToShown(add, 'Add').then(function (r) { if (r && r.length) addToAccount(a.id, r); }); } } })));
+    });
+    if (accounts.length) pop.appendChild(h('div', { class: 'dd-sep' }));
+    pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: !LIVE || !ids.length, text: '＋ New account with ' + ids.length.toLocaleString() + ' selected…',
+      on: { click: function () {
+        close();
+        scopeToShown(ids, 'Add').then(function (r) {
+          if (!r || !r.length) return;
+          newAccount(true).then(function (a) { if (a) addToAccount(a.id, r); });
+        });
+      } } }));
+    pop.appendChild(h('div', { class: 'dd-note', text: 'Accounts hold the key people at a company you’re targeting — see the Accounts tab at the top.' }));
+  }
+  $('acctSelDd').addEventListener('toggle', function () { if ($('acctSelDd').open) renderAcctMenu(); });
+
+  // ---- wiring
+  Array.prototype.forEach.call(document.querySelectorAll('#modeSw button'), function (b) {
+    b.addEventListener('click', function () { setMode(b.getAttribute('data-mode')); });
+  });
+  $('accQ').addEventListener('input', function () { acc.q = $('accQ').value; renderAccList(); });
+  $('accNew').addEventListener('click', function () { newAccount(); });
+  $('accExt').addEventListener('click', openExtDialog);
+  $('accNew').disabled = $('accExt').disabled = !LIVE;
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && acc.open && !document.querySelector('dialog[open]')) closeDrawer();
+  });
+  /** SSE `accounts` + full-state reloads land here */
+  function accountsUpdated(list, changed, notice) {
+    accounts = list;
+    renderModeSw();
+    if ($('acctSelDd').open) renderAcctMenu();
+    if (mode === 'accounts') {
+      renderAccList();
+      if (acc.cur && !accById(acc.cur)) { acc.cur = ''; acc.view = null; closeDrawer(); renderAccMain(); }
+      else if (!acc.cur && changed) { acc.cur = changed; loadAccount(); }
+      else if (acc.cur && (!changed || changed === acc.cur)) {
+        // don't clobber the brief while it's being typed
+        var typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#accMain textarea, #accDrawer textarea');
+        if (!typing) loadAccount();
+      }
+    }
+    if (notice) toast(notice, 'good', { label: 'Open', fn: function () { acc.cur = changed; acc.view = null; acc.open = ''; setMode('accounts'); } });
+  }
+
   // ---------------------------------------------------------------- boot
   syncControls();
   renderFilterMenus();
@@ -3209,6 +3828,8 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
   renderPaths();
   renderLensBar();
   refresh();
+  renderModeSw();
+  if (mode === 'accounts') setMode('accounts');
   connect();
 
   // expose for debugging in devtools / tests

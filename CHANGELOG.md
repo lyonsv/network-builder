@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- **Accounts (ABX):** the explorer has a new **Accounts** view. Each account holds:
+  - an ABX brief in markdown;
+  - its key people as an org chart (department → seniority, placed from job titles and correctable), each with a
+    buying-committee role, reporting line and notes;
+  - coverage gaps and your warm paths in.
+
+  **⧉ Copy for AI** copies the whole account as one markdown document. In People, **Add to account ▾** files selected
+  connections under an account.
+- **Chrome extension** (`extension/`): a **＋ Network Builder** button on LinkedIn profiles captures the profile you're
+  viewing (about, experience, education, skills, plus the page text as a fallback) into an account.
+  - Pairing uses a long-lived, add-only capture token.
+  - If the app isn't running, profiles wait in the extension and are sent automatically, with clear status, retry and
+    notifications.
+  - Captured people are kept out of your network: no lenses, People view, network search or exports.
+- **MCP:** 8 new account tools (`network_get_account` returns everything for one account in one call), an `abx_campaign`
+  prompt and `account://<id>` resources.
+- Schema migration: `accounts`, `contacts` (+ `contact_captures` history), `account_members`.
+
 ## 0.3.0
 
 - **Desktop app (macOS):** `desktop/` is an Electron shell (Network Builder.app) that runs the explorer server as a

@@ -56,10 +56,25 @@ To use a different database, add `-e NETWORK_BUILDER_HOME=/path/to/folder`, or a
 | `network_set_lens_threshold` | Change a lens's score cut-off. | local, reversible |
 | `network_save_list` | Create, replace or append to a named list. | local |
 | `network_export` | Write CSVs to the outputs folder: `crm`, `full`, or `ahoy` (Companies, Contacts and Notes files). | writes files |
+| `network_list_accounts` | Target accounts with status, people, connections and buying-committee coverage. | no |
+| `network_get_account` | **One account as one markdown document:** ABX brief, buying committee and gaps, org chart (department → seniority, reporting lines), each person's full LinkedIn profile and notes, and your warm paths (connections who work or worked there). Found by name, alias, id or LinkedIn company URL. `detail: "summary"` leaves out the profiles. | no |
+| `network_get_contact` | One key person on an account in full: placement, role, notes, every experience entry with descriptions, education, skills; optionally the raw captured page text. | no |
+| `network_create_account` / `network_update_account` | Create an account, or change its name, domain, LinkedIn page, aliases, status or brief. `brief_mode: "append"` (the default) adds to the brief, e.g. a campaign plan. | local |
+| `network_account_add_people` | Put connections (ids or LinkedIn URLs) or captured people on an account, optionally with a role. | local |
+| `network_account_update_person` | Set role, department or level (`""` = automatic from the title), who they report to, notes. | local |
+| `network_account_remove_person` | Take someone off an account (their captured profile is kept). | local, reversible |
 
 **Prompts:**
 - `warm_intro`: find intro paths to a company or person.
 - `lens_shortlist`: build a reasoned shortlist from a lens and save it, asking you first.
+- `abx_campaign`: plan an account-based campaign for one account: committee and gaps, the angle for each person,
+  warm paths, a 6-week multi-touch sequence and first drafts. It asks before saving the plan to the brief.
+
+**Resources:** `account://<id>` is the same document as `network_get_account`, so a client can attach an account as
+context.
+
+People captured from LinkedIn with the [Chrome extension](../extension/README.md) are reachable **only** through the
+account tools. They aren't connections, so network search, lenses and exports never include them.
 
 Results are paged with `limit`, `offset`, `has_more` and `next_offset`. Search tools take
 `response_format: "concise" | "detailed"`. Text output is capped at about 25k characters, with a note saying how to
@@ -70,7 +85,8 @@ narrow the results.
 - **Nothing that costs money or touches other systems.** It won't start web research, create or re-score lenses, or send
   anything to Ahoy. Those stay human-triggered in the explorer (`network-builder`). If a task needs them, Claude will
   tell you which people to research there.
-- **No deletes.** Removing someone from a lens is reversible, and lists are only created or updated.
+- **No deletes of your data.** Removing someone from a lens or an account is reversible (captured profiles are kept),
+  and lists are only created or updated.
 - **No network access.** Everything is read from and written to your local SQLite database and outputs folder.
 
 People you've removed from a lens stay hidden from that lens's results, the same as in the explorer, and Claude is told
@@ -83,4 +99,6 @@ to respect that.
 - "Find heads of marketing at fintech companies I'm connected to."
 - "Which candidates in my angel lens score 60–69? Add the ones who've had an exit."
 - "Save the top 20 angel-lens members as 'Q4 outreach' and export it for Ahoy."
+- "Plan an ABX campaign for Ledgerly." / "Who on the Initech account reports to the CFO, and who's our champion?"
+- "Add my connections who work at Ledgerly to that account, and append this meeting summary to its brief."
 - "Give me an overview of my network: top companies, seniority mix, and how many people have web profiles."

@@ -32,6 +32,7 @@
   },
   "files": [
     "dist",
+    "extension",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"

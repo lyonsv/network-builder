@@ -80,8 +80,9 @@ describe('network-builder MCP server', () => {
     const tools = (await client.listTools()).tools;
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
-      'network_export', 'network_find_connections_at', 'network_get_list', 'network_get_person', 'network_lens_add', 'network_lens_members',
-      'network_lens_remove', 'network_list_lenses', 'network_list_lists', 'network_save_list', 'network_search_people', 'network_set_lens_threshold', 'network_stats',
+      'network_account_add_people', 'network_account_remove_person', 'network_account_update_person', 'network_create_account',
+      'network_export', 'network_find_connections_at', 'network_get_account', 'network_get_contact', 'network_get_list', 'network_get_person', 'network_lens_add', 'network_lens_members',
+      'network_lens_remove', 'network_list_accounts', 'network_list_lenses', 'network_list_lists', 'network_save_list', 'network_search_people', 'network_set_lens_threshold', 'network_stats', 'network_update_account',
     ]);
     const search = tools.find((t) => t.name === 'network_search_people')!;
     expect(search.annotations?.readOnlyHint).toBe(true);
@@ -89,7 +90,7 @@ describe('network-builder MCP server', () => {
     // nothing that spends money is exposed
     expect(names.some((n) => /dossier|profile_build|research|score|ahoy/.test(n))).toBe(false);
     const prompts = (await client.listPrompts()).prompts.map((p) => p.name).sort();
-    expect(prompts).toEqual(['lens_shortlist', 'warm_intro']);
+    expect(prompts).toEqual(['abx_campaign', 'lens_shortlist', 'warm_intro']);
   });
 
   it('searches free text across headline, profile and web profile', async () => {

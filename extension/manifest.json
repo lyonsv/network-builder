@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Network Builder for LinkedIn",
+  "short_name": "Network Builder",
+  "version": "0.1.0",
+  "description": "Add the LinkedIn profile you're viewing to an account in your local Network Builder, in one click.",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "Network Builder",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
+  },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["storage", "alarms", "notifications"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

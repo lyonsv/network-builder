@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs';
+import { AccountsRepo } from './accounts';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { slugify } from '../io/output';
@@ -75,6 +76,8 @@ export interface DbStats {
  */
 export class Store {
   readonly db: DatabaseSync;
+  /** accounts (ABX), captured LinkedIn contacts and account membership */
+  readonly accounts: AccountsRepo;
 
   private constructor(readonly path: string) {
     if (path !== ':memory:') mkdirSync(pathDir(path), { recursive: true });
@@ -94,6 +97,7 @@ export class Store {
     }
     this.db.exec('PRAGMA synchronous = NORMAL');
     migrate(this.db);
+    this.accounts = new AccountsRepo(this.db);
   }
 
   static open(dbPath: string): Store {

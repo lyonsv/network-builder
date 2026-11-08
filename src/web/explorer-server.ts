@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Store } from '../db/store';
 import { ensureDir, writeFileAtomic } from '../io/fs-utils';
 import { ahoyPaths, explorerExportFilename, snapshotFilename, toAhoyFiles, toExplorerCsv } from '../io/explorer-export';
@@ -29,6 +31,7 @@ import type {
 import {
   HTML_HEADERS,
   HttpError,
+  checkExtensionRequest,
   checkHostAndOrigin,
   isAbortError,
   listenLocal,
@@ -38,6 +41,12 @@ import {
   sendJson,
 } from './http-common';
 import { renderExplorerHtml } from './template';
+import { AccountError, type AccountPatch, type MemberPatch } from '../db/accounts';
+import { CaptureError } from '../accounts/capture';
+import { accountMarkdown } from '../accounts/brief';
+import { ingestCapture } from '../accounts/ingest';
+import { accountSummaries, buildAccountView } from '../accounts/view';
+import type { AccountSummary, CapturePayload, CommitteeRole } from '../accounts/types';
 
 export type DossierFn = typeof buildDossier;
 export type ScoreFn = typeof scoreLens;
@@ -98,6 +107,21 @@ const LIST_ID = /^[a-z0-9-]{1,64}$/;
 const LENS_ID = /^[a-z0-9-]{1,80}$/;
 
 const stripPrompt = ({ prompt: _p, ...l }: SavedList & { prompt?: string | null }): SavedList => l;
+
+/** the unpacked Chrome extension shipped with network-builder ('' if this install doesn't include it) */
+export function extensionDir(): string {
+  let here = '';
+  try {
+    here = path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return '';
+  }
+  for (const rel of ['../extension', '../../extension', '../../../extension']) {
+    const d = path.resolve(here, rel);
+    if (existsSync(path.join(d, 'manifest.json'))) return d;
+  }
+  return '';
+}
 
 export async function startExplorerServer(opts: ExplorerServerOptions): Promise<ExplorerServer> {
   const { store } = opts;
@@ -211,6 +235,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       ahoySendUsdPerProposal: AHOY_SEND_USD_PER_PROPOSAL,
     },
     dbPath: opts.dbPath,
+    accounts: accountList(),
   });
 
   const emit = (e: ExplorerEvent) => {
@@ -230,6 +255,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       return;
     }
     emit({ type: 'lenses', lenses: store.listLenses() });
+    emit({ type: 'accounts', accounts: accountList() });
     emit({ type: 'reload', reason: 'the database was changed by another network-builder process' });
   };
   const emitQueue = () => {
@@ -748,6 +774,147 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     return { path: paths[0], paths, count: rows.length };
   };
 
+  // ---- accounts (ABX) ----
+  const accountList = (): AccountSummary[] => accountSummaries(store.accounts, new Set(people.keys()));
+  /** run an accounts operation, mapping validation errors to 400 / 404 */
+  const acct = <T>(fn: () => T): T => {
+    try {
+      return fn();
+    } catch (e) {
+      if (e instanceof CaptureError) throw new HttpError(400, e.message);
+      if (e instanceof AccountError) throw new HttpError(/no such account|no longer exists/.test(e.message) ? 404 : 400, e.message);
+      throw e;
+    }
+  };
+  const accountOr404 = (id: string) => {
+    const a = store.accounts.get(id);
+    if (!a) throw new HttpError(404, 'no such account');
+    return a;
+  };
+  const accountView = (id: string) => buildAccountView(store.accounts, accountOr404(id), people);
+  const accountsChanged = (changed?: string, notice?: string) => {
+    const all = accountList();
+    emit({ type: 'accounts', accounts: all, ...(changed ? { changed } : {}), ...(notice ? { notice } : {}) });
+    return all;
+  };
+  const strOpt = (v: unknown, field: string): string | undefined => {
+    if (v === undefined) return undefined;
+    if (typeof v !== 'string') throw new HttpError(400, `\`${field}\` must be a string`);
+    return v;
+  };
+  const accountPatch = (b: Record<string, unknown>): AccountPatch => {
+    const p: AccountPatch = {};
+    const name = strOpt(b.name, 'name');
+    if (name !== undefined) p.name = name;
+    const domain = strOpt(b.domain, 'domain');
+    if (domain !== undefined) p.domain = domain;
+    const li = strOpt(b.linkedinUrl, 'linkedinUrl');
+    if (li !== undefined) p.linkedinUrl = li;
+    if (b.aliases !== undefined) {
+      if (!Array.isArray(b.aliases) || !b.aliases.every((x) => typeof x === 'string')) throw new HttpError(400, '`aliases` must be an array of strings');
+      p.aliases = b.aliases as string[];
+    }
+    const status = strOpt(b.status, 'status');
+    if (status !== undefined) p.status = status as AccountPatch['status'];
+    const brief = strOpt(b.brief, 'brief');
+    if (brief !== undefined) p.brief = brief;
+    return p;
+  };
+  const memberPatch = (b: Record<string, unknown>): MemberPatch => {
+    const p: MemberPatch = {};
+    for (const k of ['department', 'tier', 'role', 'reportsTo', 'notes'] as const) {
+      const v = strOpt(b[k], k);
+      if (v !== undefined) (p as Record<string, string>)[k] = v;
+    }
+    return p;
+  };
+  const createAccount = (b: Record<string, unknown>) => {
+    const patch = accountPatch(b);
+    if (!patch.name) throw new HttpError(400, '`name` is required');
+    const account = acct(() => store.accounts.create({ ...patch, name: patch.name! }));
+    return { account, accounts: accountsChanged(account.id) };
+  };
+  const updateAccount = (id: string, b: Record<string, unknown>) => {
+    accountOr404(id);
+    acct(() => store.accounts.update(id, accountPatch(b)));
+    return { view: accountView(id), accounts: accountsChanged(id) };
+  };
+  const deleteAccount = (id: string) => {
+    if (!store.accounts.delete(id)) throw new HttpError(404, 'no such account');
+    return { accounts: accountsChanged(id) };
+  };
+  const addMembers = (id: string, b: Record<string, unknown>) => {
+    accountOr404(id);
+    const ids = parseIds(b.ids, true)!;
+    if (!ids.length) throw new HttpError(400, 'no people to add');
+    const role = strOpt(b.role, 'role') as CommitteeRole | '' | undefined;
+    const r = acct(() => store.accounts.addMembers(id, ids, role ? { role } : {}));
+    return { ...r, view: accountView(id), accounts: accountsChanged(id) };
+  };
+  const updateMember = (id: string, pid: string, b: Record<string, unknown>) => {
+    accountOr404(id);
+    acct(() => store.accounts.updateMember(id, pid, memberPatch(b)));
+    return { view: accountView(id), accounts: accountsChanged(id) };
+  };
+  const removeMember = (id: string, pid: string) => {
+    accountOr404(id);
+    if (!store.accounts.removeMember(id, pid)) throw new HttpError(404, 'that person isn’t on this account');
+    return { view: accountView(id), accounts: accountsChanged(id) };
+  };
+
+  // ---- Chrome extension ----
+  const extToken = (rotate = false): string => {
+    let t = store.getMeta('ext_token');
+    if (!t || rotate) {
+      t = randomBytes(24).toString('base64url');
+      store.setMeta('ext_token', t);
+    }
+    return t;
+  };
+  const pairingCode = (rotate: boolean) => {
+    const json = JSON.stringify({ v: 1, u: `http://127.0.0.1:${port}`, t: extToken(rotate) });
+    return { code: `nb1.${Buffer.from(json).toString('base64url')}`, port, extensionDir: extensionDir() };
+  };
+  const extLookup = (url: URL) => {
+    const profileUrl = url.searchParams.get('url') ?? '';
+    const { id, isConnection } = acct(() => store.accounts.idForProfileUrl(profileUrl));
+    const contact = store.accounts.getContact(id);
+    const names = new Map(store.accounts.list().map((a) => [a.id, a.name]));
+    const suggested = store.accounts.match(url.searchParams.get('company') ?? '', url.searchParams.get('companyUrl') ?? '');
+    return {
+      id,
+      isConnection,
+      capturedAt: contact?.capturedAt ?? null,
+      accounts: store.accounts.membershipsOf(id).map((m) => ({ id: m.accountId, name: names.get(m.accountId) ?? m.accountId, role: m.role })),
+      suggested: suggested ? { id: suggested.id, name: suggested.name } : null,
+    };
+  };
+  const extCapture = (b: Record<string, unknown>) => {
+    if (!b.profile || typeof b.profile !== 'object' || Array.isArray(b.profile)) throw new HttpError(400, '`profile` is required');
+    const r = acct(() =>
+      ingestCapture(store.accounts, {
+        profile: b.profile as CapturePayload,
+        accountId: strOpt(b.accountId, 'accountId') || undefined,
+        accountName: strOpt(b.accountName, 'accountName'),
+        role: (strOpt(b.role, 'role') ?? '') as CommitteeRole | '',
+        notes: strOpt(b.notes, 'notes'),
+      }),
+    );
+    const verb = r.addedToAccount ? 'Added' : 'Updated';
+    accountsChanged(
+      r.account.id,
+      `${verb} ${r.contact.fullName} ${r.addedToAccount ? 'to' : 'on'} ${r.account.name}${r.createdAccount ? ' (new account)' : ''} — from LinkedIn`,
+    );
+    return {
+      account: { id: r.account.id, name: r.account.name },
+      person: { id: r.contact.id, fullName: r.contact.fullName, title: r.contact.title },
+      createdAccount: r.createdAccount,
+      addedToAccount: r.addedToAccount,
+      isConnection: r.isConnection,
+      firstCapture: r.firstCapture,
+    };
+  };
+
   // ---- snapshot ----
   let snapshotChain: Promise<unknown> = Promise.resolve();
   const snapshot = (): Promise<string> => {
@@ -767,23 +934,62 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     return next;
   };
 
+  /** /ext/* — the Chrome extension. Long-lived capture token (header X-NB-Capture); only adds data, never spends money. */
+  const handleExtension = async (req: IncomingMessage, res: ServerResponse, url: URL, method: string) => {
+    checkExtensionRequest(req, port);
+    const route = `${method} ${url.pathname}`;
+    const known = ['GET /ext/ping', 'GET /ext/accounts', 'GET /ext/lookup', 'POST /ext/capture'];
+    if (!known.includes(route)) throw new HttpError(known.some((k) => k.endsWith(` ${url.pathname}`)) ? 405 : 404, 'not found');
+    const stored = store.getMeta('ext_token') ?? '';
+    if (!stored || !safeEqual(String(req.headers['x-nb-capture'] ?? ''), stored)) {
+      throw new HttpError(401, 'not paired (or the pairing was reset) — in Network Builder open Accounts → Chrome extension and pair again');
+    }
+    if (route !== 'POST /ext/capture') notifyIfChanged();
+    switch (route) {
+      case 'GET /ext/ping':
+        return sendJson(res, 200, { ok: true, app: 'network-builder', accounts: store.accounts.list().length });
+      case 'GET /ext/accounts':
+        return sendJson(res, 200, {
+          accounts: accountList().map((a) => ({ id: a.id, name: a.name, status: a.status, memberCount: a.memberCount })),
+        });
+      case 'GET /ext/lookup':
+        return sendJson(res, 200, extLookup(url));
+      case 'POST /ext/capture': {
+        const body = await readJsonBody(req);
+        if (closing) throw new HttpError(503, 'Network Builder is shutting down');
+        notifyIfChanged();
+        return sendJson(res, 200, extCapture(body));
+      }
+    }
+  };
+
   // ---- HTTP ----
   let port = 0;
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     const method = req.method ?? 'GET';
+    if (url.pathname.startsWith('/ext/')) return handleExtension(req, res, url, method);
     checkHostAndOrigin(req, port);
 
     let param = '';
     let routePath = url.pathname;
-    const m = /^\/api\/(lists|lenses)\/([^/]+)(\/refresh)?$/.exec(url.pathname);
-    if (m) {
+    let param2 = '';
+    const dec = (v: string) => {
       try {
-        param = decodeURIComponent(m[2]!);
+        return decodeURIComponent(v);
       } catch {
         throw new HttpError(400, 'invalid id');
       }
+    };
+    const m = /^\/api\/(lists|lenses)\/([^/]+)(\/refresh)?$/.exec(url.pathname);
+    const am = /^\/api\/accounts\/([^/]+)(?:\/(brief|members)(?:\/([^/]+))?)?$/.exec(url.pathname);
+    if (m) {
+      param = dec(m[2]!);
       routePath = `/api/${m[1]}/:id${m[3] ?? ''}`;
+    } else if (am) {
+      param = dec(am[1]!);
+      if (am[3]) param2 = dec(am[3]);
+      routePath = `/api/accounts/:id${am[2] ? `/${am[2]}` : ''}${am[3] ? '/:pid' : ''}`;
     }
     const route = `${method} ${routePath}`;
     const known = [
@@ -793,6 +999,9 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       'GET /api/lists', 'PUT /api/lists/:id', 'DELETE /api/lists/:id',
       'POST /api/export', 'POST /api/snapshot',
       'POST /api/ahoy/check', 'POST /api/ahoy/resolve', 'POST /api/ahoy/plan', 'POST /api/ahoy/send',
+      'GET /api/accounts', 'POST /api/accounts', 'GET /api/accounts/:id', 'PUT /api/accounts/:id', 'DELETE /api/accounts/:id',
+      'GET /api/accounts/:id/brief', 'POST /api/accounts/:id/members', 'PUT /api/accounts/:id/members/:pid',
+      'DELETE /api/accounts/:id/members/:pid', 'POST /api/ext/pair',
     ];
     if (!known.includes(route)) {
       if (known.some((k) => k.endsWith(` ${routePath}`))) throw new HttpError(405, 'method not allowed');
@@ -875,6 +1084,32 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
         const body = await readJsonBody(req);
         if (closing) throw new HttpError(503, 'server is shutting down');
         return sendJson(res, 200, ahoySend(body));
+      }
+      case 'GET /api/accounts':
+        return sendJson(res, 200, { accounts: accountList() });
+      case 'POST /api/accounts':
+        return sendJson(res, 200, createAccount(await readJsonBody(req)));
+      case 'GET /api/accounts/:id':
+        return sendJson(res, 200, accountView(param));
+      case 'PUT /api/accounts/:id':
+        return sendJson(res, 200, updateAccount(param, await readJsonBody(req)));
+      case 'DELETE /api/accounts/:id':
+        await readJsonBody(req);
+        return sendJson(res, 200, deleteAccount(param));
+      case 'GET /api/accounts/:id/brief': {
+        const detail = url.searchParams.get('detail') === 'summary' ? 'summary' : 'full';
+        return sendJson(res, 200, { markdown: accountMarkdown(accountView(param), detail) });
+      }
+      case 'POST /api/accounts/:id/members':
+        return sendJson(res, 200, addMembers(param, await readJsonBody(req)));
+      case 'PUT /api/accounts/:id/members/:pid':
+        return sendJson(res, 200, updateMember(param, param2, await readJsonBody(req)));
+      case 'DELETE /api/accounts/:id/members/:pid':
+        await readJsonBody(req);
+        return sendJson(res, 200, removeMember(param, param2));
+      case 'POST /api/ext/pair': {
+        const body = await readJsonBody(req);
+        return sendJson(res, 200, pairingCode(body.rotate === true));
       }
       case 'POST /api/snapshot':
         await readJsonBody(req);

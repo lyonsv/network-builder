@@ -521,3 +521,79 @@ describe('Ahoy CRM endpoints', () => {
     expect((await req('POST', `${base}/api/ahoy/resolve`, { token, body: { id: 'ccc', contactId: 'new' } })).status).toBe(400);
   });
 });
+
+describe('accounts + Chrome extension API', () => {
+  const EXT_ORIGIN = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop';
+  const profile = {
+    url: 'https://www.linkedin.com/in/riley-moss-example/',
+    fullName: 'Riley Moss',
+    headline: 'CFO at Ledgerly',
+    currentCompany: 'Ledgerly',
+    sections: { experience: { items: [{ lines: ['Chief Financial Officer', 'Ledgerly', 'Mar 2022 - Present'], companyUrl: 'https://www.linkedin.com/company/ledgerly/' }] } },
+  };
+
+  it('pairs, then captures into a new account with a live event; network people are untouched', async () => {
+    const { base, token, events } = await setup();
+    const ext = (method: string, p: string, o: { body?: unknown; capture?: string; origin?: string } = {}) =>
+      req(method, base + p, { body: o.body, headers: { ...(o.capture !== undefined ? { 'X-NB-Capture': o.capture } : {}), Origin: o.origin ?? EXT_ORIGIN } });
+
+    // not paired yet → 401 with a message that says how to pair
+    expect((await ext('GET', '/ext/ping', { capture: 'nope' })).json.error).toMatch(/pair/);
+    // the page token is not accepted on /ext, and the pairing endpoint needs the page token
+    expect((await ext('GET', '/ext/ping', { capture: token })).status).toBe(401);
+    expect((await req('POST', `${base}/api/ext/pair`, { body: {} })).status).toBe(401);
+
+    const pair = await req('POST', `${base}/api/ext/pair`, { token, body: {} });
+    expect(pair.json.code).toMatch(/^nb1\./);
+    const decoded = JSON.parse(Buffer.from(pair.json.code.slice(4), 'base64url').toString());
+    expect(decoded.u).toBe(base);
+    const cap = decoded.t as string;
+
+    expect((await ext('GET', '/ext/ping', { capture: cap })).json.ok).toBe(true);
+    // a web page can't use the capture token
+    expect((await ext('GET', '/ext/ping', { capture: cap, origin: 'https://www.linkedin.com' })).status).toBe(403);
+
+    const look = await ext('GET', `/ext/lookup?url=${encodeURIComponent(profile.url)}&company=Ledgerly`, { capture: cap });
+    expect(look.json).toMatchObject({ isConnection: false, capturedAt: null, accounts: [], suggested: null });
+
+    const r = await ext('POST', '/ext/capture', { capture: cap, body: { profile, role: 'decision-maker' } });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ account: { name: 'Ledgerly' }, createdAccount: true, addedToAccount: true, isConnection: false });
+    const ev = events.find((e) => e.type === 'accounts' && e.notice) as any;
+    expect(ev.notice).toMatch(/Added Riley Moss to Ledgerly/);
+    expect(ev.accounts[0]).toMatchObject({ name: 'Ledgerly', memberCount: 1, roles: { 'decision-maker': 1 } });
+
+    // a bad capture is a 400 with a readable reason
+    const bad = await ext('POST', '/ext/capture', { capture: cap, body: { profile: { ...profile, url: 'https://www.linkedin.com/feed/' } } });
+    expect(bad.status).toBe(400);
+    expect(bad.json.error).toMatch(/profile URL/);
+
+    const state = await req('GET', `${base}/api/state`, { token });
+    expect(state.json.people).toHaveLength(3);
+    expect(state.json.accounts[0].name).toBe('Ledgerly');
+
+    // rotating the pairing invalidates the old code
+    await req('POST', `${base}/api/ext/pair`, { token, body: { rotate: true } });
+    expect((await ext('GET', '/ext/ping', { capture: cap })).status).toBe(401);
+  });
+
+  it('manages accounts and members from the page', async () => {
+    const { base, token } = await setup();
+    const created = await req('POST', `${base}/api/accounts`, { token, body: { name: 'Initech', domain: 'initech.example' } });
+    const id = created.json.account.id;
+    expect((await req('POST', `${base}/api/accounts`, { token, body: { name: 'initech' } })).status).toBe(400);
+    const add = await req('POST', `${base}/api/accounts/${id}/members`, { token, body: { ids: ['aaa', 'bbb', 'zzz'] } });
+    expect(add.json.added).toEqual(['aaa', 'bbb']);
+    expect(add.json.unknown).toEqual(['zzz']);
+    const up = await req('PUT', `${base}/api/accounts/${id}/members/bbb`, { token, body: { role: 'champion', reportsTo: 'aaa', department: 'sales' } });
+    expect(up.json.view.members.find((m: any) => m.id === 'bbb')).toMatchObject({ role: 'champion', reportsTo: 'aaa', department: 'sales', isConnection: true });
+    expect((await req('PUT', `${base}/api/accounts/${id}/members/bbb`, { token, body: { role: 'boss' } })).status).toBe(400);
+    await req('PUT', `${base}/api/accounts/${id}`, { token, body: { brief: '## Why now\nNew CFO.' } });
+    const brief = await req('GET', `${base}/api/accounts/${id}/brief`, { token });
+    expect(brief.json.markdown).toContain('New CFO.');
+    expect(brief.json.markdown).toContain('**Champion:** Bob Builder');
+    expect((await req('DELETE', `${base}/api/accounts/${id}/members/aaa`, { token })).json.view.members).toHaveLength(1);
+    expect((await req('DELETE', `${base}/api/accounts/${id}`, { token })).json.accounts).toEqual([]);
+    expect((await req('GET', `${base}/api/accounts/${id}`, { token })).status).toBe(404);
+  });
+});

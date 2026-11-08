@@ -50,6 +50,12 @@ outrank a partner at a fund. Then you curate the list in a fast local web app an
 - 🖥️ **A Mac app for your Dock.** The explorer in a native window, with its own server. [Details →](#️-desktop-app-macos)
 - 🤖 **Use it from Claude Code (MCP).** Ask about your network ("who could intro me to Stripe?"), curate lenses and
   lists, and export, from any Claude Code session. [Setup →](docs/MCP.md)
+- 🏢 **Accounts for ABX.** Pick the companies you're targeting and collect their key people, grouped by org chart
+  (department → seniority), each with a buying-committee role, reporting line and notes. Add your ABX brief, then let
+  Claude plan the campaign from one MCP call. [Details →](#-accounts-abx-and-the-chrome-extension)
+- 🧩 **Chrome extension.** A **＋ Network Builder** button on LinkedIn profiles files a decision maker, with their full
+  profile, under an account in one click. It works even when they aren't a connection, and saves profiles until the app
+  is running.
 - 🔗 **Ahoy CRM, live.** See who's already in your CRM, pick the right record when several match, and send new people
   plus research notes to Ahoy as proposals you approve.
 - 📤 **Export to your CRM.** HubSpot/Salesforce-friendly CSVs, an **Ahoy** import bundle (companies, contacts and
@@ -209,15 +215,40 @@ Then ask Claude Code things like:
 - *"Who in my network could introduce me to someone at Stripe?"*
 - *"List my angel-investor lens members in London that have deep profiles."*
 - *"Save the top 20 as 'Q4 outreach' and export it for Ahoy."*
+- *"Plan an ABX campaign for Ledgerly. Who's the champion, and what's my warm path in?"*
 
-It has 13 tools:
+It has 21 tools:
 - search, people, past and current companies, lenses, lists and stats;
 - adding and removing people from lenses, the score cut-off, saving lists and exporting;
-- two prompts (`warm_intro`, `lens_shortlist`).
+- accounts (ABX): the full account context in one call, key people, roles, reporting lines and the brief;
+- three prompts (`warm_intro`, `lens_shortlist`, `abx_campaign`), and an `account://<id>` resource per account.
 
 It reads your local database live, so it works alongside the explorer. Anything that costs AI money (web profiles,
 scoring a lens, Ahoy calls) stays in the explorer, where you start it yourself. Full reference:
 **[docs/MCP.md](docs/MCP.md)**.
+
+## 🏢 Accounts (ABX) and the Chrome extension
+
+Switch the explorer to **Accounts** (top right) to work account by account:
+
+- **Account:** a company you're targeting. It has a status (target, engaged, customer, paused), a domain, its LinkedIn
+  page, aliases, and an **ABX brief** in markdown (why now, pains, triggers, angle, plan). The brief autosaves.
+- **Org chart:** the key people, grouped by department → seniority. Each person is placed automatically from their
+  job title; click someone to correct it, set their **buying-committee role** (decision maker, champion, influencer,
+  end user, gatekeeper, blocker), who they **report to**, and notes.
+- **Coverage and gaps:** e.g. "no decision maker", "nobody at VP level or above", "no warm path".
+- **Warm paths:** your connections who work there now (one click adds them), or used to.
+- **⧉ Copy for AI:** the whole account as one markdown document.
+
+Ways to add people:
+1. **From LinkedIn** with the [Chrome extension](extension/README.md). Click **＋ Network Builder** on any profile,
+   connection or not. The full profile (about, experience with descriptions, education, skills) is saved. People who
+   aren't connections stay under the account and never enter your network, lenses or exports.
+2. **From your network.** Select people in **People**, then **Add to account ▾**.
+3. **From Claude**, with `network_account_add_people`.
+
+Then ask Claude Code: *"Plan an ABX campaign for Ledgerly"* (the `abx_campaign` prompt). It calls `network_get_account`,
+which returns the brief, buying committee, org chart, full profiles and warm paths in one go.
 
 ## 🔗 Ahoy CRM integration
 

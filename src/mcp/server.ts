@@ -32,6 +32,7 @@ import {
   type SearchFilters,
   type SortKey,
 } from './data';
+import { ACCOUNT_INSTRUCTIONS, registerAccountTools } from './accounts';
 
 /**
  * network-builder as an MCP server (stdio): read your network, curate lens membership and lists, and export CSVs —
@@ -59,7 +60,8 @@ list (network_save_list) → export CSV for a CRM (network_export, preset "ahoy"
 
 Not available here by design: starting web research, creating or re-scoring lenses, or sending to Ahoy — those cost
 money or touch external systems and are started by the user in the explorer UI (run \`network-builder\`). Suggest it
-when a task needs them (e.g. "these 5 have no web profile; research them in the explorer first").`;
+when a task needs them (e.g. "these 5 have no web profile; research them in the explorer first").
+${ACCOUNT_INSTRUCTIONS}`;
 
 export interface NetworkMcpOptions {
   dbPath: string;
@@ -579,6 +581,9 @@ export function createNetworkMcpServer(opts: NetworkMcpOptions): { server: McpSe
       return ok(`Exported ${rows.length} people (${a.preset}) to:\n${paths.map((p) => `- ${p}`).join('\n')}`, { count: rows.length, preset: a.preset, paths });
     }),
   );
+
+  // ------------------------------------------------------------------ accounts (ABX)
+  registerAccountTools(server, { db, ok, wrap, userError: (m) => new UserError(m) });
 
   // ------------------------------------------------------------------ prompts
   server.registerPrompt(

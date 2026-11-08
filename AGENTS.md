@@ -21,7 +21,10 @@ child env). Data is one local SQLite file.
 | `src/llm/` | `claude.ts` (subprocess runner, retries, `buildArgs`), `enrich.ts` (headline profiles), `dossier.ts` (light/deep web profiles), `lens.ts` (scoring rubric + Haiku pass + Sonnet rerank), `ahoy.ts` (Ahoy check / proposal plan / send) |
 | `src/io/` | `csv.ts` (any CSV; LinkedIn exports incl. "Notes:" preamble), `explorer-export.ts` (CRM / full / Ahoy files — mirrored in the page) |
 | `src/web/` | `explorer.html` (single-file vanilla UI, no deps), `explorer-server.ts` (node:http API + SSE), `http-common.ts` (security), `CONTRACT.md` (**the API/data-model spec — update it with every change**) |
-| `src/mcp/` | stdio MCP server (`network-builder mcp`): 13 `network_*` tools + 2 prompts; see `docs/MCP.md` |
+| `src/accounts/` | ABX accounts: `types.ts` (vocab), `classify.ts` (title → department/tier, no AI), `capture.ts` (parse extension captures; raw-text fallback), `ingest.ts` (capture → contact → account), `view.ts` (org chart, warm paths, gaps), `brief.ts` (the LLM markdown) |
+| `src/db/accounts.ts` | `AccountsRepo` (`store.accounts`): accounts, captured contacts (+ history), membership |
+| `src/mcp/` | stdio MCP server (`network-builder mcp`): 21 `network_*` tools + 3 prompts + `account://` resources (account tools in `accounts.ts`); see `docs/MCP.md` |
+| `extension/` | Chrome MV3 extension (plain JS, no build): `content.js` (button + panel + DOM reader on linkedin.com/in/*), `background.js` (pairing, `/ext/*` client, offline queue), `popup.*` |
 | `desktop/` | macOS Electron shell (own pnpm root + lockfile, so CLI installs never pull Electron): `src/main.ts`, `scripts/build.mjs` (main + fully-bundled server `dist-server/bin.mjs`), `scripts/icon.mjs`, `scripts/install.mjs` (→ /Applications + Dock), `electron-builder.yml` (unsigned, ad-hoc) |
 | `test/` | vitest; `test/fixtures/*.csv` are fictional |
 
@@ -45,7 +48,10 @@ CI (`.github/workflows/ci.yml`) runs install --frozen-lockfile, typecheck, test,
    use `execute_crm_operations`. Never retry a write blindly (duplicate-proposal risk).
 4. **Selection survives filtering**, so every bulk action asks before touching selected people the filters hide
    (`scopeToShown` in the page). Keep that for new actions.
-5. **Scores reward evidence, not keywords** (see `LENS_RUBRIC` in `src/llm/lens.ts`): institutional roles and named
+5. **Captured LinkedIn people never enter the network.** They live in `contacts`, not `people`, so lenses, the People
+   view, network search and exports stay your connections only. The extension reads only the profile on screen, only
+   on click (no crawling), and spends no money.
+6. **Scores reward evidence, not keywords** (see `LENS_RUBRIC` in `src/llm/lens.ts`): institutional roles and named
    investments beat self-applied headline labels; for "potential …" goals, *capacity* (exits, C-level at scaled
    companies, boards) counts and "no investments found" is neutral.
 
@@ -63,6 +69,8 @@ CI (`.github/workflows/ci.yml`) runs install --frozen-lockfile, typecheck, test,
   MCP calls (`mcpTools`) must NOT pass `--strict-mcp-config` (hides claude.ai connectors) or `--tools ''` (hides MCP
   tools); they disallow all built-ins and allow only the named MCP tools. Never `--bare` (forces API-key auth).
 - **Server:** 127.0.0.1 only, per-session token (header `X-NB-Token`; SSE `?t=`), Host/Origin checks, 1 MB bodies.
+  `/ext/*` (Chrome extension) instead takes the long-lived capture token (`X-NB-Capture`, meta `ext_token`, issued by
+  `POST /api/ext/pair`) and only `chrome-extension://` origins; it can only read account names and add captures.
   One lens job and one Ahoy job at a time (409). Rate-limited web profiles back off, then wait for a manual Resume.
 - **Template is re-read per request**, so `pnpm build` (copies `explorer.html` to `dist/`) updates a running explorer's
   page on browser refresh — but new API endpoints need a server restart. The in-memory profile queue is lost on

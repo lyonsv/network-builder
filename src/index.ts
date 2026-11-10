@@ -167,7 +167,17 @@ program
 // `pnpm start -- …` / `pnpm dev -- …` pass a literal "--" through; drop it so options still parse.
 const argv = process.argv[2] === '--' ? [...process.argv.slice(0, 2), ...process.argv.slice(3)] : process.argv;
 
-program.parseAsync(argv).catch((err: unknown) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// Inside the desktop app the CLI runs as an Electron utility process, which stays alive after its work is done (the
+// parent port keeps it open). Exit explicitly so the app sees the exit code (e.g. "database is newer than this app")
+// instead of waiting forever on its loading screen.
+const inElectronUtility = 'parentPort' in process && (process as { parentPort?: unknown }).parentPort != null;
+
+program
+  .parseAsync(argv)
+  .catch((err: unknown) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    if (inElectronUtility) process.exit(process.exitCode ?? 0);
+  });

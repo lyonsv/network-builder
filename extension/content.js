@@ -63,14 +63,56 @@
     return out;
   }
 
+  /** the name from the tab title ("(3) Riley Test | LinkedIn") — survives markup changes */
+  const titleName = () => (document.title || '').replace(/^\(\d+\+?\)\s*/, '').replace(/\s*[|–-]\s*LinkedIn.*$/i, '').trim();
+
+  const visible = (e) => !!(e && (e.offsetWidth || e.offsetHeight || e.getClientRects().length));
+  const label = (e) => ((e.getAttribute('aria-label') || '') + ' ' + (e.textContent || '')).replace(/\s+/g, ' ').trim();
+
+  /** the profile's name heading: <h1> in <main> (classic markup), any <h1>, or a heading whose text is the name */
+  function nameEl() {
+    const h = document.querySelector('main h1') || document.querySelector('h1');
+    if (h && txt(h)) return h;
+    const name = titleName();
+    if (!name) return null;
+    for (const e of document.querySelectorAll('h1, h2, [role="heading"]')) if (txt(e) === name || txt(e).startsWith(name)) return e;
+    return null;
+  }
+
+  /** profile action buttons (Message / More / Connect / Follow), in page order, skipping our own and the global nav */
+  function actionButtons() {
+    const root = document.querySelector('main') || document.body;
+    const re = /^(message|more|more actions|connect|follow|pending)\b/i;
+    return [...root.querySelectorAll('button, a[role="button"], a[href*="/messaging/"]')].filter(
+      (e) => visible(e) && !e.closest('#nb-add-btn, header, nav, aside, [role="dialog"]') && label(e).length < 60 && re.test(label(e)),
+    );
+  }
+
+  /** the row holding Message / More: the smallest element containing two action buttons, else one button's row */
+  function findActionBar() {
+    const btns = actionButtons().filter((e) => e.getBoundingClientRect().top + window.scrollY < 1400);
+    if (!btns.length) return null;
+    const [a, b] = btns;
+    if (b) {
+      let n = a.parentElement;
+      while (n && !n.contains(b)) n = n.parentElement;
+      if (n && n !== document.body && n.tagName !== 'MAIN') return n;
+    }
+    return a.parentElement?.parentElement || a.parentElement;
+  }
+
   function topCard() {
-    const h1 = document.querySelector('main h1');
-    return h1 ? h1.closest('section') || h1.parentElement : null;
+    const n = nameEl();
+    if (n) return n.closest('section') || n.parentElement?.parentElement?.parentElement || n.parentElement;
+    const bar = findActionBar();
+    return bar ? bar.closest('section') || bar.parentElement : null;
   }
 
   function sectionItems(section) {
     const list = section.querySelector('ul');
-    if (!list) return [];
+    return list ? listItems(list) : [];
+  }
+  function listItems(list) {
     return [...list.children]
       .filter((li) => li.tagName === 'LI')
       .map((li) => {
@@ -84,13 +126,26 @@
       .filter((it) => it.lines.length || (it.sub && it.sub.length));
   }
 
+  /** headline + location from the lines after the name (skips "· 1st", pronouns, badges such as "LIVE") */
+  function topLines(main, fullName) {
+    const lines = (main.innerText || '').split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const i = lines.indexOf(fullName);
+    if (i < 0) return { headline: '', location: '' };
+    const skip = (l) => /^·/.test(l) || /^(1st|2nd|3rd\+?)$/.test(l) || /^\(?(he|she|they)\/\w+\)?$/i.test(l) ||
+      /^(live|verified|premium|open to work|hiring|creator|top voice)$/i.test(l) || l.length < 3;
+    const rest = lines.slice(i + 1, i + 12).filter((l) => !skip(l));
+    const headline = rest[0] || '';
+    const loc = rest[1] && rest[1] !== 'Contact info' && !/followers|connections/i.test(rest[1]) ? rest[1] : '';
+    return { headline, location: loc };
+  }
+
   function scrape() {
     const main = document.querySelector('main') || document.body;
     const card = topCard();
-    const h1 = document.querySelector('main h1');
-    const fullName = txt(h1);
-    let headline = txt(card && card.querySelector('.text-body-medium'));
-    let location = txt(card && card.querySelector('.text-body-small.inline.t-black--light, span.text-body-small.inline'));
+    const fullName = txt(nameEl()) || titleName();
+    const tl = topLines(main, fullName);
+    let headline = tl.headline || txt(card && card.querySelector('.text-body-medium'));
+    let location = tl.location || txt(card && card.querySelector('.text-body-small.inline.t-black--light, span.text-body-small.inline'));
     let currentCompany = '';
     const cc = card && card.querySelector('[aria-label^="Current company"]');
     if (cc) currentCompany = (/Current company:\s*(.+?)\.\s*Click/i.exec(cc.getAttribute('aria-label')) || [])[1] || txt(cc);
@@ -126,6 +181,77 @@
       sections,
       rawText: (main.innerText || '').slice(0, 60000),
     };
+  }
+
+  // ---------- full lists (/details/<kind>/): every role with dates & tenure, all education, skills, … ----------
+  // The profile page only shows a summary (and LinkedIn renders sections lazily), so on click we open the person's
+  // "Show all" pages in hidden same-origin frames — exactly what you'd see clicking through — and read their text.
+  const DETAIL_KINDS = ['experience', 'education', 'skills', 'certifications', 'languages', 'volunteering-experiences', 'honors'];
+
+  function loadDetail(slug, kind, timeoutMs = 15000) {
+    return new Promise((resolve) => {
+      const f = document.createElement('iframe');
+      f.src = `${location.origin}/in/${encodeURIComponent(decodeURIComponent(slug))}/details/${kind}/`;
+      f.setAttribute('aria-hidden', 'true');
+      f.tabIndex = -1;
+      f.style.cssText = 'position:fixed;left:0;top:0;width:1100px;height:2400px;opacity:0;pointer-events:none;z-index:-1;border:0;';
+      let done = false;
+      let last = -1;
+      let stableSince = 0;
+      const started = Date.now();
+      const finish = (val) => {
+        if (done) return;
+        done = true;
+        clearInterval(timer);
+        f.remove();
+        resolve(val);
+      };
+      const timer = setInterval(() => {
+        let doc;
+        try {
+          doc = f.contentDocument;
+        } catch {
+          return finish(null); // not same-origin (blocked)
+        }
+        const main = doc && (doc.querySelector('main') || doc.body);
+        if (main) {
+          try {
+            f.contentWindow.scrollTo(0, doc.documentElement.scrollHeight); // trigger lazy loading
+          } catch {}
+          const text = main.innerText || '';
+          if (text.length !== last) {
+            last = text.length;
+            stableSince = Date.now();
+          } else if (text.trim().length > 15 && Date.now() - stableSince > 1500) {
+            // structured items when the classic list markup is there; the text is always sent
+            const lists = [...main.querySelectorAll('ul')].filter((u) => !u.parentElement.closest('ul'));
+            const big = lists.sort((a, b) => b.children.length - a.children.length)[0];
+            return finish({ text: text.slice(0, 30000), items: big ? listItems(big) : [] });
+          }
+        }
+        if (Date.now() - started > timeoutMs) finish(last > 15 && main ? { text: (main.innerText || '').slice(0, 30000), items: [] } : null);
+      }, 400);
+      document.documentElement.append(f);
+    });
+  }
+
+  /** load all detail pages, 3 at a time; onProgress(doneCount, total) */
+  async function loadDetails(slug, onProgress) {
+    const out = {};
+    let n = 0;
+    const queue = [...DETAIL_KINDS];
+    const worker = async () => {
+      while (queue.length) {
+        const kind = queue.shift();
+        const r = await loadDetail(slug, kind);
+        // keep only pages that are that list (a missing section shows LinkedIn's empty / error page instead)
+        const word = kind === 'volunteering-experiences' ? 'volunteer' : kind === 'honors' ? 'hono' : kind.slice(0, 7);
+        if (r && r.text && r.text.slice(0, 3000).toLowerCase().includes(word)) out[kind] = r;
+        onProgress && onProgress(++n, DETAIL_KINDS.length);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    return out;
   }
 
   const guessCompany = (p) =>
@@ -220,7 +346,21 @@
     const found = el('div', { class: 'found muted' },
       `Will save: ${[p.headline && 'headline', p.location && 'location', p.about && 'about', nExp && `${nExp} experience item${nExp > 1 ? 's' : ''}`,
         p.sections.education && `${p.sections.education.items.length} education`].filter(Boolean).join(' · ') || 'name and page text'}`);
-    const thin = !nExp ? banner('info', 'Experience hasn’t loaded on this page yet. Scroll down the profile so LinkedIn loads it, then reopen this panel — or save now (the page text is kept).') : null;
+    const detailSlot = el('div', { class: 'found muted' }, 'Reading full experience, education & skills…');
+    const slug = profileSlug();
+    let details = null;
+    const detailsReady = loadDetails(slug, (n, t) => {
+      if (shadow && n < t) detailSlot.textContent = `Reading full experience, education & skills… ${n}/${t}`;
+    }).then((d) => {
+      details = d;
+      if (!shadow) return d;
+      const got = Object.keys(d);
+      detailSlot.textContent = got.length
+        ? `✓ Full profile read: ${got.map((k) => k.replace('-experiences', '')).join(', ')}`
+        : 'Couldn’t open the full lists — the visible profile will be saved.';
+      return d;
+    });
+    const thin = null;
 
     const panel = el('div', { class: 'panel', role: 'dialog', 'aria-label': 'Add to Network Builder' },
       el('header', {}, el('b', { text: 'Add to Network Builder' }), el('button', { class: 'x', 'aria-label': 'Close', onclick: closePanel, text: '×' })),
@@ -233,6 +373,7 @@
         el('label', { text: 'Buying-committee role' }), roleSel,
         el('label', { text: 'Notes' }), notes,
         found,
+        detailSlot,
         el('div', { class: 'row' }, goBtn),
         result,
       ),
@@ -304,10 +445,18 @@
       goBtn.disabled = true;
       goBtn.textContent = 'Saving…';
       result.replaceChildren();
+      if (!details) {
+        goBtn.textContent = 'Reading full profile…';
+        await detailsReady;
+        if (!shadow) return;
+        goBtn.textContent = 'Saving…';
+      }
       const fresh = scrape(); // the page may have loaded more since the panel opened
+      const prof = fresh.fullName ? fresh : p;
+      if (details && Object.keys(details).length) prof.details = details;
       const hit = accountsCache && accountsCache.find((a) => a.name.toLowerCase() === name.toLowerCase());
       const body = {
-        profile: fresh.fullName ? fresh : p,
+        profile: prof,
         ...(hit ? { accountId: hit.id, accountLabel: hit.name } : { accountName: name }),
         role: roleSel.value,
         notes: notes.value.trim(),
@@ -351,10 +500,15 @@
     const b = el('button', {
       type: 'button',
       id: 'nb-add-btn',
-      class: 'artdeco-button artdeco-button--2 artdeco-button--secondary',
-      style: 'margin-left:8px;display:inline-flex;align-items:center;gap:4px;',
+      // styled inline (LinkedIn's class names change): a filled pill in Network Builder's purple; matchRow() sizes it
+      style: 'margin-left:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;' +
+        'height:32px;padding:0 16px;border-radius:999px;border:0;color:#fff;' +
+        'background:linear-gradient(135deg,#5b5bf0,#8b4fe0 60%,#c04fd0);box-shadow:none;' +
+        'font:600 16px/1 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;cursor:pointer;white-space:nowrap;vertical-align:middle;',
       title: 'Add this person to an account in Network Builder',
-    }, el('span', { text: '＋', 'aria-hidden': 'true' }), el('span', { class: 'nb-label artdeco-button__text', text: 'Network Builder' }));
+    }, el('span', { text: '＋', 'aria-hidden': 'true' }), el('span', { class: 'nb-label', text: 'Network Builder' }));
+    b.addEventListener('mouseenter', () => (b.style.filter = 'brightness(1.1)'));
+    b.addEventListener('mouseleave', () => (b.style.filter = ''));
     b.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -363,18 +517,22 @@
     return b;
   }
 
-  function findActionBar(card) {
-    if (!card) return null;
-    const more = card.querySelector('button[aria-label*="More actions"], button[aria-label^="More"]');
-    if (more) {
-      const bar = more.closest('div.pvs-profile-actions, div[class*="profile-actions"]') || more.parentElement?.parentElement || more.parentElement;
-      if (bar) return bar;
+  /** same height, font size and spacing as LinkedIn's own buttons in the row (e.g. Message) */
+  function matchRow(b, bar) {
+    const ref = actionButtons().find((e) => bar.contains(e) && e !== b && e.offsetHeight > 0);
+    if (ref) {
+      const cs = getComputedStyle(ref);
+      b.style.height = `${ref.offsetHeight}px`;
+      b.style.fontSize = cs.fontSize;
+      b.style.paddingLeft = b.style.paddingRight = cs.paddingLeft !== '0px' ? cs.paddingLeft : '16px';
     }
-    const msg = card.querySelector('a[href*="/messaging/"], button[aria-label^="Message"]');
-    return msg ? msg.parentElement?.parentElement || msg.parentElement : null;
+    const gap = parseFloat(getComputedStyle(bar).columnGap);
+    if (gap > 0) b.style.marginLeft = '0';
   }
 
   let lastSlug = '';
+  let slugSince = 0; // when we first saw this profile URL (the float fallback waits for the page to render)
+  let floating = false;
   async function ensureButton() {
     const slug = profileSlug();
     if (!slug) {
@@ -383,22 +541,29 @@
       lastSlug = '';
       return;
     }
-    const card = topCard();
-    if (!card) return;
-    if (btn && document.contains(btn) && slug === lastSlug) return;
+    if (slug !== lastSlug && !slugSince) slugSince = Date.now();
+    const bar = findActionBar();
+    // already placed in the row for this profile (a floating button moves into the row once the row appears)
+    if (btn && document.contains(btn) && slug === lastSlug && (!floating || !bar)) return;
+    if (!bar && Date.now() - slugSince < 2500) {
+      setTimeout(schedule, 800); // page still rendering: look again shortly
+      return;
+    }
     if (btn) btn.remove();
     btn = makeButton();
-    const bar = findActionBar(card);
-    if (bar) bar.append(btn);
-    else {
-      // couldn't find the Message/More row: float the button at the bottom-right instead
-      btn.className = '';
+    floating = !bar;
+    if (bar) {
+      bar.append(btn);
+      matchRow(btn, bar);
+    } else {
+      // couldn't find the Message / More row: float the button at the bottom-right instead
       btn.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:2147482000;background:#0a66c2;color:#fff;border:0;border-radius:20px;padding:10px 16px;font:600 14px -apple-system,system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.2);cursor:pointer;display:inline-flex;gap:4px;';
       document.body.append(btn);
     }
     if (slug === lastSlug && savedLabel) setButtonState(true, savedLabel);
     if (slug !== lastSlug) {
       lastSlug = slug;
+      slugSince = 0;
       savedLabel = '';
       closePanel();
       const r = await send({ type: 'lookup', url: profileUrl(), company: '', companyUrl: '' });

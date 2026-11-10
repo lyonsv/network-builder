@@ -195,6 +195,159 @@ function itemsFromFlatLines(lines: string[]): Item[] {
   return items;
 }
 
+// ---------- full-list pages (/details/<kind>/) ----------
+
+const DETAIL_HEADINGS: Record<string, RegExp> = {
+  experience: /^experience$/i,
+  education: /^education$/i,
+  skills: /^skills$/i,
+  certifications: /^licen[cs]es? (&|and) certifications$|^certifications$/i,
+  languages: /^languages$/i,
+  'volunteering-experiences': /^volunteer(ing)?( experience)?$/i,
+  honors: /^hono(u)?rs (&|and) awards$/i,
+};
+export const DETAIL_LABELS: Record<string, string> = {
+  skills: 'Skills', certifications: 'Licenses & certifications', languages: 'Languages',
+  'volunteering-experiences': 'Volunteering', honors: 'Honors & awards',
+};
+const NOISE = /^(show all.*|see more|…\s*see more|see less|show more|show less|…\s*more|back|load more|show more results|nothing to see for now.*)$/i;
+
+/** the list part of a details page's text: after its heading, before the sidebar / footer; screen-reader repeats dropped */
+export function detailLines(kind: string, text: string): string[] {
+  const raw = (text || '').split('\n').map((l) => clean(l)).filter(Boolean);
+  const head = DETAIL_HEADINGS[kind];
+  // no heading = not that list (an empty section, an error or a sign-in page): read nothing rather than noise
+  const at = head ? raw.findIndex((l) => head.test(l)) : -1;
+  if (at < 0) return [];
+  const start = at + 1;
+  const out: string[] = [];
+  for (let i = start; i < raw.length; i++) {
+    const l = raw[i]!;
+    const key = l.toLowerCase();
+    if (STOP_HEADINGS.has(key) || /^linkedin corporation ©/i.test(l) || (key === 'about' && /^accessibility$/i.test(raw[i + 1] ?? ''))) break;
+    if (NOISE.test(l) || l === out[out.length - 1]) continue;
+    out.push(l);
+  }
+  return out.slice(0, 1500);
+}
+
+const EMPLOYMENT_IN_LINE = (l: string) => l.split(' · ').length > 1 && EMPLOYMENT.test(l.split(' · ').pop()!.trim());
+const looksLikeProse = (l: string) => l.length > 100 || /[.!?:]$/.test(l) || /^(skills|grade|activities)\b/i.test(l);
+
+/**
+ * Experience from a details page's text. Handles single roles ("Title / Company · Full-time / dates / location /
+ * description") and grouped companies ("Company / Full-time · 6 yrs / location / Role / dates / … / Role / dates …").
+ */
+export function parseExperienceText(lines: string[]): ExperienceEntry[] {
+  const L = lines;
+  const isRange = (l: string) => DATE_RANGE.test(l) || (SINGLE_DATE.test(l) && l.length < 40);
+  type Role = { title: string; company: string; employmentType?: string; start: number; date: number; groupLoc?: string };
+  const roles: Role[] = [];
+  const groupStarts: number[] = [];
+  let group: { company: string; at: number; loc?: string } | null = null;
+  let prevDate = -1;
+  for (let i = 0; i < L.length; i++) {
+    if (DURATION_ONLY.test(L[i]!) && i > 0 && !isRange(L[i]!)) {
+      // grouped company header: the line before is the company; an optional location follows
+      const loc = L[i + 1] && looksLikeLocation(L[i + 1]!) && !isRange(L[i + 1]!) ? L[i + 1] : undefined;
+      group = { company: splitCompanyLine(L[i - 1]!).company || L[i - 1]!, at: i - 1, loc };
+      groupStarts.push(i - 1);
+      continue;
+    }
+    if (!isRange(L[i]!)) continue;
+    let j = i - 1;
+    let employmentType: string | undefined;
+    if (j > prevDate && EMPLOYMENT.test(L[j]!)) {
+      employmentType = L[j];
+      j--;
+    }
+    if (j <= prevDate || j < 0) continue; // a date with no header (e.g. a second date line): ignore
+    let title: string;
+    let company: string;
+    let start: number;
+    if (EMPLOYMENT_IN_LINE(L[j]!) && j - 1 > prevDate) {
+      const c = splitCompanyLine(L[j]!);
+      company = c.company;
+      employmentType = c.employmentType;
+      title = L[j - 1]!;
+      start = j - 1;
+      group = null;
+    } else if (group && j > group.at + 1) {
+      title = L[j]!;
+      company = group.company;
+      start = j;
+    } else if (j - 1 > prevDate && !looksLikeProse(L[j - 1]!) && !(group && j - 1 <= group.at + 1)) {
+      title = L[j - 1]!;
+      company = splitCompanyLine(L[j]!).company || L[j]!;
+      start = j - 1;
+      group = null;
+    } else {
+      title = L[j]!;
+      company = group?.company ?? '';
+      start = j;
+    }
+    roles.push({ title, company, employmentType, start, date: i, groupLoc: group?.loc });
+    prevDate = i;
+  }
+  const bounds = [...roles.map((r) => r.start), ...groupStarts].sort((a, b) => a - b);
+  return roles.slice(0, MAX_ITEMS).map((r) => {
+    const next = bounds.find((b) => b > r.date) ?? L.length;
+    let rest = L.slice(r.date + 1, next);
+    let location: string | undefined;
+    if (rest[0] && looksLikeLocation(rest[0])) {
+      location = rest[0];
+      rest = rest.slice(1);
+    }
+    location ??= r.groupLoc;
+    const description = rest.join('\n').trim();
+    const dates = L[r.date]!;
+    return {
+      title: r.title,
+      company: r.company,
+      ...(r.employmentType ? { employmentType: r.employmentType } : {}),
+      dates,
+      current: /present/i.test(dates),
+      ...(location ? { location } : {}),
+      ...(description ? { description: description.slice(0, MAX_LINE) } : {}),
+    };
+  });
+}
+
+/** Education from a details page's text: "School / Degree, field / 2005 - 2009 / Grade… / Activities…" */
+export function parseEducationText(lines: string[]): EducationEntry[] {
+  const L = lines;
+  const isYears = (l: string) => DATE_RANGE.test(l) || /^\d{4}$/.test(l);
+  const heads: { school: string; degree: string; start: number; date: number }[] = [];
+  let prev = -1;
+  for (let i = 0; i < L.length; i++) {
+    if (!isYears(L[i]!) || i - 1 <= prev) continue;
+    const two = i - 2 > prev && !looksLikeProse(L[i - 2]!) && !looksLikeProse(L[i - 1]!);
+    heads.push(two ? { school: L[i - 2]!, degree: L[i - 1]!, start: i - 2, date: i } : { school: L[i - 1]!, degree: '', start: i - 1, date: i });
+    prev = i;
+  }
+  if (!heads.length) return L.length ? [{ school: L[0]!, detail: L.slice(1, 4).join(' · ') }] : [];
+  return heads.slice(0, MAX_ITEMS).map((h, k) => {
+    const end = heads[k + 1]?.start ?? L.length;
+    const extra = L.slice(h.date + 1, end);
+    return { school: h.school, detail: [h.degree, L[h.date], ...extra].filter(Boolean).join(' · ').slice(0, MAX_LINE) };
+  });
+}
+
+/** skills / languages / certifications …: unique lines minus endorsement counters and role cross-references */
+function listLines(kind: string, lines: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const l of lines) {
+    if (kind === 'skills' && (/endorse/i.test(l) || /^\d+ experiences? (at|across)/i.test(l) || /^(all|industry knowledge|tools & technologies|interpersonal skills|other skills)$/i.test(l) || /skill assessment/i.test(l))) continue;
+    if (/^\d+ experiences? (at|across)/i.test(l)) continue;
+    const k = l.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(l);
+  }
+  return out.slice(0, 300);
+}
+
 /** "VP Finance at Ledgerly | Ex-Globex" → { title: 'VP Finance', company: 'Ledgerly' } */
 export function splitHeadline(headline: string): { title: string; company: string } {
   const first = (headline || '').split(/\s[|•·]\s/)[0]!.trim();
@@ -204,14 +357,29 @@ export function splitHeadline(headline: string): { title: string; company: strin
 
 export class CaptureError extends Error {}
 
+/** badges LinkedIn shows beside the name ("LIVE", "1st", pronouns, …) — never a headline */
+const BADGE = /^(live|·.*|(1st|2nd|3rd\+?)|\(?(he|she|they)\/\w+\)?|verified|premium|open to work|hiring|creator|top voice)$/i;
+
+/** headline + location from the visible text after the name (first lines of the profile) */
+function topFromText(raw: string, fullName: string): { headline: string; location: string } {
+  const lines = raw.split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const i = lines.indexOf(fullName);
+  if (i < 0) return { headline: '', location: '' };
+  const rest = lines.slice(i + 1, i + 12).filter((l) => l.length >= 3 && !BADGE.test(l));
+  const loc = rest[1] && rest[1] !== 'Contact info' && !/followers|connections/i.test(rest[1]) && rest[1].length < 90 ? rest[1] : '';
+  return { headline: (rest[0] ?? '').slice(0, 500), location: loc };
+}
+
 export function parseCapture(p: CapturePayload): CapturedProfile {
   if (!p || typeof p !== 'object') throw new CaptureError('missing profile');
   const url = canonicalProfileUrl(String(p.url ?? ''));
   if (!url) throw new CaptureError('not a LinkedIn profile URL (expected linkedin.com/in/…)');
   const fullName = clean(p.fullName, 200);
   if (!fullName) throw new CaptureError('could not read the person’s name from the page — scroll to the top of the profile and try again');
-  const headline = clean(p.headline, 500);
   const rawText = clean(p.rawText, MAX_RAW_TEXT);
+  const top = topFromText(rawText, fullName);
+  let headline = clean(p.headline, 500);
+  if ((!headline || BADGE.test(headline)) && top.headline) headline = top.headline;
   const sections = p.sections && typeof p.sections === 'object' ? p.sections : {};
   const items = (k: string): Item[] => {
     const s = (sections as Record<string, unknown>)[k] as { items?: unknown } | undefined;
@@ -223,6 +391,33 @@ export function parseCapture(p: CapturePayload): CapturedProfile {
   if (!experience.length && fallback.experience?.length) experience = parseExperience(itemsFromFlatLines(fallback.experience));
   let education = parseEducation(items('education'));
   if (!education.length && fallback.education?.length) education = [{ school: fallback.education[0]!, detail: fallback.education.slice(1, 4).join(' · ') }];
+
+  // full lists from /details/<kind>/ beat the profile page's summary whenever they found more
+  const detailsText: Record<string, string> = {};
+  const detailOther: Record<string, string[]> = {};
+  const details = p.details && typeof p.details === 'object' ? p.details : {};
+  for (const kind of Object.keys(DETAIL_HEADINGS)) {
+    const d = (details as Record<string, { text?: unknown; items?: unknown }>)[kind];
+    if (!d || typeof d !== 'object') continue;
+    const lines = detailLines(kind, clean(d.text, 30_000));
+    if (lines.length) detailsText[kind] = lines.join('\n');
+    const its = Array.isArray(d.items) ? (d.items as Item[]).filter((x) => x && Array.isArray(x.lines)) : [];
+    if (kind === 'experience') {
+      const fromItems = parseExperience(its);
+      const fromText = parseExperienceText(lines);
+      const dated = (xs: ExperienceEntry[]) => xs.filter((e) => e.dates).length;
+      const best = dated(fromItems) >= dated(fromText) ? fromItems : fromText;
+      if (dated(best) > dated(experience) || (dated(best) === dated(experience) && best.length > experience.length)) experience = best;
+    } else if (kind === 'education') {
+      const fromItems = parseEducation(its);
+      const best = fromItems.length >= 1 && fromItems.some((e) => /\d{4}/.test(e.detail)) ? fromItems : parseEducationText(lines);
+      if (best.length >= education.length) education = best;
+    } else {
+      const ls = its.length ? its.map((it) => it.lines.map((l) => clean(l)).filter(Boolean)[0] ?? '').filter(Boolean) : lines;
+      const xs = listLines(kind, ls.length ? ls : lines);
+      if (xs.length) detailOther[DETAIL_LABELS[kind]!] = xs;
+    }
+  }
   let about = clean(p.about, 8000);
   if (!about && fallback.about?.length) about = fallback.about.join('\n').slice(0, 8000);
 
@@ -236,6 +431,11 @@ export function parseCapture(p: CapturePayload): CapturedProfile {
     if (k === 'experience' || k === 'education' || k === 'about' || !v.length) continue;
     if (!Object.keys(other).some((h) => h.toLowerCase().startsWith(k.slice(0, 5)))) other[k] = v.slice(0, MAX_ITEMS);
   }
+  // the full lists replace the profile page's short versions of the same section
+  for (const [label, v] of Object.entries(detailOther)) {
+    for (const k of Object.keys(other)) if (k.toLowerCase().slice(0, 5) === label.toLowerCase().slice(0, 5)) delete other[k];
+    other[label] = v;
+  }
 
   const cur = experience.find((e) => e.current) ?? experience[0];
   const fromHeadline = splitHeadline(headline);
@@ -245,7 +445,7 @@ export function parseCapture(p: CapturePayload): CapturedProfile {
     url,
     fullName,
     headline,
-    location: clean(p.location, 200),
+    location: clean(p.location, 200) || top.location,
     title: title || fromHeadline.title,
     company,
     companyUrl: cur?.companyUrl ?? '',
@@ -254,5 +454,6 @@ export function parseCapture(p: CapturePayload): CapturedProfile {
     education,
     other,
     rawText,
+    ...(Object.keys(detailsText).length ? { detailsText } : {}),
   };
 }

@@ -21,6 +21,7 @@ import type {
   DossierRecord,
   ExplorerCosts,
   ExplorerEvent,
+  ExtensionStatus,
   ExplorerPerson,
   ExplorerState,
   JobQueueState,
@@ -236,6 +237,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     },
     dbPath: opts.dbPath,
     accounts: accountList(),
+    extension: extensionStatus(),
   });
 
   const emit = (e: ExplorerEvent) => {
@@ -868,12 +870,30 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     if (!t || rotate) {
       t = randomBytes(24).toString('base64url');
       store.setMeta('ext_token', t);
+      store.setMeta('ext_seen', ''); // a new code: not connected until the extension uses it
     }
     return t;
   };
   const pairingCode = (rotate: boolean) => {
     const json = JSON.stringify({ v: 1, u: `http://127.0.0.1:${port}`, t: extToken(rotate) });
-    return { code: `nb1.${Buffer.from(json).toString('base64url')}`, port, extensionDir: extensionDir() };
+    return {
+      code: `nb1.${Buffer.from(json).toString('base64url')}`,
+      port,
+      extensionDir: extensionDir(),
+      extension: extensionStatus(),
+    };
+  };
+  /** paired = a code was issued; seenAt = the extension last reached this database with it */
+  function extensionStatus(): ExtensionStatus {
+    return { paired: !!store.getMeta('ext_token'), seenAt: store.getMeta('ext_seen') || null };
+  }
+  /** record the extension's contact (throttled); tell the page when it (re)appears so pairing shows as connected */
+  const extSeen = () => {
+    const last = Date.parse(store.getMeta('ext_seen') ?? '');
+    const now = Date.now();
+    if (Number.isFinite(last) && now - last < 60_000) return;
+    store.setMeta('ext_seen', new Date(now).toISOString());
+    emit({ type: 'extension', extension: extensionStatus(), connected: !Number.isFinite(last) || now - last > 10 * 60_000 });
   };
   const extLookup = (url: URL) => {
     const profileUrl = url.searchParams.get('url') ?? '';
@@ -945,6 +965,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       throw new HttpError(401, 'not paired (or the pairing was reset) — in Network Builder open Accounts → Chrome extension and pair again');
     }
     if (route !== 'POST /ext/capture') notifyIfChanged();
+    extSeen();
     switch (route) {
       case 'GET /ext/ping':
         return sendJson(res, 200, { ok: true, app: 'network-builder', accounts: store.accounts.list().length });

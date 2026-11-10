@@ -548,8 +548,13 @@ describe('accounts + Chrome extension API', () => {
     const decoded = JSON.parse(Buffer.from(pair.json.code.slice(4), 'base64url').toString());
     expect(decoded.u).toBe(base);
     const cap = decoded.t as string;
+    expect(pair.json.extension).toEqual({ paired: true, seenAt: null });
 
     expect((await ext('GET', '/ext/ping', { capture: cap })).json.ok).toBe(true);
+    // the page learns the extension connected (header button turns green)
+    const st = await req('GET', `${base}/api/state`, { token });
+    expect(st.json.extension.paired).toBe(true);
+    expect(typeof st.json.extension.seenAt).toBe('string');
     // a web page can't use the capture token
     expect((await ext('GET', '/ext/ping', { capture: cap, origin: 'https://www.linkedin.com' })).status).toBe(403);
 

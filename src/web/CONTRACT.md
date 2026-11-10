@@ -391,7 +391,10 @@ export function startExplorerServer(opts: {
   `{added, already, unknown, view, accounts}`, `PUT|DELETE /api/accounts/:id/members/:pid` (PUT body any of role,
   department, tier, reportsTo, notes). Validation errors are 400, unknown account 404.
 - Pairing: `POST /api/ext/pair {rotate?}` → `{code: "nb1." + base64url(JSON {v:1, u:"http://127.0.0.1:<port>", t}),
-  port, extensionDir}`. The capture token lives in meta `ext_token` (survives restarts; `rotate` revokes it).
+  port, extensionDir, extension}`. The capture token lives in meta `ext_token` (survives restarts; `rotate` revokes it).
+- Status: `state.extension = {paired, seenAt}`; every authorised `/ext/*` call records meta `ext_seen` (at most once a
+  minute) and emits SSE `{type:'extension', extension, connected}` (`connected` = first contact, or first in 10 min).
+  The header's 🧩 button shows not set up / waiting to pair / connected.
 - Extension API `/ext/*`: header `X-NB-Capture: <token>` (never the page token); Origin absent or
   `chrome-extension://[a-p]{32}`; Host must be ours. `GET /ext/ping`, `GET /ext/accounts` (id, name, status,
   memberCount), `GET /ext/lookup?url&company&companyUrl` → `{id, isConnection, capturedAt, accounts:[{id,name,role}],
@@ -400,7 +403,11 @@ export function startExplorerServer(opts: {
   or alias match → LinkedIn company URL / company name match → create. Notes append; re-capture refreshes the profile
   and keeps history. 401 = re-pair, 400 = bad capture (not retried by the extension).
 - CapturePayload: `{url, fullName, headline, location, currentCompany, about, sections: {<anchor id>: {heading, items:
-  [{lines, sub?, companyUrl?}]}}, rawText ≤ 60k}`. All interpretation is server-side (`parseCapture`): grouped
+  [{lines, sub?, companyUrl?}]}}, rawText ≤ 60k, details?: {<kind>: {text ≤ 30k, items}}}`. `details` holds the
+  person's full lists (`/in/<slug>/details/<kind>/` for experience, education, skills, certifications, languages,
+  volunteering-experiences, honors), read in hidden same-origin frames when the panel opens; the server prefers them
+  over the profile page's summary (`detailLines` cuts to the list, `parseExperienceText` / `parseEducationText`) and
+  keeps the cleaned text as `CapturedProfile.detailsText`. A page without its heading counts as empty. All interpretation is server-side (`parseCapture`): grouped
   roles, nested descriptions, employment type, dates/current, location, and a raw-text section fallback.
 - UI: header switch People | Accounts (persisted in localStorage `nb.mode` / `nb.account`). Accounts view = account list
   + header fields + autosaving brief + buying committee & gaps + warm paths (＋ Add) + org chart (department columns →

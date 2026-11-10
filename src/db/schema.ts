@@ -243,7 +243,8 @@ export function migrate(db: DatabaseSync): void {
     let version = readVersion(db);
     if (version > SCHEMA_VERSION) {
       throw new Error(
-        `network.db schema v${version} is newer than this network-builder (v${SCHEMA_VERSION}). Update the CLI.`,
+        `network.db schema v${version} is newer than this network-builder (v${SCHEMA_VERSION}) — a newer copy has already ` +
+          'upgraded it. Update network-builder (desktop app: `cd desktop && pnpm build && node scripts/install.mjs`).',
       );
     }
     if (version === SCHEMA_VERSION) return;

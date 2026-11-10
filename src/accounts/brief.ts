@@ -60,17 +60,20 @@ export function profileSections(p: CapturedProfile, opts: { descMax?: number; in
   if (p.about) out.push('', `**About:** ${oneLine(p.about, 1500)}`);
   if (p.experience?.length) {
     out.push('', '**Experience:**');
-    for (const e of p.experience.slice(0, 15)) {
-      const head = [e.title, e.company && `at ${e.company}`, e.dates && `(${e.dates})`, e.location && `· ${e.location}`].filter(Boolean).join(' ');
+    for (const e of p.experience.slice(0, 30)) {
+      const head = [e.title, e.company && `at ${e.company}`, e.employmentType && `[${e.employmentType}]`, e.dates && `(${e.dates})`, e.location && `· ${e.location}`].filter(Boolean).join(' ');
       out.push(`- ${head}${e.description ? ` — ${oneLine(e.description, descMax)}` : ''}`);
     }
   }
   if (p.education?.length) {
-    out.push('', '**Education:**', ...p.education.slice(0, 6).map((e) => `- ${e.school}${e.detail ? ` — ${e.detail}` : ''}`));
+    out.push('', '**Education:**', ...p.education.slice(0, 10).map((e) => `- ${e.school}${e.detail ? ` — ${e.detail}` : ''}`));
   }
   for (const [k, v] of Object.entries(p.other ?? {})) {
     if (!v.length) continue;
-    out.push('', `**${k[0]!.toUpperCase()}${k.slice(1)}:** ${oneLine(v.join('; '), 600)}`);
+    out.push('', `**${k[0]!.toUpperCase()}${k.slice(1)}:** ${oneLine(v.join('; '), 1500)}`);
+  }
+  if (opts.includeRaw && p.detailsText) {
+    for (const [k, t] of Object.entries(p.detailsText)) out.push('', `**Full ${k.replace(/-/g, ' ')} list (as captured):**`, '```', t.slice(0, 15_000), '```');
   }
   if ((opts.includeRaw || (!p.experience?.length && !p.about)) && p.rawText) {
     out.push('', '**Page text (as captured):**', '```', p.rawText.slice(0, opts.includeRaw ? 20_000 : 3000), '```');

@@ -675,6 +675,15 @@ export interface ExplorerState {
   dbPath: string;
   /** accounts (ABX) — summaries only; GET /api/accounts/:id for the full view */
   accounts?: AccountSummary[];
+  /** Chrome extension pairing */
+  extension?: ExtensionStatus;
+}
+
+export interface ExtensionStatus {
+  /** a pairing code has been issued */
+  paired: boolean;
+  /** when the extension last reached this database (ISO), null if never since the code was issued */
+  seenAt: string | null;
 }
 
 export type ExplorerEvent =
@@ -689,5 +698,7 @@ export type ExplorerEvent =
   | { type: 'notice'; level: 'info' | 'warn' | 'error'; message: string }
   /** accounts changed (`changed` = the account touched; `notice` = e.g. a capture from the Chrome extension) */
   | { type: 'accounts'; accounts: AccountSummary[]; changed?: string; notice?: string }
+  /** the Chrome extension reached the server (`connected` = first contact, or first in 10 min) */
+  | { type: 'extension'; extension: ExtensionStatus; connected: boolean }
   /** another process changed the database: clients should refetch GET /api/state */
   | { type: 'reload'; reason: string };

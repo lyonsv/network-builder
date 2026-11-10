@@ -455,9 +455,19 @@ td.loc { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-spac
 .paused { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 
 /* ---------- accounts (ABX) ---------- */
-.modesw { flex: none; }
-.modesw button { padding: 6px 14px; font-size: 13px; font-weight: 600; }
-.modesw b { font-weight: 600; margin-left: 4px; opacity: .75; }
+.modesw { flex: none; margin-left: 14px; }
+.modesw button { padding: 7px 18px; font-size: 14px; font-weight: 600; }
+.modesw b { font-weight: 600; margin-left: 5px; opacity: .75; }
+.extbtn { cursor: pointer; font: inherit; font-size: 12.5px; }
+.extbtn:hover { border-color: var(--border-strong); color: var(--text); }
+.extbtn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.extbtn.ok .dot { background: var(--good, #3fb950); }
+.extbtn.wait .dot { background: var(--warn); }
+.extbtn.off { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.ext-status { border-radius: 8px; padding: 8px 11px; margin: 4px 0 10px; font-size: 13px; }
+.ext-status.ok { background: var(--good-soft, #1f6b3d22); color: var(--good, #3fb950); }
+.ext-status.wait { background: var(--warn-soft); color: var(--warn); }
+@media (max-width: 760px) { .modesw { margin-left: 0; } }
 body.mode-accounts .top .wrap > :not(.head) { display: none !important; }
 body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !important; }
 .acc { padding-top: 16px; padding-bottom: 60px; }
@@ -560,11 +570,12 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
           <div class="app">network-builder · explorer</div>
           <div class="goal" id="goal">Your network</div>
         </div>
+        <div class="seg modesw" id="modeSw" role="group" aria-label="View">
+          <button type="button" data-mode="people" aria-pressed="true" title="Your LinkedIn connections, lenses and lists">👥 People</button>
+          <button type="button" data-mode="accounts" aria-pressed="false" title="Target accounts: key people by org chart, buying committee and your ABX brief">🏢 Accounts<b id="acctN"></b></button>
+        </div>
       </div>
-      <div class="seg modesw" id="modeSw" role="group" aria-label="View">
-        <button type="button" data-mode="people" aria-pressed="true" title="Your LinkedIn connections, lenses and lists">People</button>
-        <button type="button" data-mode="accounts" aria-pressed="false" title="Target accounts: key people by org chart, buying committee and your ABX brief">Accounts<b id="acctN"></b></button>
-      </div>
+      <button type="button" class="chip extbtn" id="extBtn" hidden><span class="dot"></span><span id="extBtnT">🧩 Chrome extension</span></button>
       <div class="stats" id="stats" aria-live="polite"></div>
     </div>
     <div class="lensbar" id="lensbar">
@@ -816,6 +827,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
 <dialog id="dlgExt" style="width:min(520px, calc(100vw - 32px))">
   <form method="dialog" class="dlg">
     <h3>Add people from LinkedIn</h3>
+    <div class="ext-status" id="extStatus" hidden></div>
     <p>The Network Builder Chrome extension puts a <b>＋ Network Builder</b> button on LinkedIn profiles. One click files the person — with their full profile — under an account here. It only reads the profile you’re viewing, when you click.</p>
     <ol>
       <li>Install it once: open <code>chrome://extensions</code>, turn on <b>Developer mode</b>, click <b>Load unpacked</b> and choose <span id="extDir"></span>.</li>
@@ -2538,6 +2550,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     if (Array.isArray(s.lenses)) lenses = s.lenses;
     if (Array.isArray(s.lists)) lists = s.lists;
     if (Array.isArray(s.accounts)) accountsUpdated(s.accounts);
+    if (s.extension) { extState = s.extension; renderExt(); }
     applyQueue(s.queue, true);
     reindex();
     selected.forEach(function (id) { if (!byId.has(id)) selected.delete(id); });
@@ -2641,6 +2654,13 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     });
     on('accounts', function (d) {
       if (d && Array.isArray(d.accounts)) accountsUpdated(d.accounts, d.changed, d.notice);
+    });
+    on('extension', function (d) {
+      if (!d || !d.extension) return;
+      var was = extState;
+      extState = d.extension;
+      renderExt();
+      if (d.connected && (!was || !was.seenAt)) toast('✓ Chrome extension connected', 'good');
     });
     on('notice', function (d) {
       if (d && d.message) toast(d.message, d.level === 'error' ? 'bad' : d.level === 'warn' ? null : 'good');
@@ -3735,11 +3755,36 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   }
 
   // ---- Chrome extension pairing
+  var extState = state.extension || null;
+  function extAgo(iso) {
+    var s = (Date.now() - Date.parse(iso)) / 1000;
+    if (!isFinite(s)) return '';
+    if (s < 90) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + ' h ago';
+    return new Date(iso).toLocaleDateString();
+  }
+  function renderExt() {
+    var b = $('extBtn'), st = extState;
+    b.hidden = !LIVE;
+    var kind = !st || !st.paired ? 'off' : st.seenAt ? 'ok' : 'wait';
+    b.className = 'chip extbtn ' + kind;
+    $('extBtnT').textContent = kind === 'off' ? '🧩 Connect Chrome extension' : kind === 'wait' ? '🧩 Extension: waiting to pair' : '🧩 Extension';
+    b.title = kind === 'off' ? 'Add people to accounts from LinkedIn with one click — set up the Chrome extension'
+      : kind === 'wait' ? 'A pairing code was made but the extension hasn’t used it yet — paste it into the extension'
+      : 'Chrome extension connected (last seen ' + extAgo(st.seenAt) + ')';
+    var box = $('extStatus');
+    box.hidden = kind === 'off';
+    box.className = 'ext-status ' + kind;
+    box.textContent = kind === 'ok' ? '✓ The extension is connected (last seen ' + extAgo(st.seenAt) + '). Open a LinkedIn profile and click ＋ Network Builder.'
+      : 'Waiting for the extension — paste the code below into it. This turns green as soon as it connects.';
+  }
   function openExtDialog() {
     if (!LIVE) return;
     var dlg = $('dlgExt');
     $('extCode').value = 'Loading…';
     api('/api/ext/pair', {}).then(function (res) {
+      if (res.extension) { extState = res.extension; renderExt(); }
       $('extCode').value = res.code;
       var d = $('extDir'); d.textContent = '';
       if (res.extensionDir) append(d, h('code', { text: res.extensionDir }));
@@ -3754,7 +3799,10 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   $('extReset').addEventListener('click', function () {
     confirmDlg('Reset the pairing?', 'The extension stops sending until you paste the new code into it. Use this if a code leaked or you want to unpair a browser.', 'Reset').then(function (ok) {
       if (!ok) return;
-      api('/api/ext/pair', { rotate: true }).then(function (res) { $('extCode').value = res.code; toast('New pairing code — paste it into the extension', 'good'); })
+      api('/api/ext/pair', { rotate: true }).then(function (res) {
+        if (res.extension) { extState = res.extension; renderExt(); }
+        $('extCode').value = res.code; toast('New pairing code — paste it into the extension', 'good');
+      })
         .catch(function (e) { toast('Reset failed: ' + e.message, 'bad'); });
       if (!$('dlgExt').open && typeof $('dlgExt').showModal === 'function') $('dlgExt').showModal();
     });
@@ -3796,6 +3844,8 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   $('accQ').addEventListener('input', function () { acc.q = $('accQ').value; renderAccList(); });
   $('accNew').addEventListener('click', function () { newAccount(); });
   $('accExt').addEventListener('click', openExtDialog);
+  $('extBtn').addEventListener('click', openExtDialog);
+  renderExt();
   $('accNew').disabled = $('accExt').disabled = !LIVE;
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && acc.open && !document.querySelector('dialog[open]')) closeDrawer();

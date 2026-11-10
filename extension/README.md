@@ -4,7 +4,9 @@ Adds a **＋ Network Builder** button next to *Message / More* on LinkedIn profi
 their full profile, under an **account** (a company you're targeting) in your local Network Builder. From there Claude
 can plan an ABX campaign with `network_get_account`.
 
-- **Reads only the profile you're viewing, and only when you click.** No crawling, no background page loads.
+- **Reads only the person you're viewing, and only when you click.** It then opens that person's own "Show all" lists
+  (experience, education, skills, certifications, languages, volunteering, honours) in hidden frames in the same tab, so it
+  captures every role with dates and tenure, just as you'd see clicking through. No crawling of anyone else.
 - **Sends only to your own machine** (`http://127.0.0.1:<port>`). It contacts no other server, and nothing costs money.
 - **People you capture are not added to your network.** They live under the account, never in your connections,
   lenses or exports.
@@ -34,7 +36,10 @@ Open a profile, click **＋ Network Builder**, then:
 
 Adding someone again refreshes their profile, and the earlier capture is kept.
 
-If **Experience** hasn't loaded yet, the panel says so. Scroll down the profile and reopen the panel.
+While the panel is open it reads the full lists (a few seconds); the panel shows what it read. If LinkedIn won't open
+them, the visible profile is saved instead.
+
+After updating the extension's files, click ↻ on its card in `chrome://extensions` and reload your LinkedIn tabs.
 
 ## When something's wrong
 

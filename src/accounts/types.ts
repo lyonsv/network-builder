@@ -106,6 +106,8 @@ export interface CapturedProfile {
   other: Record<string, string[]>;
   /** the page's visible text — kept so nothing is lost when LinkedIn changes its markup */
   rawText: string;
+  /** the full-list pages' text (experience, education, skills, …), cleaned — kept for the same reason */
+  detailsText?: Record<string, string>;
 }
 
 export interface Contact {
@@ -208,4 +210,6 @@ export interface CapturePayload {
   about?: string;
   sections?: Record<string, { heading?: string; items: { lines: string[]; sub?: string[][]; companyUrl?: string }[] }>;
   rawText?: string;
+  /** the person's full lists (linkedin.com/in/<slug>/details/<kind>/): page text + list items when readable */
+  details?: Record<string, { text?: string; items?: { lines: string[]; sub?: string[][]; companyUrl?: string }[] }>;
 }

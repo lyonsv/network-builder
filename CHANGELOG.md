@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Desktop app:** if the explorer server can't start (e.g. the database is newer than the app), the window now shows
+  the error instead of spinning forever.
+- **Explorer header:** People / Accounts are now clear tabs beside the logo, and a 🧩 button shows the Chrome
+  extension's status (not set up / waiting to pair / connected) and opens pairing.
 - **Accounts (ABX):** the explorer has a new **Accounts** view. Each account holds:
   - an ABX brief in markdown;
   - its key people as an org chart (department → seniority, placed from job titles and correctable), each with a
@@ -10,8 +14,9 @@
 
   **⧉ Copy for AI** copies the whole account as one markdown document. In People, **Add to account ▾** files selected
   connections under an account.
-- **Chrome extension** (`extension/`): a **＋ Network Builder** button on LinkedIn profiles captures the profile you're
-  viewing (about, experience, education, skills, plus the page text as a fallback) into an account.
+- **Chrome extension** (`extension/`): a **＋ Network Builder** button on LinkedIn profiles captures the person you're
+  viewing into an account. It reads their full "Show all" lists (every role with dates and tenure, education, skills,
+  certifications, languages, volunteering, honours) plus the page text as a fallback.
   - Pairing uses a long-lived, add-only capture token.
   - If the app isn't running, profiles wait in the extension and are sent automatically, with clear status, retry and
     notifications.

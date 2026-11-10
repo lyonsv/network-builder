@@ -5,7 +5,10 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { accountMarkdown } from '../src/accounts/brief';
-import { canonicalCompanyUrl, canonicalProfileUrl, normalizeCompany, parseCapture, parseExperience, sectionsFromText, splitHeadline } from '../src/accounts/capture';
+import {
+  canonicalCompanyUrl, canonicalProfileUrl, detailLines, normalizeCompany, parseCapture, parseEducationText, parseExperience,
+  parseExperienceText, sectionsFromText, splitHeadline,
+} from '../src/accounts/capture';
 import { classify, departmentFromTitle, tierFromTitle } from '../src/accounts/classify';
 import { ingestCapture } from '../src/accounts/ingest';
 import type { CapturePayload } from '../src/accounts/types';
@@ -98,6 +101,73 @@ describe('capture parsing', () => {
 
   it('skips grouped companies whose roles are missing', () => {
     expect(parseExperience([{ lines: ['Globex', '5 yrs 2 mos'] }])).toEqual([]);
+  });
+});
+
+// what LinkedIn's /details/experience/ page text looks like (screen-reader copies repeat each line; nav + sidebar around it)
+const EXPERIENCE_PAGE = [
+  'Home', 'My Network', 'Back', 'Experience',
+  'Head of Growth', 'Head of Growth', 'Ledgerly · Full-time', 'Jan 2022 - Present · 2 yrs 11 mos', 'Berlin, Germany · Hybrid',
+  'Built the partner channel from zero to 40% of new revenue.', 'Skills: Pricing Strategy · Business Development',
+  'Globex', '7 yrs 2 mos', 'Dublin, Ireland',
+  'VP Sales', 'Full-time', 'Mar 2019 - Dec 2021 · 2 yrs 10 mos', 'Ran EMEA enterprise sales.',
+  'Director of Sales', 'Nov 2014 - Mar 2019 · 4 yrs 5 mos',
+  'Advisor', 'Initech · Part-time', '2012 - 2014 · 2 yrs',
+  'Show all', 'More profiles for you', 'Someone Else', '· 2nd', 'About', 'Accessibility', 'LinkedIn Corporation © 2026',
+].join('\n');
+
+describe('full-list (details) pages', () => {
+  it('reads every role with dates, tenure, employment type, location, description and grouped companies', () => {
+    const lines = detailLines('experience', EXPERIENCE_PAGE);
+    expect(lines[0]).toBe('Head of Growth');
+    expect(lines).not.toContain('More profiles for you');
+    expect(detailLines('certifications', 'Error 404\nNothing matches the given URI')).toEqual([]);
+    const ex = parseExperienceText(lines);
+    expect(ex.map((e) => [e.title, e.company])).toEqual([
+      ['Head of Growth', 'Ledgerly'], ['VP Sales', 'Globex'], ['Director of Sales', 'Globex'], ['Advisor', 'Initech'],
+    ]);
+    expect(ex[0]).toMatchObject({ employmentType: 'Full-time', dates: 'Jan 2022 - Present · 2 yrs 11 mos', current: true, location: 'Berlin, Germany · Hybrid' });
+    expect(ex[0]!.description).toContain('partner channel');
+    expect(ex[0]!.description).not.toContain('Globex');
+    expect(ex[1]).toMatchObject({ employmentType: 'Full-time', location: 'Dublin, Ireland', description: 'Ran EMEA enterprise sales.' });
+    expect(ex[2]!.description).toBeUndefined();
+    expect(ex[3]).toMatchObject({ employmentType: 'Part-time', dates: '2012 - 2014 · 2 yrs', current: false });
+  });
+
+  it('reads education with degree, years and extras', () => {
+    const ed = parseEducationText(detailLines('education', [
+      'Education', 'Northwind Business School', 'MSc, Finance', '2010 - 2011', 'Grade: Distinction',
+      'Lakeside University', 'BA, Economics', '2006 - 2010', 'Show all',
+    ].join('\n')));
+    expect(ed).toEqual([
+      { school: 'Northwind Business School', detail: 'MSc, Finance · 2010 - 2011 · Grade: Distinction' },
+      { school: 'Lakeside University', detail: 'BA, Economics · 2006 - 2010' },
+    ]);
+  });
+
+  it('a capture with details uses the full lists, fixes skills, and keeps the text', () => {
+    const p = parseCapture({
+      url: 'https://www.linkedin.com/in/riley-test/', fullName: 'Riley Test', headline: 'Business builder at Ledgerly',
+      about: 'Builds things.', sections: {}, rawText: 'Riley Test\nBusiness builder at Ledgerly\nAbout\nBuilds things.',
+      details: {
+        experience: { text: EXPERIENCE_PAGE, items: [] },
+        skills: { text: 'Skills\nAll\nPricing Strategy\nEndorsed by Sam Rivera\n3 endorsements\nBusiness Development\n2 experiences across Ledgerly and Globex\nPricing Strategy', items: [] },
+      },
+    });
+    expect(p.experience).toHaveLength(4);
+    expect(p.title).toBe('Head of Growth');
+    expect(p.company).toBe('Ledgerly');
+    expect(p.other['Skills']).toEqual(['Pricing Strategy', 'Business Development']);
+    expect(p.detailsText?.experience).toContain('Director of Sales');
+  });
+
+  it('a badge captured as the headline ("LIVE") is replaced from the page text', () => {
+    const p = parseCapture({
+      url: 'https://www.linkedin.com/in/riley-test/', fullName: 'Riley Test', headline: 'LIVE',
+      rawText: 'Riley Test\n\n· 1st\nLIVE\nBusiness builder at Ledgerly | Payments\nBerlin, Germany\n·\nContact info',
+    });
+    expect(p.headline).toBe('Business builder at Ledgerly | Payments');
+    expect(p.location).toBe('Berlin, Germany');
   });
 });
 

@@ -921,6 +921,19 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       }),
     );
     const verb = r.addedToAccount ? 'Added' : 'Updated';
+    const pr = r.contact.profile;
+    const saved = {
+      experience: pr.experience.length,
+      education: pr.education.length,
+      sections: Object.keys(pr.other),
+      lists: Object.keys(pr.detailsText ?? {}),
+    };
+    // statuses and sizes only (no profile content): what the extension managed to read, for troubleshooting
+    const diag = (b.profile as { detailsDiag?: unknown }).detailsDiag;
+    console.log(
+      `capture: ${saved.experience} roles, ${saved.education} education, lists [${saved.lists.join(', ')}]` +
+        (diag && typeof diag === 'object' ? ` · read ${Object.entries(diag as Record<string, unknown>).map(([k, v]) => `${k}=${String(v).slice(0, 40)}`).join(' ')}` : ''),
+    );
     accountsChanged(
       r.account.id,
       `${verb} ${r.contact.fullName} ${r.addedToAccount ? 'to' : 'on'} ${r.account.name}${r.createdAccount ? ' (new account)' : ''} — from LinkedIn`,
@@ -932,6 +945,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       addedToAccount: r.addedToAccount,
       isConnection: r.isConnection,
       firstCapture: r.firstCapture,
+      saved,
     };
   };
 

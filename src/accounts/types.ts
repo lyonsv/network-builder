@@ -212,4 +212,6 @@ export interface CapturePayload {
   rawText?: string;
   /** the person's full lists (linkedin.com/in/<slug>/details/<kind>/): page text + list items when readable */
   details?: Record<string, { text?: string; items?: { lines: string[]; sub?: string[][]; companyUrl?: string }[] }>;
+  /** per list: how reading it went (status + size), logged for troubleshooting — never stored */
+  detailsDiag?: Record<string, string>;
 }

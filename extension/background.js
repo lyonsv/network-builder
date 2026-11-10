@@ -257,7 +257,58 @@ const handlers = {
     await saveQueue((await getQueue()).filter((x) => x.id !== id));
     return { ok: true };
   },
+  async readDetails({ slug, kinds }) {
+    return readDetails(String(slug || ''), Array.isArray(kinds) ? kinds.map(String) : []);
+  },
 };
+
+// ---------- full lists ----------
+// The person's "Show all" pages (/in/<slug>/details/<kind>/) render only as real pages, so open them in a minimized
+// window, ask our content script in each tab for the list text once it settles, then close the window.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const DETAIL_TIMEOUT_MS = 25000;
+
+async function readDetails(slug, kinds) {
+  if (!/^[^/?#]+$/.test(slug) || !kinds.length) return { ok: false, message: 'bad request', results: {} };
+  const urls = kinds.map((k) => `https://www.linkedin.com/in/${slug}/details/${encodeURIComponent(k)}/`);
+  let win;
+  try {
+    win = await chrome.windows.create({ url: urls, focused: false, state: 'minimized' });
+  } catch (e) {
+    return { ok: false, message: `couldn’t open the lists: ${(e && e.message) || e}`, results: {} };
+  }
+  const tabs = (win.tabs || []).slice(0, kinds.length);
+  const results = {};
+  const started = Date.now();
+  try {
+    await Promise.all(
+      tabs.map(async (tab, i) => {
+        const kind = kinds[i];
+        let last = null;
+        while (Date.now() - started < DETAIL_TIMEOUT_MS) {
+          await sleep(700);
+          let r;
+          try {
+            r = await chrome.tabs.sendMessage(tab.id, { type: 'nb-read-list', kind });
+          } catch {
+            continue; // page (and our content script) still loading
+          }
+          if (r) last = r;
+          if (r && r.ready) {
+            results[kind] = { status: 'ok', text: r.text, items: r.items || [], url: r.url };
+            return;
+          }
+        }
+        results[kind] = last && last.text
+          ? { status: 'timeout', text: last.text, items: last.items || [], url: last.url }
+          : { status: 'timeout', text: '', items: [], url: last && last.url };
+      }),
+    );
+  } finally {
+    chrome.windows.remove(win.id).catch(() => {});
+  }
+  return { ok: true, results };
+}
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   const h = msg && handlers[msg.type];

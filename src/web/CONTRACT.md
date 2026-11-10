@@ -399,13 +399,15 @@ export function startExplorerServer(opts: {
   `chrome-extension://[a-p]{32}`; Host must be ours. `GET /ext/ping`, `GET /ext/accounts` (id, name, status,
   memberCount), `GET /ext/lookup?url&company&companyUrl` → `{id, isConnection, capturedAt, accounts:[{id,name,role}],
   suggested}`, `POST /ext/capture {profile: CapturePayload, accountId? | accountName?, role?, notes?}` →
-  `{account, person, createdAccount, addedToAccount, isConnection, firstCapture}`. Account resolution: accountId → name
+  `{account, person, createdAccount, addedToAccount, isConnection, firstCapture, saved: {experience, education,
+  sections, lists}}`; the server logs `saved` plus the extension's `detailsDiag` (statuses and sizes only). Account resolution: accountId → name
   or alias match → LinkedIn company URL / company name match → create. Notes append; re-capture refreshes the profile
   and keeps history. 401 = re-pair, 400 = bad capture (not retried by the extension).
 - CapturePayload: `{url, fullName, headline, location, currentCompany, about, sections: {<anchor id>: {heading, items:
   [{lines, sub?, companyUrl?}]}}, rawText ≤ 60k, details?: {<kind>: {text ≤ 30k, items}}}`. `details` holds the
   person's full lists (`/in/<slug>/details/<kind>/` for experience, education, skills, certifications, languages,
-  volunteering-experiences, honors), read in hidden same-origin frames when the panel opens; the server prefers them
+  volunteering-experiences, honors), read when the panel opens: the background opens them in a minimized window and the
+  content script in each tab answers `nb-read-list` once its text settles (LinkedIn won't render them in frames); the server prefers them
   over the profile page's summary (`detailLines` cuts to the list, `parseExperienceText` / `parseEducationText`) and
   keeps the cleaned text as `CapturedProfile.detailsText`. A page without its heading counts as empty. All interpretation is server-side (`parseCapture`): grouped
   roles, nested descriptions, employment type, dates/current, location, and a raw-text section fallback.

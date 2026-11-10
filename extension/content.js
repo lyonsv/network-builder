@@ -184,74 +184,51 @@
   }
 
   // ---------- full lists (/details/<kind>/): every role with dates & tenure, all education, skills, … ----------
-  // The profile page only shows a summary (and LinkedIn renders sections lazily), so on click we open the person's
-  // "Show all" pages in hidden same-origin frames — exactly what you'd see clicking through — and read their text.
+  // The profile page only shows a summary (and renders sections lazily). On click, the background opens the person's
+  // "Show all" pages in a minimized window — exactly what you'd see clicking through — and this script, running in
+  // each of those tabs, answers with the list text once the page has settled.
   const DETAIL_KINDS = ['experience', 'education', 'skills', 'certifications', 'languages', 'volunteering-experiences', 'honors'];
 
-  function loadDetail(slug, kind, timeoutMs = 15000) {
-    return new Promise((resolve) => {
-      const f = document.createElement('iframe');
-      f.src = `${location.origin}/in/${encodeURIComponent(decodeURIComponent(slug))}/details/${kind}/`;
-      f.setAttribute('aria-hidden', 'true');
-      f.tabIndex = -1;
-      f.style.cssText = 'position:fixed;left:0;top:0;width:1100px;height:2400px;opacity:0;pointer-events:none;z-index:-1;border:0;';
-      let done = false;
-      let last = -1;
-      let stableSince = 0;
-      const started = Date.now();
-      const finish = (val) => {
-        if (done) return;
-        done = true;
-        clearInterval(timer);
-        f.remove();
-        resolve(val);
-      };
-      const timer = setInterval(() => {
-        let doc;
-        try {
-          doc = f.contentDocument;
-        } catch {
-          return finish(null); // not same-origin (blocked)
-        }
-        const main = doc && (doc.querySelector('main') || doc.body);
-        if (main) {
-          try {
-            f.contentWindow.scrollTo(0, doc.documentElement.scrollHeight); // trigger lazy loading
-          } catch {}
-          const text = main.innerText || '';
-          if (text.length !== last) {
-            last = text.length;
-            stableSince = Date.now();
-          } else if (text.trim().length > 15 && Date.now() - stableSince > 1500) {
-            // structured items when the classic list markup is there; the text is always sent
-            const lists = [...main.querySelectorAll('ul')].filter((u) => !u.parentElement.closest('ul'));
-            const big = lists.sort((a, b) => b.children.length - a.children.length)[0];
-            return finish({ text: text.slice(0, 30000), items: big ? listItems(big) : [] });
-          }
-        }
-        if (Date.now() - started > timeoutMs) finish(last > 15 && main ? { text: (main.innerText || '').slice(0, 30000), items: [] } : null);
-      }, 400);
-      document.documentElement.append(f);
-    });
+  async function loadDetails(slug) {
+    const r = await send({ type: 'readDetails', slug, kinds: DETAIL_KINDS });
+    const out = {};
+    const diag = {};
+    const res = (r && r.results) || {};
+    for (const kind of DETAIL_KINDS) {
+      const x = res[kind];
+      const word = kind === 'volunteering-experiences' ? 'volunteer' : kind === 'honors' ? 'hono' : kind.slice(0, 7);
+      const has = x && x.text && x.text.slice(0, 4000).toLowerCase().includes(word);
+      diag[kind] = !x ? (r && r.message) || 'not read' : has ? `${x.status} ${x.text.length}` : x.text ? `${x.status} no-list ${x.text.length}` : `${x.status} empty`;
+      if (has) out[kind] = { text: x.text.slice(0, 30000), items: x.items || [] };
+    }
+    return { details: out, diag, error: r && r.ok === false ? r.message : '' };
   }
 
-  /** load all detail pages, 3 at a time; onProgress(doneCount, total) */
-  async function loadDetails(slug, onProgress) {
-    const out = {};
-    let n = 0;
-    const queue = [...DETAIL_KINDS];
-    const worker = async () => {
-      while (queue.length) {
-        const kind = queue.shift();
-        const r = await loadDetail(slug, kind);
-        // keep only pages that are that list (a missing section shows LinkedIn's empty / error page instead)
-        const word = kind === 'volunteering-experiences' ? 'volunteer' : kind === 'honors' ? 'hono' : kind.slice(0, 7);
-        if (r && r.text && r.text.slice(0, 3000).toLowerCase().includes(word)) out[kind] = r;
-        onProgress && onProgress(++n, DETAIL_KINDS.length);
+  // in a list tab opened by the background: report the page's list once its text stops changing
+  if (/^\/in\/[^/]+\/details\/[^/]+\/?$/.test(location.pathname)) {
+    let lastLen = -1;
+    let stableSince = Date.now();
+    chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+      if (!msg || msg.type !== 'nb-read-list') return false;
+      const main = document.querySelector('main') || document.body;
+      try {
+        window.scrollTo(0, document.documentElement.scrollHeight); // trigger lazy loading
+      } catch {}
+      const text = (main && main.innerText) || '';
+      if (text.length !== lastLen) {
+        lastLen = text.length;
+        stableSince = Date.now();
       }
-    };
-    await Promise.all([worker(), worker(), worker()]);
-    return out;
+      const ready = text.trim().length > 15 && Date.now() - stableSince > 1500;
+      let items = [];
+      if (ready) {
+        const lists = [...main.querySelectorAll('ul')].filter((u) => !u.parentElement.closest('ul'));
+        const big = lists.sort((x, y) => y.children.length - x.children.length)[0];
+        items = big ? listItems(big) : [];
+      }
+      reply({ ready, text: text.slice(0, 30000), items, url: location.href });
+      return false;
+    });
   }
 
   const guessCompany = (p) =>
@@ -346,18 +323,19 @@
     const found = el('div', { class: 'found muted' },
       `Will save: ${[p.headline && 'headline', p.location && 'location', p.about && 'about', nExp && `${nExp} experience item${nExp > 1 ? 's' : ''}`,
         p.sections.education && `${p.sections.education.items.length} education`].filter(Boolean).join(' · ') || 'name and page text'}`);
-    const detailSlot = el('div', { class: 'found muted' }, 'Reading full experience, education & skills…');
+    const detailSlot = el('div', { class: 'found muted' }, 'Reading the full profile (experience, education, skills…) — LinkedIn’s lists open briefly in a minimized window…');
     const slug = profileSlug();
     let details = null;
-    const detailsReady = loadDetails(slug, (n, t) => {
-      if (shadow && n < t) detailSlot.textContent = `Reading full experience, education & skills… ${n}/${t}`;
-    }).then((d) => {
-      details = d;
+    let detailDiag = null;
+    const detailsReady = loadDetails(slug).then((d) => {
+      details = d.details;
+      detailDiag = d.diag;
       if (!shadow) return d;
-      const got = Object.keys(d);
+      const got = Object.keys(d.details).map((k) => k.replace('-experiences', ''));
       detailSlot.textContent = got.length
-        ? `✓ Full profile read: ${got.map((k) => k.replace('-experiences', '')).join(', ')}`
-        : 'Couldn’t open the full lists — the visible profile will be saved.';
+        ? `✓ Full profile read: ${got.join(', ')}`
+        : `Couldn’t read the full lists${d.error ? ` (${d.error})` : ''} — the visible profile will be saved.`;
+      detailSlot.title = Object.entries(d.diag).map(([k, v]) => `${k}: ${v}`).join('\n');
       return d;
     });
     const thin = null;
@@ -454,6 +432,7 @@
       const fresh = scrape(); // the page may have loaded more since the panel opened
       const prof = fresh.fullName ? fresh : p;
       if (details && Object.keys(details).length) prof.details = details;
+      if (detailDiag) prof.detailsDiag = detailDiag;
       const hit = accountsCache && accountsCache.find((a) => a.name.toLowerCase() === name.toLowerCase());
       const body = {
         profile: prof,
@@ -468,12 +447,13 @@
       if (r.ok) {
         const d = r.data;
         result.replaceChildren(
-          banner('ok', `✓ ${d.addedToAccount ? 'Added' : 'Updated'} ${d.person.fullName} ${d.addedToAccount ? 'to' : 'on'} ${d.account.name}${d.createdAccount ? ' (new account)' : ''}${d.isConnection ? ' · your connection' : ''}.`),
+          banner('ok', `✓ ${d.addedToAccount ? 'Added' : 'Updated'} ${d.person.fullName} ${d.addedToAccount ? 'to' : 'on'} ${d.account.name}${d.createdAccount ? ' (new account)' : ''}${d.isConnection ? ' · your connection' : ''}.` +
+            (d.saved ? ` Saved ${d.saved.experience} role${d.saved.experience === 1 ? '' : 's'}, ${d.saved.education} education${d.saved.sections.length ? `, ${d.saved.sections.join(', ').toLowerCase()}` : ''}.` : '')),
         );
         goBtn.textContent = 'Saved ✓';
         goBtn.disabled = true;
         setButtonState(true, d.account.name);
-        setTimeout(closePanel, 2500);
+        setTimeout(closePanel, 6000);
       } else if (r.queued) {
         result.replaceChildren(banner('warn', `Saved in the browser — ${p.fullName} will be sent to “${name}” automatically when Network Builder is running and paired. (The extension icon shows how many are waiting.)`));
         goBtn.textContent = 'Saved for later ✓';

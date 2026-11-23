@@ -305,15 +305,25 @@
     return false;
   }
 
+  /** the results have rendered: at least one readable result card, or LinkedIn's "no results" text */
+  function resultsRendered(doc, href) {
+    if (noResults(doc)) return true;
+    return resultCards(doc, href).some((c) => readCard(c, href).lines.length > 0);
+  }
+
   // ---------- after a full page load mid-walk ----------
+  /** a full load this soon after our own Next click is that click's page */
+  const CONTINUE_WINDOW_MS = 30000;
   /**
-   * The content script restarted while a walk was running (a full page load in the same tab), so the walk itself is
-   * gone. What happened? `saved` is the walk state content.js keeps per tab: {kind, path, filters, lastPage,
-   * nextClicked, started}. → 'end' when LinkedIn sent us back to an earlier page of the SAME search right after we
-   * clicked Next (what it does when you page past the last results page); else 'cancelled'. Never 'resume': a walk
-   * starts only from a click on Start (AGENTS.md rule 5).
+   * The content script restarted while a walk was running (a full page load in the same tab), so the in-memory walk is
+   * gone. What happened? `saved` is the walk state content.js keeps per tab: {kind, filters, lastPage, nextClicked,
+   * clickedNextAt, started}; `href` is read only after the results have rendered; `at` is when this page load began.
+   *  - 'continue': our own Next click (≤ 30 s ago) loaded the next page of the SAME search (page = lastPage + 1) as a
+   *    full page load — the walk the user started carries on with its own pagination;
+   *  - 'end': the same search came back on page ≤ lastPage after our Next click (LinkedIn does that past the last page);
+   *  - 'cancelled': anything else (a reload without our Next, another URL, another search, a People tab).
    */
-  function reloadVerdict(saved, href) {
+  function reloadVerdict(saved, href, at) {
     if (!saved || !saved.started) return 'cancelled';
     let path = '';
     try {
@@ -324,9 +334,13 @@
     const sameList = saved.kind === 'search' && pageKind(path) === 'search' && filterKey(href) === saved.filters;
     if (!sameList || !saved.nextClicked) return 'cancelled';
     const pg = pageNumber(href);
-    return pg === 1 || pg < (Number(saved.lastPage) || 1) ? 'end' : 'cancelled';
+    const last = Number(saved.lastPage) || 1;
+    if (pg <= last) return 'end';
+    const since = Number(at) - Number(saved.clickedNextAt);
+    if (pg === last + 1 && since >= 0 && since <= CONTINUE_WINDOW_MS) return 'continue';
+    return 'cancelled';
   }
 
   globalThis.NBList = { pageKind, companySlug, keywordsOf, filterKey, visibleLines, resultCards, readCard, headerText, facetsText, facetsExpandButton, stopReason, noResults, loadMoreButton, nextButton,
-    pageNumber, isLoading, reloadVerdict };
+    pageNumber, isLoading, resultsRendered, reloadVerdict };
 })();

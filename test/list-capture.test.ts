@@ -25,7 +25,8 @@ interface NBList {
   nextButton(doc: Document): Element | null;
   pageNumber(href: string): number;
   isLoading(doc: Document): boolean;
-  reloadVerdict(saved: unknown, href: string): 'end' | 'cancelled';
+  reloadVerdict(saved: unknown, href: string, at: number): 'continue' | 'end' | 'cancelled';
+  resultsRendered(doc: Document, href: string): boolean;
 }
 let L: NBList;
 beforeAll(() => {
@@ -265,7 +266,7 @@ describe('extension list reader (DOM, fictional fixtures)', () => {
 
   it('the headcount-only action: one trusted click, zero rows, at most one expand click, no walking', () => {
     const content = readFileSync(path.join(root, 'extension/content.js'), 'utf8');
-    const h = content.slice(content.indexOf("hcBtn.addEventListener('click'"), content.indexOf('// the ONLY place a walk starts'));
+    const h = content.slice(content.indexOf("hcBtn.addEventListener('click'"), content.indexOf('* run a walk in this panel'));
     expect(h).toContain('if (!e.isTrusted || walk || starting || hcBusy) return;');
     expect(h).toContain('rows: []');
     expect(h).toContain('final: true');
@@ -353,21 +354,54 @@ describe('walk across a full page load (live 2026-11: LinkedIn sends you back to
     expect(L.pageNumber('not a url')).toBe(1);
   });
 
-  it('same search, back to page 1 (or an earlier page) right after Next → end', () => {
-    expect(L.reloadVerdict(saved, `${S}&origin=FACETED_SEARCH&sid=x1`)).toBe('end');
-    expect(L.reloadVerdict(saved, `${S}&page=4`)).toBe('end');
-    expect(L.reloadVerdict({ ...saved, lastPage: 1 }, S)).toBe('end');
+  const T = 1_800_000_000_000; // when the page load began
+  const clicked = { ...saved, clickedNextAt: T - 4000 }; // our Next click, 4 s before the load
+  beforeAll(() => {
+    clicked.filters = saved.filters;
   });
 
-  it('anything else → cancelled; never a resume', () => {
-    expect(L.reloadVerdict({ ...saved, nextClicked: false }, S)).toBe('cancelled'); // a reload, not a Next
-    expect(L.reloadVerdict(saved, `${S}&page=14`)).toBe('cancelled'); // a full load onto the next page
-    expect(L.reloadVerdict(saved, `${S}&page=13`)).toBe('cancelled'); // the same page reloaded
-    expect(L.reloadVerdict(saved, 'https://www.linkedin.com/search/results/people/?keywords=sales')).toBe('cancelled');
-    expect(L.reloadVerdict(saved, 'https://www.linkedin.com/in/someone-example/')).toBe('cancelled');
-    expect(L.reloadVerdict({ ...saved, kind: 'people-tab' }, 'https://www.linkedin.com/company/ledgerly/people/')).toBe('cancelled');
-    expect(L.reloadVerdict({ ...saved, started: false }, S)).toBe('cancelled');
-    expect(L.reloadVerdict(null, S)).toBe('cancelled');
+  it('same search, page = lastPage + 1 within 30 s of our Next click → continue (live: Next does a full page load)', () => {
+    const two = { ...clicked, lastPage: 1 };
+    expect(L.reloadVerdict(two, `${S}&page=2&spellCorrectionEnabled=true&prioritizeMessage=false`, T)).toBe('continue');
+    expect(L.reloadVerdict(clicked, `${S}&page=14`, T)).toBe('continue');
+    expect(L.reloadVerdict({ ...clicked, clickedNextAt: T - 30_000 }, `${S}&page=14`, T)).toBe('continue');
+    // too long after the click, a page skipped, or the click is unknown → not ours to continue
+    expect(L.reloadVerdict({ ...clicked, clickedNextAt: T - 31_000 }, `${S}&page=14`, T)).toBe('cancelled');
+    expect(L.reloadVerdict(clicked, `${S}&page=15`, T)).toBe('cancelled');
+    expect(L.reloadVerdict(saved, `${S}&page=14`, T)).toBe('cancelled');
+    expect(L.reloadVerdict({ ...clicked, clickedNextAt: T + 5000 }, `${S}&page=14`, T)).toBe('cancelled');
+  });
+
+  it('same search back on page ≤ lastPage after our Next click (page 1, no `page`) → end', () => {
+    expect(L.reloadVerdict(clicked, `${S}&origin=FACETED_SEARCH&sid=x1`, T)).toBe('end');
+    expect(L.reloadVerdict(clicked, `${S}&page=4`, T)).toBe('end');
+    expect(L.reloadVerdict(clicked, `${S}&page=13`, T)).toBe('end');
+    expect(L.reloadVerdict({ ...clicked, lastPage: 1 }, S, T)).toBe('end');
+  });
+
+  it('a reload without a recent Next click, another URL or search, a People tab → cancelled', () => {
+    const noNext = { ...clicked, nextClicked: false, clickedNextAt: 0 };
+    expect(L.reloadVerdict(noNext, S, T)).toBe('cancelled');
+    expect(L.reloadVerdict(noNext, `${S}&page=14`, T)).toBe('cancelled');
+    expect(L.reloadVerdict(clicked, 'https://www.linkedin.com/search/results/people/?keywords=sales&page=14', T)).toBe('cancelled');
+    expect(L.reloadVerdict(clicked, 'https://www.linkedin.com/in/someone-example/', T)).toBe('cancelled');
+    expect(L.reloadVerdict({ ...clicked, kind: 'people-tab' }, 'https://www.linkedin.com/company/ledgerly/people/', T)).toBe('cancelled');
+    expect(L.reloadVerdict({ ...clicked, started: false }, `${S}&page=14`, T)).toBe('cancelled');
+    expect(L.reloadVerdict(null, S, T)).toBe('cancelled');
+  });
+
+  it('a late `page` param: before the results render the URL reads as page 1; the verdict uses the settled URL', () => {
+    const two = { ...clicked, lastPage: 1 };
+    const w = new Window({ url: S }); // LinkedIn first shows the URL without `page` and no results yet
+    const doc = w.document as unknown as Document;
+    expect(L.resultsRendered(doc, w.location.href)).toBe(false);
+    expect(L.reloadVerdict(two, w.location.href, T)).toBe('end'); // why the recovery must not judge yet
+    w.history.replaceState(null, '', `${S}&page=2&spellCorrectionEnabled=true`);
+    w.document.body.innerHTML = fixture('linkedin-search-listitems.html');
+    expect(L.resultsRendered(doc, w.location.href)).toBe(true);
+    expect(L.reloadVerdict(two, w.location.href, T)).toBe('continue');
+    expect(L.resultsRendered(page('<main><h2>No results found</h2></main>', S).doc, S)).toBe(true);
+    expect(L.resultsRendered(page('<main><div class="search-results__skeleton-card"></div></main>', S).doc, S)).toBe(false);
   });
 
   it('sees skeleton placeholders while a page loads, not hidden ones', () => {
@@ -384,14 +418,27 @@ describe('walk across a full page load (live 2026-11: LinkedIn sends you back to
     return content.slice(at, content.indexOf('\n  }\n', at));
   };
 
-  it('after a reload the restarted script only closes the run: a final post with zero rows, never a walk or a click', () => {
+  it('after a reload the restarted script settles, then continues our own pagination or closes the run; it never clicks', () => {
     const r = fn('recoverWalkNow');
     expect(r).toContain("send({ type: 'walkLoad' })");
-    expect(r).toContain('NBL.reloadVerdict(saved, location.href)');
+    // the page number is read only after the results have settled
+    expect(r.indexOf('await settle()')).toBeGreaterThan(0);
+    expect(r.indexOf('await settle()')).toBeLessThan(r.indexOf('NBL.reloadVerdict(saved, location.href, loadedAt)'));
+    expect(r.indexOf('const loadedAt = Date.now()')).toBeLessThan(r.indexOf('await send('));
+    const st = fn('settle');
+    expect(st).toContain('LIST.SETTLE_MS');
+    expect(st).toContain('NBL.resultsRendered(document, location.href)');
+    expect(content).toMatch(/SETTLE_MS: 15000/);
+    // continue only on 'continue', never past the run cap or the daily limit
+    const cont = r.slice(r.indexOf("if (verdict === 'continue')"), r.indexOf("type: 'captureList'"));
+    expect(cont).toMatch(/saved\.rows[\s\S]*>= \(Number\(saved\.cap\)[\s\S]*used >= LIST\.DAILY/);
+    expect(cont.indexOf("verdict = 'cap'")).toBeLessThan(cont.indexOf('openListPanel({ resume: saved })'));
+    expect(r.match(/openListPanel\(/g)).toHaveLength(1);
     expect(r).toMatch(/rows: \[\], final: true, stopReason: verdict/);
     expect(r).toContain('Done — reached the end of the results (');
     expect(r).toContain('never restarts by itself');
     expect(r).not.toMatch(/startWalk|\.click\(|scroll|nextButton|loadMoreButton|while \(/);
+    expect(fn('settle')).not.toMatch(/\.click\(|scroll|startWalk/);
     // the state is cleared before anything else, so a second load never handles it again
     expect(r.indexOf('await clearWalkState()')).toBeLessThan(r.indexOf("type: 'captureList'"));
     // a run that never reached Network Builder is not created by the recovery
@@ -402,7 +449,17 @@ describe('walk across a full page load (live 2026-11: LinkedIn sends you back to
   it('the walk saves its state before the first await, marks Next before clicking it, and clears it at the end', () => {
     const w = fn('startWalk');
     expect(w.indexOf('persist(); // before the first await')).toBeLessThan(w.indexOf('await '));
-    expect(w.indexOf('persist({ lastPage: pageBefore, nextClicked: true })')).toBeLessThan(w.indexOf('next.click()'));
+    expect(w.indexOf('persist({ lastPage: pageBefore, nextClicked: true, clickedNextAt: Date.now(), paceMs })')).toBeLessThan(w.indexOf('next.click()'));
+    // persist() always stores the counts and the people seen (so a continuation never re-counts them)
+    expect(w).toMatch(/Object\.assign\(walkState, patch \|\| \{\}, \{ rows: run\.rows, seen: \[\.\.\.seenHrefs\]/);
+    // in-page: the page number after a turn is read once the URL and the results have settled
+    const turn = w.slice(w.indexOf('next.click()'));
+    expect(turn.indexOf('Date.now() - urlSince >= 1000')).toBeLessThan(turn.indexOf('NBL.pageNumber(location.href) <= pageBefore'));
+    // a continuation keeps the run id, counts, people seen and pacing, and doesn't create a new run
+    expect(w).toContain('id: resume ? resume.runId : crypto.randomUUID()');
+    expect(w).toContain('rows: resume ? Number(resume.rows) || 0 : 0');
+    expect(w).toContain('if (!resume) await post(pageInfo())');
+    expect(w).toContain('let paceMs = walkState.paceMs;');
     expect(w).toMatch(/if \(pending\.length\) await post\(\{\}\);[^\n]*\n[\s\S]*next\.click\(\)/);
     expect(w).toContain('await clearWalkState();');
     for (const k of ['runId', 'account', 'cap', 'rows', 'filters', 'lastPage', 'started']) expect(w).toMatch(new RegExp(`${k}[:,]`));
@@ -480,13 +537,22 @@ describe('extension safeguards (static checks, so they cannot quietly regress)',
     expect(handler).not.toMatch(/chrome\.windows|chrome\.tabs|enqueue/);
   });
 
-  it('a walk starts only from a trusted click on the Start button', () => {
+  it('a walk starts only from a trusted click on the Start button (and only continues its own pagination after a page load)', () => {
     const calls = [...listBranch.matchAll(/startWalk\(/g)];
-    expect(calls).toHaveLength(2); // the definition + one call
-    const callAt = listBranch.indexOf('= startWalk(');
-    const handlerAt = listBranch.lastIndexOf("goBtn.addEventListener('click'", callAt);
+    expect(calls).toHaveLength(2); // the definition + one call, inside runWalk
+    expect(listBranch.indexOf('= startWalk(')).toBeGreaterThan(listBranch.indexOf('const runWalk = async'));
+    // runWalk is called from exactly two places: the trusted Start handler, and the resume branch of openListPanel
+    expect([...listBranch.matchAll(/runWalk\(\{/g)]).toHaveLength(2);
+    const handlerAt = listBranch.indexOf("goBtn.addEventListener('click'", listBranch.indexOf('const runWalk = async'));
+    const callAt = listBranch.indexOf('runWalk({', handlerAt);
     expect(handlerAt).toBeGreaterThan(0);
     const handler = listBranch.slice(handlerAt, callAt);
+    const resumeAt = listBranch.indexOf('if (resume && !walk) {');
+    expect(listBranch.indexOf('runWalk({', callAt + 1)).toBeGreaterThan(resumeAt);
+    // openListPanel gets `resume` only from recoverWalkNow, after a 'continue' verdict
+    const opens = [...listBranch.matchAll(/openListPanel\(\{ resume: /g)];
+    expect(opens).toHaveLength(1);
+    expect(listBranch.lastIndexOf("if (verdict === 'continue')", opens[0]!.index)).toBeGreaterThan(listBranch.indexOf('async function recoverWalkNow('));
     expect(handler).toContain('if (!e.isTrusted || walk || starting || recovering) return;');
     // the double-click guard is set before the first await
     expect(handler.indexOf('starting = true')).toBeLessThan(handler.indexOf('await '));

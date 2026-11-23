@@ -51,7 +51,8 @@ CI (`.github/workflows/ci.yml`) runs install --frozen-lockfile, typecheck, test,
 5. **Captured LinkedIn people never enter the network.** They live in `contacts`, not `people`, so lenses, the People
    view, network search and exports stay your connections only. The extension reads only what is on the screen.
    Full profiles: one click per person. Lists (company People tab, people search): only after a click on that page, in
-   the visible foreground tab, at human pace with jitter, capped per run (300 default, 500 max) and per day, stops on
+   the visible foreground tab (a walk continues its own pagination across page loads: when its own Next click loads
+   the next page of the same search as a full page, within 30 s; nothing else ever starts or resumes one), at human pace with jitter, capped per run (300 default, 500 max) and per day, stops on
    any checkpoint/captcha/login/limit page, cancellable; out-of-network "LinkedIn Member" rows are kept only as
    anonymous counts. No hidden fields, no background or minimized-window walking, no money spent. The `/ext/*` auth
    model (capture token, `chrome-extension://` origin only) stays as it is.

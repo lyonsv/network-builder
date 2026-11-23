@@ -877,6 +877,27 @@ vendor-funded roles are part of the org.
   run (partial) is used only when the list has no other walk. Abandoned runs still appear in `runs`. The page labels
   them "abandoned (no activity for 10 min)".
 
+#### Extension 0.3.3 — a walk continues its own pagination across page loads
+
+- Live (2026-11): on some accounts/layouts a people search's **Next** does a FULL page load to `…&page=2&…` instead of
+  an SPA navigation, and the URL can change in steps (`page` added late). 0.3.2 read the page number too early and ended
+  every such walk on page 1.
+- Before clicking Next the walk saves `{runId, cap, rows, seen (profile URLs read), lastPage, nextClicked: true,
+  clickedNextAt, paceMs, …}`. After a page load `recoverWalk` first **settles** (≤ 15 s, `SETTLE_MS`: the URL unchanged
+  for 1 s and `NBList.resultsRendered` — a readable card or "No results found"), then
+  `NBList.reloadVerdict(saved, href, loadedAt)`:
+  - `'continue'` — same search (filter key), `page == lastPage + 1`, ≤ 30 s after our Next click (`loadedAt −
+    clickedNextAt`) → the panel opens with "Continuing on page N" and the walk carries on in this tab with the same run
+    id, cap, counts, people seen and pacing (no new run is created; the run already exists). Not past the run's cap or
+    the daily limit (then the run is closed as `cap`). The hidden-tab pause, stop scans and Cancel apply as before.
+  - `'end'` — same search, `page ≤ lastPage`, after our Next click → final post `end`, "Done — reached the end of the
+    results (N people)".
+  - `'cancelled'` — anything else (no recent Next, another URL / search, a People tab, a skipped page, > 30 s).
+- In-page (no full load) the page number after a turn is also read only once the URL has been stable for 1 s and new
+  results (or "no results") are on screen.
+- Rule 5 (AGENTS.md): a walk still starts only from a trusted Start click; `runWalk` is called from that handler and
+  from `openListPanel({resume})`, which only `recoverWalkNow` calls, only after a `'continue'` verdict (static tests).
+
 ### v9 Phase 6 — MCP + docs (v9 complete)
 
 - MCP (`src/mcp/accounts.ts`), 22 tools. The MCP `view()` attaches `org = buildOrgMap(view, orgMapSources(repo, id))`

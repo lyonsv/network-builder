@@ -574,6 +574,7 @@
     BATCH: 25, // rows per post to Network Builder
     HEARTBEAT_MS: 120000, // an empty post at least this often (paused, slow pages), so the server never closes a live run
     STATE_MAX_AGE_MS: 15 * 60000, // saved walk state older than this is ignored after a page load
+    SETTLE_MS: 15000, // after a page load / page turn: wait this long at most for the results before reading the URL's page
     CAP_DEFAULT: 300,
     CAP_MAX: 500,
     DAILY: 1000,
@@ -646,8 +647,12 @@
     document.documentElement.append(noticeHost);
   }
 
-  /** once per page load: close a walk this tab was running before the page reloaded (never resumes it) */
-  let recovering = true; // Start stays disabled until recoverWalk has finished (it may close a run of this tab)
+  /**
+   * Once per page load: a walk this tab was running before a full page load either CONTINUES (our own Next click loaded
+   * the next page of the same search as a full page — the walk the user started carries on with its pagination) or is
+   * closed on Network Builder ('end' / 'cancelled'). See NBList.reloadVerdict. Nothing else ever starts a walk.
+   */
+  let recovering = true; // Start stays disabled until recoverWalk has finished (it may close or continue a run of this tab)
   const recoveryWaiters = [];
   const whenRecovered = (fn) => (recovering ? recoveryWaiters.push(fn) : fn());
   async function recoverWalk() {
@@ -658,11 +663,27 @@
       for (const fn of recoveryWaiters.splice(0)) fn();
     }
   }
+  /** wait (≤ SETTLE_MS) until the results have rendered and the URL has stopped changing; LinkedIn may add `page` late */
+  async function settle() {
+    const end = Date.now() + LIST.SETTLE_MS;
+    let href = location.href;
+    let since = Date.now();
+    while (Date.now() < end) {
+      if (location.href !== href) {
+        href = location.href;
+        since = Date.now();
+      }
+      if (Date.now() - since >= 1000 && NBL.resultsRendered(document, location.href)) return true;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    return false;
+  }
   async function recoverWalkNow() {
+    const loadedAt = Date.now(); // when this page load began (for "≤ 30 s after our Next click")
     const r = await send({ type: 'walkLoad' });
     const saved = r && r.ok ? r.state : null;
     if (!saved || !saved.runId) return;
-    await clearWalkState(); // handled once, whatever happens next
+    await clearWalkState(); // handled once, whatever happens next (a continuing walk saves its own state again)
     // too old to describe what just happened (Network Builder closes such runs as `abandoned` by itself)
     if (!(Date.now() - Number(saved.savedAt) <= LIST.STATE_MAX_AGE_MS)) return;
     const who = saved.account && saved.account.name ? ` on ${saved.account.name}` : '';
@@ -670,7 +691,20 @@
       walkNotice('warn', 'The page reloaded before mapping started, so nothing was read. Click “⇣ Map to Network Builder” and Start to map this list.');
       return;
     }
-    const verdict = NBL ? NBL.reloadVerdict(saved, location.href) : 'cancelled';
+    // read the page number only once the results (or "no results") are on screen
+    if (NBL && listKind() === 'search') await settle();
+    let verdict = NBL ? NBL.reloadVerdict(saved, location.href, loadedAt) : 'cancelled';
+    let capNote = '';
+    if (verdict === 'continue') {
+      const used = await rowsToday();
+      if ((Number(saved.rows) || 0) >= (Number(saved.cap) || 0) || used >= LIST.DAILY) {
+        verdict = 'cap'; // never past the run's cap or the daily limit
+        capNote = used >= LIST.DAILY ? 'the daily limit' : `your cap of ${saved.cap} rows`;
+      } else {
+        openListPanel({ resume: saved }); // not awaited: the walk runs on in this tab
+        return;
+      }
+    }
     const res = await send({ type: 'captureList', body: {
       runId: saved.runId, ...(saved.acctRef || {}), page: saved.page, rows: [], final: true, stopReason: verdict,
     } });
@@ -681,6 +715,8 @@
     const unsaved = res && !res.ok && !/finished|closed/i.test(res.message || '') ? ` (Network Builder didn’t record the end: ${res.message})` : '';
     if (verdict === 'end') {
       walkNotice('ok', `Done — reached the end of the results (${people}${who}).${unsaved}`);
+    } else if (verdict === 'cap') {
+      walkNotice('ok', `Stopped at ${capNote} (${people}${who}).${unsaved}`);
     } else {
       walkNotice('warn', `The page reloaded or changed while mapping, so the walk stopped (${people} saved${who}). ` +
         `It never restarts by itself: click “⇣ Map to Network Builder” and Start to map again.${unsaved}`);
@@ -701,7 +737,8 @@
     listHost = listShadow = null;
   }
 
-  async function openListPanel() {
+  /** `resume`: only from recoverWalk, to continue a walk across our own Next click's full page load */
+  async function openListPanel({ resume } = {}) {
     if (listHost) return;
     const kind = listKind();
     if (!kind) return;
@@ -722,7 +759,7 @@
     if (recovering) {
       goBtn.disabled = true; // until a walk interrupted by the last page load is closed
       whenRecovered(() => {
-        if (!walk) goBtn.disabled = false;
+        if (!walk && !resume) goBtn.disabled = false;
       });
     }
     const stopBtn = el('button', { class: 'sec', type: 'button', text: 'Cancel', style: 'display:none' });
@@ -837,6 +874,49 @@
       });
     }
 
+    /**
+     * run a walk in this panel and show how it ended. Reached only from the trusted Start click below, or with `resume`
+     * from recoverWalk when our own Next click loaded the next page as a full page load.
+     * Synchronous up to startWalk(), which sets `walk` before its first await.
+     */
+    const runWalk = async ({ account, cap, resume }) => {
+      goBtn.disabled = true;
+      acctInput.disabled = capInput.disabled = true;
+      stopBtn.style.display = '';
+      stopBtn.disabled = false;
+      stopBtn.textContent = 'Cancel';
+      result.replaceChildren();
+      const ui = {
+        phase: (t) => (progress.textContent = t),
+        prompt: (message) =>
+          new Promise((resolve) => {
+            walk.resolvePrompt = resolve;
+            result.replaceChildren(banner('err', `${message} The walk is paused.`, { label: 'Retry', fn: () => resolve('retry') }));
+          }).then((choice) => {
+            if (walk) walk.resolvePrompt = null;
+            result.replaceChildren();
+            return choice;
+          }),
+      };
+      const walkDone = startWalk({ account, cap, kind, companyUrl, ui, resume });
+      const out = await walkDone;
+      walk = null;
+      if (!listShadow) return;
+      stopBtn.style.display = 'none';
+      goBtn.disabled = false;
+      goBtn.textContent = 'Start again';
+      acctInput.disabled = capInput.disabled = false;
+      const r = out.data;
+      const reason = (out.reason === 'cap' ? `Stopped at ${cap} rows. ` : STOP_TEXT[out.reason] ? STOP_TEXT[out.reason] + ' ' : '') + (out.message ? out.message + ' ' : '');
+      if (r) {
+        result.replaceChildren(banner(['end', 'cap', 'cancelled'].includes(out.reason) ? 'ok' : 'warn',
+          `${reason}${r.run.named} ${r.run.named === 1 ? 'person' : 'people'}${r.run.anonymous ? ` + ${r.run.anonymous} anonymous` : ''} on ${r.account.name}.`));
+      } else {
+        result.replaceChildren(banner('err', `${reason}Nothing more was sent.`));
+      }
+      usage.textContent = `Up to ${LIST.CAP_MAX} per run and ${LIST.DAILY.toLocaleString()} a day · ${(await rowsToday()).toLocaleString()} read today.`;
+    };
+
     // the ONLY place a walk starts: a real click on this button
     let starting = false;
     goBtn.addEventListener('click', async (e) => {
@@ -862,67 +942,48 @@
       const cap = Math.min(capWanted, LIST.DAILY - usedNow);
       capInput.value = String(capWanted);
       const hit = accounts.find((a) => a.name.toLowerCase() === name.toLowerCase());
-      goBtn.disabled = true;
-      acctInput.disabled = capInput.disabled = true;
-      stopBtn.style.display = '';
-      stopBtn.disabled = false;
-      stopBtn.textContent = 'Cancel';
-      result.replaceChildren();
-      const ui = {
-        phase: (t) => (progress.textContent = t),
-        prompt: (message) =>
-          new Promise((resolve) => {
-            walk.resolvePrompt = resolve;
-            result.replaceChildren(banner('err', `${message} The walk is paused.`, { label: 'Retry', fn: () => resolve('retry') }));
-          }).then((choice) => {
-            if (walk) walk.resolvePrompt = null;
-            result.replaceChildren();
-            return choice;
-          }),
-      };
-      const walkDone = startWalk({ account: hit ? { id: hit.id, name: hit.name } : { name }, cap, kind, companyUrl, ui });
-      starting = false; // startWalk has set `walk` synchronously
-      const out = await walkDone;
-      walk = null;
-      if (!listShadow) return;
-      stopBtn.style.display = 'none';
-      goBtn.disabled = false;
-      goBtn.textContent = 'Start again';
-      acctInput.disabled = capInput.disabled = false;
-      const r = out.data;
-      const reason = (out.reason === 'cap' ? `Stopped at ${cap} rows. ` : STOP_TEXT[out.reason] ? STOP_TEXT[out.reason] + ' ' : '') + (out.message ? out.message + ' ' : '');
-      if (r) {
-        result.replaceChildren(banner(['end', 'cap', 'cancelled'].includes(out.reason) ? 'ok' : 'warn',
-          `${reason}${r.run.named} ${r.run.named === 1 ? 'person' : 'people'}${r.run.anonymous ? ` + ${r.run.anonymous} anonymous` : ''} on ${r.account.name}.`));
-      } else {
-        result.replaceChildren(banner('err', `${reason}Nothing more was sent.`));
-      }
-      usage.textContent = `Up to ${LIST.CAP_MAX} per run and ${LIST.DAILY.toLocaleString()} a day · ${(await rowsToday()).toLocaleString()} read today.`;
+      const done = runWalk({ account: hit ? { id: hit.id, name: hit.name } : { name }, cap });
+      starting = false; // runWalk → startWalk has set `walk` synchronously
+      await done;
     });
+
+    // continuing our own walk after its Next click loaded the next page as a full page load (see recoverWalk)
+    if (resume && !walk) {
+      acctInput.value = (resume.account && resume.account.name) || '';
+      capInput.value = String(resume.cap);
+      statusSlot.replaceChildren(banner('info', `Continuing on page ${NBL.pageNumber(location.href)}: LinkedIn loaded the next page as a new page. Cancel stops it.`));
+      runWalk({ account: resume.account, cap: Number(resume.cap), resume });
+    }
   }
 
   /** the paced walk (ported from the connections exporter's loop). → { reason, message, data: last server answer } */
-  async function startWalk({ account, cap, kind, companyUrl, ui }) {
-    const run = { id: crypto.randomUUID(), cancelled: false, rows: 0, resolvePrompt: null };
+  /**
+   * `resume`: the saved state of this tab's walk whose own Next click loaded the next page as a full page load (from
+   * recoverWalk only): same run id, cap, counts, people seen and pacing; the run already exists on Network Builder.
+   */
+  async function startWalk({ account, cap, kind, companyUrl, ui, resume }) {
+    const run = { id: resume ? resume.runId : crypto.randomUUID(), cancelled: false, rows: resume ? Number(resume.rows) || 0 : 0, resolvePrompt: null };
     walk = run;
-    const startPath = location.pathname;
+    const startRows = run.rows;
+    const startPath = resume ? resume.path : location.pathname;
     // the list's result-set filters (keywords, company, location, …) — paging and LinkedIn's UI flags aside; a new
     // search or changed filters ends this run
     const filtersOf = (href) => NBL.filterKey(href);
-    const startFilters = filtersOf(location.href);
-    const page = { kind, url: location.href.split('#')[0], keywords: NBL.keywordsOf(location.href), ...(companyUrl ? { companyUrl } : {}) };
-    const acctRef = account.id ? { accountId: account.id } : { accountName: account.name };
+    const startFilters = resume ? resume.filters : filtersOf(location.href);
+    const page = resume ? resume.page : { kind, url: location.href.split('#')[0], keywords: NBL.keywordsOf(location.href), ...(companyUrl ? { companyUrl } : {}) };
+    const acctRef = resume ? resume.acctRef : account.id ? { accountId: account.id } : { accountName: account.name };
+    const seenHrefs = new Set(resume && Array.isArray(resume.seen) ? resume.seen : []);
     const walkState = {
-      runId: run.id, account: { id: account.id || '', name: account.name }, acctRef, cap, rows: 0, kind, path: startPath,
-      filters: startFilters, page, lastPage: NBL.pageNumber(location.href), nextClicked: false, started: false,
+      runId: run.id, account: { id: account.id || '', name: account.name }, acctRef, cap, rows: run.rows, kind, path: startPath,
+      filters: startFilters, page, lastPage: NBL.pageNumber(location.href), nextClicked: false, clickedNextAt: 0,
+      started: !!resume, paceMs: resume ? Number(resume.paceMs) || 0 : 0, seen: [],
     };
     const persist = (patch) => {
-      Object.assign(walkState, patch || {}, { rows: run.rows });
+      Object.assign(walkState, patch || {}, { rows: run.rows, seen: [...seenHrefs].slice(-LIST.CAP_MAX * 2) });
       return saveWalkState(walkState);
     };
     persist(); // before the first await: a reload from here on is noticed
     let seenEls = new WeakSet(); // cards already read on this page (search: reset per page)
-    const seenHrefs = new Set();
     let pending = [];
     let last = null;
     let phase = '';
@@ -1071,18 +1132,21 @@
     let stop = null;
     let closedNote = '';
     try {
-      say('Starting');
+      say(resume ? `Continuing on page ${NBL.pageNumber(location.href)}` : 'Starting');
       await check();
-      await post(pageInfo()); // creates the run on the account; checks pairing before anything is read
+      if (!resume) await post(pageInfo()); // creates the run on the account; checks pairing before anything is read
       say('Reading the list');
       const first = await waitLoad(() => {
         harvest();
-        return run.rows > 0 || NBL.noResults(document);
+        if (run.rows > startRows || NBL.noResults(document)) return true;
+        // continuing: a drawn page of people we already have is read too
+        const cards = NBL.resultCards(document, location.href);
+        return !!resume && cards.length > 0 && !NBL.isLoading(document) && cards.every((c) => seenEls.has(c));
       }, { label: 'Waiting for LinkedIn to load the results', quietMs: 15000 });
       if (first === 'stalled') throw stalled('the results');
-      if (run.rows === 0) throw new WalkStop('end', 'No results on this page.');
+      if (run.rows === startRows && (!resume || NBL.noResults(document))) throw new WalkStop('end', resume ? 'LinkedIn shows no more results.' : 'No results on this page.');
       let noGrowth = 0;
-      let paceMs = 0;
+      let paceMs = walkState.paceMs;
       while (true) {
         await check();
         harvest();
@@ -1118,17 +1182,30 @@
           const hrefBefore = location.href;
           const pageBefore = NBL.pageNumber(hrefBefore);
           const want = `page ${pageBefore + 1}`;
-          await persist({ lastPage: pageBefore, nextClicked: true }); // a reload from here on may be the end of the list
+          // saved BEFORE the click: if it causes a full page load, recoverWalk continues (next page) or ends (page ≤ this)
+          await persist({ lastPage: pageBefore, nextClicked: true, clickedNextAt: Date.now(), paceMs });
           next.click();
           const turned = await waitLoad(() => location.href !== hrefBefore || NBL.resultCards(document, location.href)[0] !== firstBefore,
             { label: `Waiting for LinkedIn to load ${want}`, mustArrive: true });
           if (turned === 'stalled') throw stalled(want);
+          // read the page number only once the URL has stopped changing and the new results (or "no results") are on
+          // screen: LinkedIn may change the URL in steps and add `page` late
+          let urlNow = location.href;
+          let urlSince = Date.now();
+          await waitLoad(() => {
+            if (location.href !== urlNow) {
+              urlNow = location.href;
+              urlSince = Date.now();
+            }
+            const fresh = NBL.noResults(document) || NBL.resultCards(document, location.href)[0] !== firstBefore;
+            return Date.now() - urlSince >= 1000 && fresh && NBL.resultsRendered(document, location.href);
+          }, { label: `Waiting for LinkedIn to load ${want}`, quietMs: LIST.SETTLE_MS });
           // LinkedIn sends you back to an earlier page (page 1, no `page`) when you page past the last results page
           if (location.href !== hrefBefore && NBL.pageNumber(location.href) <= pageBefore) {
             throw new WalkStop('end', `LinkedIn went back to page ${NBL.pageNumber(location.href)} after page ${pageBefore}, so this was the last page.`);
           }
           seenEls = new WeakSet(); // a new page (LinkedIn may reuse card elements); people are de-duplicated by link
-          await persist({ lastPage: NBL.pageNumber(location.href), nextClicked: false });
+          await persist({ lastPage: NBL.pageNumber(location.href), nextClicked: false, clickedNextAt: 0 });
           const loaded = await waitLoad(() => {
             harvest();
             if (run.rows > before || NBL.noResults(document)) return true;

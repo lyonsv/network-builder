@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Chrome extension 0.3.3:** when LinkedIn's **Next** loads the next results page as a full page load, the walk now
+  continues on that page (same run, cap and counts) instead of stopping after page 1. The page number is read only once
+  the results have rendered.
 - **Chrome extension 0.3.2:** people-search cards on LinkedIn's newer layout (`role="listitem"`, 2nd-degree cards with
   a mutual-connections row) are read again, with the card's own profile link. A full page load mid-walk (LinkedIn
   jumps back to page 1 past the last results page) now ends the run cleanly — "Done — reached the end of the results"

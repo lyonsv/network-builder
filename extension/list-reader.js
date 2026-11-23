@@ -105,10 +105,29 @@
       return '';
     }
   }
-  function profileLinks(root, base) {
+  /** the "X, Y & 12 other mutual connections" / "X is a mutual connection" insight under a 2nd-degree card */
+  const MUTUAL = /mutual connection|gemeinsame[rn]? kontakt|gemeinsame kontakte/i;
+  /**
+   * `a` sits in an insight row of `card`: some element between them (or `a` itself) whose visible text is only
+   * mutual-connection lines. A name column also holds the name and headline lines, so it never qualifies.
+   */
+  function inInsightRow(a, card) {
+    for (let e = a; e && e !== card; e = e.parentElement) {
+      if (!MUTUAL.test(e.textContent || '')) continue;
+      const lines = visibleLines(e);
+      if (lines.length && lines.every((l) => MUTUAL.test(l))) return true;
+    }
+    return false;
+  }
+  /**
+   * distinct profile links of `root`, in page order. With `primary`, links inside a mutual-connections insight row
+   * are skipped, so a 2nd-degree card yields only its own person (the name / photo link).
+   */
+  function profileLinks(root, base, primary) {
     const out = [];
     for (const a of root.querySelectorAll('a[href*="/in/"]')) {
       if (isHiddenEl(a) || a.closest(HIDDEN)) continue;
+      if (primary && inInsightRow(a, root)) continue;
       const h = profileHref(a, base);
       if (h && !out.includes(h)) out.push(h);
     }
@@ -133,16 +152,16 @@
     }
     const cands = [...root.querySelectorAll('li, [role="listitem"]')].filter((li) => {
       if (li.closest(HIDDEN) || li.closest('nav, header, footer, aside')) return false;
-      const n = profileLinks(li, base).length;
+      const n = profileLinks(li, base, true).length; // mutual connections' links don't count
       return n === 1 || (n === 0 && ANON.test(visibleLines(li)[0] || ''));
     });
     // outermost candidates only (a card may contain inner lists)
     return cands.filter((li) => !cands.some((o) => o !== li && o.contains(li)));
   }
 
-  /** one card → {lines, href}: the visible text and the profile link, nothing else */
+  /** one card → {lines, href}: the visible text and the card's own profile link (never a mutual connection's), nothing else */
   function readCard(card, base) {
-    return { lines: visibleLines(card, true).slice(0, 20).map((l) => l.slice(0, 500)), href: profileLinks(card, base)[0] || '' };
+    return { lines: visibleLines(card, true).slice(0, 20).map((l) => l.slice(0, 500)), href: profileLinks(card, base, true)[0] || '' };
   }
 
   // ---------- header count + "What they do" ----------
@@ -266,5 +285,48 @@
     return bs[bs.length - 1] || null;
   }
 
-  globalThis.NBList = { pageKind, companySlug, keywordsOf, filterKey, visibleLines, resultCards, readCard, headerText, facetsText, facetsExpandButton, stopReason, noResults, loadMoreButton, nextButton };
+  /** the search results page number (`page=N`, 1 when absent or unreadable) */
+  function pageNumber(href) {
+    try {
+      const n = Number(new URL(href).searchParams.get('page'));
+      return Number.isInteger(n) && n >= 1 ? n : 1;
+    } catch {
+      return 1;
+    }
+  }
+
+  /** LinkedIn is still drawing the results: skeleton / ghost placeholders or a busy region in the main area */
+  function isLoading(doc) {
+    const root = doc.querySelector('main') || doc.body;
+    if (!root) return false;
+    for (const e of root.querySelectorAll('[class*="skeleton" i], [class*="ghost" i], [aria-busy="true"]')) {
+      if (!isHiddenEl(e) && !e.closest(HIDDEN)) return true;
+    }
+    return false;
+  }
+
+  // ---------- after a full page load mid-walk ----------
+  /**
+   * The content script restarted while a walk was running (a full page load in the same tab), so the walk itself is
+   * gone. What happened? `saved` is the walk state content.js keeps per tab: {kind, path, filters, lastPage,
+   * nextClicked, started}. → 'end' when LinkedIn sent us back to an earlier page of the SAME search right after we
+   * clicked Next (what it does when you page past the last results page); else 'cancelled'. Never 'resume': a walk
+   * starts only from a click on Start (AGENTS.md rule 5).
+   */
+  function reloadVerdict(saved, href) {
+    if (!saved || !saved.started) return 'cancelled';
+    let path = '';
+    try {
+      path = new URL(href).pathname;
+    } catch {
+      return 'cancelled';
+    }
+    const sameList = saved.kind === 'search' && pageKind(path) === 'search' && filterKey(href) === saved.filters;
+    if (!sameList || !saved.nextClicked) return 'cancelled';
+    const pg = pageNumber(href);
+    return pg === 1 || pg < (Number(saved.lastPage) || 1) ? 'end' : 'cancelled';
+  }
+
+  globalThis.NBList = { pageKind, companySlug, keywordsOf, filterKey, visibleLines, resultCards, readCard, headerText, facetsText, facetsExpandButton, stopReason, noResults, loadMoreButton, nextButton,
+    pageNumber, isLoading, reloadVerdict };
 })();

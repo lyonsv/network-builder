@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Chrome extension 0.3.2:** people-search cards on LinkedIn's newer layout (`role="listitem"`, 2nd-degree cards with
+  a mutual-connections row) are read again, with the card's own profile link. A full page load mid-walk (LinkedIn
+  jumps back to page 1 past the last results page) now ends the run cleanly — "Done — reached the end of the results"
+  or "stopped" — and never resumes by itself. Slow pages show "Waiting for LinkedIn to load page N… Xs"; 60 s without
+  new results stops as *stalled*.
+- List runs that never finish are closed as *abandoned* after 10 minutes idle (on the next run for the account, or at
+  start). Schema migration 7 (`account_list_runs.updated_at`).
+
 ## 0.4.0
 
 - **Marketing org map** (Accounts → **Marketing org**): for one account, everyone in marketing, the team's size

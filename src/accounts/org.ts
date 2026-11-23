@@ -195,7 +195,10 @@ export function buildOrgMap(view: AccountView, src: OrgMapSources): OrgMap {
   const latestRun = new Map<string, ListRun>();
   // walks only: counts-only captures and runs that read nothing never replace a list's last real walk
   const walks = src.runs.filter((r) => r.stopReason !== 'counts-only');
-  for (const r of [...walks].filter((r) => r.rowsSeen > 0).sort((a, b) => (a.startedAt === b.startedAt ? 0 : a.startedAt < b.startedAt ? 1 : -1))) {
+  // an `abandoned` run (its tab reloaded mid-walk) is partial: used for a list only when it has no other walk
+  const newestFirst = (a: ListRun, b: ListRun) => (a.startedAt === b.startedAt ? 0 : a.startedAt < b.startedAt ? 1 : -1);
+  const read = walks.filter((r) => r.rowsSeen > 0);
+  for (const r of [...read.filter((r) => r.stopReason !== 'abandoned').sort(newestFirst), ...read.filter((r) => r.stopReason === 'abandoned').sort(newestFirst)]) {
     const k = runListKey(r);
     if (!latestRun.has(k)) latestRun.set(k, r);
   }

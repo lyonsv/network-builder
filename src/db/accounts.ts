@@ -118,6 +118,9 @@ export const cleanDomain = (d: string): string =>
   (d || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#].*$/, '').slice(0, LIMITS.domain);
 
 /** Accounts, captured contacts and membership. All SQL for the ABX feature lives here. */
+/** an open list run with no activity for this long is closed as `abandoned` (on a new run for the account, and at server start) */
+export const LIST_RUN_IDLE_MS = 10 * 60_000;
+
 export class AccountsRepo {
   constructor(private readonly db: DatabaseSync) {}
 
@@ -1030,6 +1033,7 @@ export class AccountsRepo {
       id: str(r.id), accountId: str(r.account_id), pageKind: str(r.page_kind) as ListPageKind, url: str(r.url), keywords: str(r.keywords),
       startedAt: str(r.started_at), finishedAt: str(r.finished_at), rowsSeen: Number(r.rows_seen) || 0, named: Number(r.named) || 0,
       anonymous: Number(r.anonymous) || 0, stopReason: str(r.stop_reason) as ListStopReason | '',
+      updatedAt: str(r.updated_at) || str(r.started_at),
     };
   }
 
@@ -1045,9 +1049,10 @@ export class AccountsRepo {
     if (p.id !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id)) throw new AccountError('run id must be a UUID');
     if (p.id && this.getListRun(p.id)) throw new AccountError('that list run already exists');
     const id = p.id ? p.id.toLowerCase() : randomUUID();
+    const t = now();
     this.db
-      .prepare('INSERT INTO account_list_runs (id, account_id, page_kind, url, keywords, started_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, accountId, p.pageKind, clip(p.url, LIMITS.url), clip(p.keywords, 200), now());
+      .prepare('INSERT INTO account_list_runs (id, account_id, page_kind, url, keywords, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(id, accountId, p.pageKind, clip(p.url, LIMITS.url), clip(p.keywords, 200), t, t);
     return this.getListRun(id)!;
   }
 
@@ -1070,8 +1075,32 @@ export class AccountsRepo {
       sets.push('finished_at = ?');
       args.push(String(p.finishedAt));
     }
-    if (sets.length) this.db.prepare(`UPDATE account_list_runs SET ${sets.join(', ')} WHERE id = ?`).run(...args, runId);
+    sets.push('updated_at = ?'); // any update is activity
+    args.push(now());
+    this.db.prepare(`UPDATE account_list_runs SET ${sets.join(', ')} WHERE id = ?`).run(...args, runId);
     return this.getListRun(runId)!;
+  }
+
+  /**
+   * Close open runs (no `finishedAt`) whose last activity is older than `idleMs` (default 10 min) as `abandoned`: the
+   * extension's tab reloaded or closed mid-walk, so the final post never came. Optionally one account only.
+   * → the runs it closed. Rows already sent are kept.
+   */
+  abandonStaleListRuns(opts: { accountId?: string; idleMs?: number; now?: Date } = {}): ListRun[] {
+    const at = opts.now ?? new Date();
+    const cutoff = new Date(at.getTime() - (opts.idleMs ?? LIST_RUN_IDLE_MS)).toISOString();
+    const rows = this.db
+      .prepare(
+        `SELECT id FROM account_list_runs WHERE finished_at = '' AND (CASE WHEN updated_at = '' THEN started_at ELSE updated_at END) < ?` +
+          (opts.accountId ? ' AND account_id = ?' : ''),
+      )
+      .all(...(opts.accountId ? [cutoff, opts.accountId] : [cutoff])) as Row[];
+    if (!rows.length) return [];
+    const st = this.db.prepare(`UPDATE account_list_runs SET finished_at = ?, stop_reason = 'abandoned' WHERE id = ? AND finished_at = ''`);
+    this.tx(() => {
+      for (const r of rows) st.run(at.toISOString(), str(r.id));
+    });
+    return rows.map((r) => this.getListRun(str(r.id))!);
   }
 
   /** newest first */

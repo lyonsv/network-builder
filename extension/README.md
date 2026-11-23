@@ -79,6 +79,16 @@ What it does and doesn't do:
 - Everyone else is saved as a *light contact* on the account (no full profile). Open a person and click
   **＋ Network Builder** when you want their full profile.
 - If Network Builder isn't running, the walk pauses with the error and a **Retry** button (lists are not queued).
+- **Slow pages:** when LinkedIn shows grey placeholder cards, the panel says "Waiting for LinkedIn to load page N… 12s".
+  After 60 seconds without new results the walk stops as *stalled*: reload the page and start again (people already
+  read are saved).
+- **If the page reloads mid-walk** (LinkedIn jumps back to page 1 when you page past the last results page, or you
+  reload), the walk can't carry on. The extension remembers the running walk for that tab only while Chrome is open and,
+  after the load, closes the run: "Done — reached the end of the results (N people)" when LinkedIn went back to an
+  earlier page of the same search right after **Next**, otherwise "the walk stopped". **It never restarts a walk by
+  itself** — click **Start** again if you want more.
+- Runs that never finish (tab closed, app quit) are closed by Network Builder as *abandoned* after 10 minutes without
+  activity, when you start a new run for that account or when Network Builder starts.
 
 **LinkedIn's terms restrict automated browsing.** LinkedIn may limit or restrict accounts that browse a lot. Keep runs
 small, map one team at a time, and stop if you see a security check.
@@ -93,6 +103,8 @@ small, map one team at a time, and stop if you see a security check.
 | Port changed | If another program had the explorer's usual port, it picked a new one. Re-pair from the popup. |
 | Red badge with a number | Some saved profiles were refused (e.g. the account was deleted). Open the popup to see why, then **Retry** or **Remove** each one. |
 | "Extension was updated — reload this tab" | Reload the LinkedIn tab after updating the extension. |
+| A search walk reads 0 rows though results are visible | Update to 0.3.2+ (2nd-degree cards with mutual connections were skipped on LinkedIn's newer layout). |
+| "Waiting for LinkedIn to load page N…" for a long time | LinkedIn is slow; after 60 s the walk stops as *stalled*. Reload the page and start again. |
 
 LinkedIn changes its page markup from time to time. The extension also sends the page's visible text, and Network
 Builder falls back to that, so profiles still come through. Parsing lives in `src/accounts/capture.ts` and

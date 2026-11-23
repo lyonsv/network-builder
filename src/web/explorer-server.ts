@@ -184,6 +184,12 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     return true;
   };
   reloadPeople();
+  // list walks whose final post never came (tab reloaded / closed mid-walk, app quit) are closed as `abandoned`
+  try {
+    store.accounts.abandonStaleListRuns();
+  } catch {
+    /* best effort: a read-only or locked database must not stop the explorer */
+  }
   const refreshPerson = (id: string) => {
     const p = store.getExplorerPerson(id);
     if (p) people.set(id, p);
@@ -1389,7 +1395,8 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     if ((header?.length ?? 0) > 2000 || (facets?.length ?? 0) > 20_000) throw new HttpError(400, '`header` / `facets` text is too long');
     if (b.final !== undefined && typeof b.final !== 'boolean') throw new HttpError(400, '`final` must be a boolean');
     const stopReason = strOpt(b.stopReason, 'stopReason') ?? '';
-    if (stopReason && !LIST_STOP_REASONS.includes(stopReason as ListStopReason)) throw new HttpError(400, `\`stopReason\` must be one of: ${LIST_STOP_REASONS.join(', ')}`);
+    const clientReasons: readonly ListStopReason[] = LIST_STOP_REASONS.filter((r) => r !== 'abandoned'); // `abandoned` is set by the server only
+    if (stopReason && !clientReasons.includes(stopReason as ListStopReason)) throw new HttpError(400, `\`stopReason\` must be one of: ${clientReasons.join(', ')}`);
 
     // the run (and its account): an existing run keeps its account; a new one resolves it like a profile capture
     let run = store.accounts.getListRun(runId.toLowerCase());
@@ -1399,7 +1406,11 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     if (run) {
       account = accountOr404(run.accountId);
       if (accountId && accountId !== run.accountId) throw new HttpError(409, 'this list run belongs to another account');
-      if (run.finishedAt) throw new HttpError(409, 'this list run has already finished — start a new one');
+      if (run.finishedAt) {
+        throw new HttpError(409, run.stopReason === 'abandoned'
+          ? 'this list run was closed after 10 minutes without activity — start a new one'
+          : 'this list run has already finished — start a new one');
+      }
     } else if (accountId) {
       account = store.accounts.get(accountId);
       if (!account) throw new HttpError(404, 'that account no longer exists — pick another one');
@@ -1414,6 +1425,8 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       }
     }
     const newRun = !run;
+    // a new run for this account first closes its stale open runs (no activity for 10 minutes) as `abandoned`
+    if (newRun) store.accounts.abandonStaleListRuns({ accountId: account.id });
     if (!run) run = acct(() => store.accounts.startListRun(account.id, { id: runId, pageKind: kind, url: parsedUrl.href, keywords }));
     if (run.rowsSeen >= LIST_ROWS_PER_RUN) throw new HttpError(409, `this list run already has ${LIST_ROWS_PER_RUN.toLocaleString('en-US')} rows (the most one run may send)`);
     const batch = rows.filter((r) => r.idx < LIST_ROWS_PER_RUN); // a run never holds more than 1,000 rows

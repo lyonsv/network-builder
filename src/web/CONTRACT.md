@@ -431,7 +431,7 @@ Phase 1 (data model only; no UI, no AI). Types in `src/accounts/types.ts` (v9 bl
   taken_at, source linkedin-people|linkedin-search|web|user, scope company|function|query, label, count, url,
   evidence_url, quote, confidence, run_id)`, `account_list_runs(id uuid, account_id, page_kind people-tab|search, url,
   keywords, started_at, finished_at, rows_seen, named, anonymous, stop_reason end|cap|cancelled|checkpoint|rate-limit|
-  login|stalled|error)`, `account_anon_rows(run_id → list_runs cascade, idx, headline, location; PK run+idx)`,
+  login|stalled|error|counts-only|abandoned; migration 7 adds updated_at)`, `account_anon_rows(run_id → list_runs cascade, idx, headline, location; PK run+idx)`,
   `account_org_facts(id, account_id, kind team|entity|reporting|leadership|hiring|headcount|other, text, evidence_url
   (http(s), required), quote, confidence, found_at, run_id)`.
 - Vocabulary: `SUBFUNCTIONS` (+ `SUBFUNCTION_LABELS`), `SENIORITIES` (+ `SENIORITY_TIER` → TIERS), `NOISE_FLAGS`,
@@ -833,6 +833,49 @@ vendor-funded roles are part of the org.
   "Referentin für Marketing", "Office Manager für Marketing & Events" are specialists in that function.
 - Light-row refresh: skipped for contacts with a `manual` source (the user typed those values) and when the posting
   run started before the run of the contact's newest list sighting (a late Retry of an old run never wins).
+
+#### Extension 0.3.2 — walk survives (and ends cleanly after) a full page load; stale runs closed; slow pages
+
+- **Card detection (live 2026-11):** search results may be `div[role=list] > div[role=listitem]` with no `li` and no
+  known card class, and 2nd-degree cards carry a "X, Y & 12 other mutual connections" row with its own `/in/` links.
+  `resultCards`' structural fallback now counts only a card's *primary* profile links (`profileLinks(root, base, true)`:
+  links inside an insight row — an element between the link and the card whose visible lines all match
+  /mutual connection|gemeinsame Kontakt/ — are skipped), so such cards are kept (outermost-only rule unchanged), and
+  `readCard().href` is the card's own person, never a mutual connection.
+- **Full page loads mid-walk** (LinkedIn sends you back to page 1, no `page` param, when you page past the last results
+  page; also some reloads) restart the content script. The walk keeps its minimal state per tab in
+  `chrome.storage.session` via the background (`walkSave` / `walkLoad` / `walkClear`, keyed `walk.<tabId>` from the
+  message sender; removed on tab close): `{runId, account {id, name}, acctRef, cap, rows, kind, path, filters
+  (NBList.filterKey), page, lastPage, nextClicked, started}`. It is saved when the walk starts (before the first await),
+  after each non-final post (`started: true`), right before clicking Next (`lastPage`, `nextClicked: true`) and after a
+  page turned; cleared after the final post. Before each Next click the page's pending rows are posted.
+- On every page load the content script calls `recoverWalk()` once: it reads and clears the state, then
+  `NBList.reloadVerdict(saved, location.href)` → `'end'` when the same search (same filter key) is back on page 1 or a
+  page below `lastPage` right after a Next click, else `'cancelled'`. If the run had started it sends one final post
+  `{runId, accountId|accountName, page, rows: [], final: true, stopReason}` and shows a notice: "Done — reached the end of
+  the results (N people)" or "The page reloaded or changed while mapping, so the walk stopped (N people saved) … It never
+  restarts by itself". **It never walks, clicks or resumes**; a walk still starts only from a trusted Start click.
+  Without a full load, a Next click that lands on a page number ≤ the previous one also ends the walk as `end`.
+- **Slow pages:** `NBList.isLoading(doc)` (visible `[class*=skeleton]`, `[class*=ghost]`, `[aria-busy=true]` in main).
+  While waiting for a page/more results the panel shows "Waiting for LinkedIn to load page N… Xs" (after 2 s). 60 s
+  (`STALL_MS`, hidden-tab time not counted) without the page turning or new cards appearing → `stalled`, with "Reload the
+  page (⌘R) and start again". A drawn page of already-read people still counts as "no growth" (back-off, then `end` /
+  `stalled` as before). A 409 because the run was closed → `cancelled` (not `cap`).
+- **Server:** `account_list_runs.updated_at` (migration 7; backfilled from `started_at`) is set on start and every
+  `updateListRun`. `AccountsRepo.abandonStaleListRuns({accountId?, idleMs = LIST_RUN_IDLE_MS (10 min), now?})` closes open
+  runs idle longer than that with `stop_reason 'abandoned'` (rows kept). Called at explorer server start (all accounts)
+  and in `POST /ext/capture-list` before a new run is created (that account only). `abandoned` is in
+  `LIST_STOP_REASONS` but the extension may not send it (400). A post to an abandoned run → 409 "this list run was
+  closed after 10 minutes without activity — start a new one". `ListRun.updatedAt` is new.
+- **Review fixes:** the walk sends a quiet empty post (`rows: []`, not final) whenever nothing was posted for 2 minutes
+  (`HEARTBEAT_MS`; from every `check()` and inside the hidden-tab pause), and the server's `updateListRun` on every post
+  — empty ones too — refreshes `updated_at`, so a live run is never abandoned. A final post refused with 409 for a
+  closed/finished/abandoned run ends quietly (no Retry) with a note saying how many unsent rows were lost. Saved walk
+  state older than 15 minutes (`savedAt`) is cleared and ignored on load. Start stays disabled (and its handler refuses)
+  until `recoverWalk` has finished.
+- **Org map:** the anonymous count's "latest run per list" prefers any non-abandoned walk of that list; an `abandoned`
+  run (partial) is used only when the list has no other walk. Abandoned runs still appear in `runs`. The page labels
+  them "abandoned (no activity for 10 min)".
 
 ### v9 Phase 6 — MCP + docs (v9 complete)
 

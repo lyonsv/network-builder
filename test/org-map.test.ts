@@ -233,7 +233,7 @@ describe('LinkedIn counts across entity pages', () => {
   });
   it('function counts from a filtered People tab are ignored; counts-only and empty runs never hide a walk', () => {
     const run = (rid: string, startedAt: string, rowsSeen: number, anonymous: number, stopReason: ListRun['stopReason']) =>
-      ({ id: rid, accountId: 'x', pageKind: 'people-tab', url: B, keywords: 'marketing', startedAt, finishedAt: startedAt, rowsSeen, named: rowsSeen, anonymous, stopReason }) as const;
+      ({ id: rid, accountId: 'x', pageKind: 'people-tab', url: B, keywords: 'marketing', startedAt, finishedAt: startedAt, updatedAt: startedAt, rowsSeen, named: rowsSeen, anonymous, stopReason }) as const;
     const m = buildOrgMap(view, {
       facts: [],
       headcounts: [snap(A, 'function', 400, '2026-11-01', 'Marketing'), snap(`${A}?keywords=brand`, 'function', 7, '2026-11-09', 'Marketing')],
@@ -242,6 +242,19 @@ describe('LinkedIn counts across entity pages', () => {
     expect(m.headcount.linkedin.marketing?.count).toBe(400);
     expect(m.headcount.anonymous).toBe(6);
     expect(m.runs.map((r) => r.id)).toEqual(['e1', 'w1']);
+  });
+  it('an abandoned (partial) run never replaces a list’s finished walk for the anonymous count, but stands in when it is the only one', () => {
+    const run = (rid: string, url: string, startedAt: string, rowsSeen: number, anonymous: number, stopReason: ListRun['stopReason']) =>
+      ({ id: rid, accountId: 'x', pageKind: 'search', url, keywords: 'marketing', startedAt, finishedAt: startedAt, updatedAt: startedAt, rowsSeen, named: rowsSeen, anonymous, stopReason }) as const;
+    const S1 = 'https://www.linkedin.com/search/results/people/?keywords=marketing&currentCompany=%5B%221%22%5D';
+    const S2 = 'https://www.linkedin.com/search/results/people/?keywords=brand&currentCompany=%5B%221%22%5D';
+    const m = buildOrgMap(view, {
+      facts: [],
+      headcounts: [],
+      runs: [run('a1', S1, '2026-11-09', 40, 2, 'abandoned'), run('w1', S1, '2026-11-02', 120, 6, 'end'), run('a2', S2, '2026-11-09', 30, 3, 'abandoned')],
+    });
+    expect(m.headcount.anonymous).toBe(6 + 3);
+    expect(m.runs.map((r) => r.id)).toEqual(['a1', 'w1', 'a2']);
   });
   it('coverage above 100% is capped and flagged', () => {
     const members = Array.from({ length: 5 }, (_, i) => ({

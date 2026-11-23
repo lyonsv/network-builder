@@ -535,6 +535,21 @@ describe('marketing org map: data model, light contacts, identity', () => {
     return store;
   };
 
+  it('migration 7 backfills list runs’ last activity from their start', () => {
+    const file = path.join(dir, 'network.db');
+    const old = new DatabaseSync(file, { enableForeignKeyConstraints: true });
+    for (const m of MIGRATIONS.slice(0, 6)) old.exec(m);
+    old.exec('PRAGMA user_version = 6');
+    const t = '2026-01-01T00:00:00Z';
+    old.prepare("INSERT INTO accounts (id, name, created_at, updated_at) VALUES ('ledgerly', 'Ledgerly', ?, ?)").run(t, t);
+    old.prepare("INSERT INTO account_list_runs (id, account_id, page_kind, url, started_at) VALUES ('r1', 'ledgerly', 'search', 'https://www.linkedin.com/search/results/people/', ?)").run(t);
+    old.close();
+    const s = open();
+    expect(s.accounts.getListRun('r1')).toMatchObject({ updatedAt: t, finishedAt: '' });
+    // an open run from before the upgrade is idle → closed as abandoned
+    expect(s.accounts.abandonStaleListRuns({ accountId: 'ledgerly' }).map((r) => [r.id, r.stopReason])).toEqual([['r1', 'abandoned']]);
+  });
+
   it('migrates a pre-org-map database: rows kept, existing reporting lines marked as the user’s, deletes cascade', () => {
     const file = path.join(dir, 'network.db');
     const old = new DatabaseSync(file, { enableForeignKeyConstraints: true });

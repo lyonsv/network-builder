@@ -4107,7 +4107,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   }
   function runsEl(org) {
     if (!org.runs.length) return null;
-    var STOP = { end: 'finished', cap: 'hit the cap', cancelled: 'cancelled', checkpoint: 'stopped: security check', 'rate-limit': 'stopped: LinkedIn limit', login: 'stopped: signed out', stalled: 'stalled', error: 'error', 'counts-only': 'headcount only' };
+    var STOP = { end: 'finished', cap: 'hit the cap', cancelled: 'cancelled', checkpoint: 'stopped: security check', 'rate-limit': 'stopped: LinkedIn limit', login: 'stopped: signed out', stalled: 'stalled', error: 'error', 'counts-only': 'headcount only', abandoned: 'abandoned (no activity for 10 min)' };
     return h('details', { class: 'o-sec o-runs' }, h('summary', { text: 'LinkedIn list walks (' + org.runs.length + (org.runs.length === 10 ? ', latest' : '') + ')' }),
       h('ul', null, org.runs.map(function (r) {
         return h('li', null, h('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer', text: (r.pageKind === 'search' ? 'Search' : 'People tab') + (r.keywords ? ' “' + r.keywords + '”' : '') }),

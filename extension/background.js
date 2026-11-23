@@ -265,6 +265,25 @@ const handlers = {
     await saveQueue((await getQueue()).filter((x) => x.id !== id));
     return { ok: true };
   },
+  // the running list walk's minimal state, per tab, in chrome.storage.session (memory only, gone when Chrome quits), so
+  // a content script that restarts after a full page load can tell how the walk ended. Never used to resume a walk.
+  async walkSave({ state }, sender) {
+    const tab = sender && sender.tab && sender.tab.id;
+    if (tab == null || !state || typeof state !== 'object') return { ok: false };
+    await chrome.storage.session.set({ [`walk.${tab}`]: { ...state, savedAt: Date.now() } });
+    return { ok: true };
+  },
+  async walkLoad(_msg, sender) {
+    const tab = sender && sender.tab && sender.tab.id;
+    if (tab == null) return { ok: true, state: null };
+    const k = `walk.${tab}`;
+    return { ok: true, state: (await chrome.storage.session.get(k))[k] || null };
+  },
+  async walkClear(_msg, sender) {
+    const tab = sender && sender.tab && sender.tab.id;
+    if (tab != null) await chrome.storage.session.remove(`walk.${tab}`);
+    return { ok: true };
+  },
   async readDetails({ slug, kinds }) {
     return readDetails(String(slug || ''), Array.isArray(kinds) ? kinds.map(String) : []);
   },
@@ -318,13 +337,18 @@ async function readDetails(slug, kinds) {
   return { ok: true, results };
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const h = msg && handlers[msg.type];
   if (!h) return false;
   Promise.resolve()
-    .then(() => h(msg))
+    .then(() => h(msg, sender))
     .then(sendResponse, (e) => sendResponse({ ok: false, kind: 'error', message: (e && e.message) || String(e) }));
   return true; // async response
+});
+
+// a closed tab's walk state is never needed again
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.session.remove(`walk.${tabId}`).catch(() => {});
 });
 
 chrome.alarms.onAlarm.addListener((a) => {

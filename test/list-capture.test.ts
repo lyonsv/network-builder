@@ -23,6 +23,9 @@ interface NBList {
   noResults(doc: Document): boolean;
   loadMoreButton(doc: Document): Element | null;
   nextButton(doc: Document): Element | null;
+  pageNumber(href: string): number;
+  isLoading(doc: Document): boolean;
+  reloadVerdict(saved: unknown, href: string): 'end' | 'cancelled';
 }
 let L: NBList;
 beforeAll(() => {
@@ -287,6 +290,28 @@ describe('extension list reader (DOM, fictional fixtures)', () => {
     expect(parsed.map((p) => [p.fullName, p.anonymous, p.title])).toEqual([['Dev Rao', false, 'Brand Specialist'], ['', true, 'Brand Manager']]);
   });
 
+  it('role="listitem" cards with mutual-connection links: one card per person, the card’s own link (live 2026-11)', () => {
+    const url = 'https://www.linkedin.com/search/results/people/?keywords=marketing&currentCompany=%5B%221%22%5D';
+    const { doc } = page(fixture('linkedin-search-listitems.html'), url);
+    const cards = L.resultCards(doc, url).map((c) => L.readCard(c, url));
+    expect(cards).toHaveLength(3);
+    expect(cards.map((c) => c.href)).toEqual([
+      'https://www.linkedin.com/in/mara-feld-example',
+      'https://www.linkedin.com/in/oskar-brandl-example',
+      '',
+    ]);
+    const parsed = cards.map((c) => parseListCard({ ...c, pageUrl: url, accountName: 'Ledgerly' }));
+    expect(parsed.map((p) => [p.fullName, p.anonymous, p.title])).toEqual([
+      ['Mara Feld', false, 'Head of Content'],
+      ['Oskar Brandl', false, 'Performance Marketing Manager'],
+      ['', true, 'Brand Manager'],
+    ]);
+    // a single mutual connection ("X is a mutual connection") never becomes the card's person either
+    const one = page(`<main><div role="list"><div role="listitem"><div><a href="/in/ana-reiss-example">Ana Reiss</a></div><div>CMO at Ledgerly</div>
+      <div><a href="/in/tomas-vey-example">Tomas Vey</a> is a mutual connection</div></div></div></main>`, url);
+    expect(L.resultCards(one.doc, url).map((c) => L.readCard(c, url).href)).toEqual(['https://www.linkedin.com/in/ana-reiss-example']);
+  });
+
   it('a disabled Next button means the last page', () => {
     const { doc } = page('<main><ul><li><a href="/in/dev-rao-example">Dev Rao</a></li></ul><button aria-label="Next" disabled>Next</button></main>', 'https://www.linkedin.com/search/results/people/');
     expect(L.nextButton(doc)).toBeNull();
@@ -311,6 +336,125 @@ describe('extension list reader (DOM, fictional fixtures)', () => {
     const none = page('<main><h2>No results found</h2></main>', 'https://www.linkedin.com/search/results/people/');
     expect(L.noResults(none.doc)).toBe(true);
     expect(L.noResults(blank.doc)).toBe(false);
+  });
+});
+
+describe('walk across a full page load (live 2026-11: LinkedIn sends you back to page 1 past the last page)', () => {
+  const S = 'https://www.linkedin.com/search/results/people/?keywords=marketing&currentCompany=%5B%221%22%5D';
+  const saved = { runId: 'r', kind: 'search', path: '/search/results/people/', filters: '', lastPage: 13, nextClicked: true, started: true };
+  beforeAll(() => {
+    saved.filters = L.filterKey(S);
+  });
+
+  it('reads the page number', () => {
+    expect(L.pageNumber(`${S}&page=13`)).toBe(13);
+    expect(L.pageNumber(S)).toBe(1);
+    expect(L.pageNumber(`${S}&page=abc`)).toBe(1);
+    expect(L.pageNumber('not a url')).toBe(1);
+  });
+
+  it('same search, back to page 1 (or an earlier page) right after Next → end', () => {
+    expect(L.reloadVerdict(saved, `${S}&origin=FACETED_SEARCH&sid=x1`)).toBe('end');
+    expect(L.reloadVerdict(saved, `${S}&page=4`)).toBe('end');
+    expect(L.reloadVerdict({ ...saved, lastPage: 1 }, S)).toBe('end');
+  });
+
+  it('anything else → cancelled; never a resume', () => {
+    expect(L.reloadVerdict({ ...saved, nextClicked: false }, S)).toBe('cancelled'); // a reload, not a Next
+    expect(L.reloadVerdict(saved, `${S}&page=14`)).toBe('cancelled'); // a full load onto the next page
+    expect(L.reloadVerdict(saved, `${S}&page=13`)).toBe('cancelled'); // the same page reloaded
+    expect(L.reloadVerdict(saved, 'https://www.linkedin.com/search/results/people/?keywords=sales')).toBe('cancelled');
+    expect(L.reloadVerdict(saved, 'https://www.linkedin.com/in/someone-example/')).toBe('cancelled');
+    expect(L.reloadVerdict({ ...saved, kind: 'people-tab' }, 'https://www.linkedin.com/company/ledgerly/people/')).toBe('cancelled');
+    expect(L.reloadVerdict({ ...saved, started: false }, S)).toBe('cancelled');
+    expect(L.reloadVerdict(null, S)).toBe('cancelled');
+  });
+
+  it('sees skeleton placeholders while a page loads, not hidden ones', () => {
+    const url = S;
+    expect(L.isLoading(page('<main><div class="search-results__skeleton-card"><div class="ghost-text"></div></div></main>', url).doc)).toBe(true);
+    expect(L.isLoading(page('<main><ul aria-busy="true"></ul></main>', url).doc)).toBe(true);
+    expect(L.isLoading(page('<main><div class="artdeco-skeleton" hidden></div><ul><li><a href="/in/dev-rao-example">Dev Rao</a></li></ul></main>', url).doc)).toBe(false);
+    expect(L.isLoading(page(fixture('linkedin-search-listitems.html'), url).doc)).toBe(false);
+  });
+
+  const content = readFileSync(path.join(root, 'extension/content.js'), 'utf8');
+  const fn = (name: string) => {
+    const at = content.indexOf(`async function ${name}(`);
+    return content.slice(at, content.indexOf('\n  }\n', at));
+  };
+
+  it('after a reload the restarted script only closes the run: a final post with zero rows, never a walk or a click', () => {
+    const r = fn('recoverWalkNow');
+    expect(r).toContain("send({ type: 'walkLoad' })");
+    expect(r).toContain('NBL.reloadVerdict(saved, location.href)');
+    expect(r).toMatch(/rows: \[\], final: true, stopReason: verdict/);
+    expect(r).toContain('Done — reached the end of the results (');
+    expect(r).toContain('never restarts by itself');
+    expect(r).not.toMatch(/startWalk|\.click\(|scroll|nextButton|loadMoreButton|while \(/);
+    // the state is cleared before anything else, so a second load never handles it again
+    expect(r.indexOf('await clearWalkState()')).toBeLessThan(r.indexOf("type: 'captureList'"));
+    // a run that never reached Network Builder is not created by the recovery
+    expect(r.indexOf('if (!saved.started)')).toBeLessThan(r.indexOf("type: 'captureList'"));
+    expect(content).toMatch(/\n  recoverWalk\(\);/);
+  });
+
+  it('the walk saves its state before the first await, marks Next before clicking it, and clears it at the end', () => {
+    const w = fn('startWalk');
+    expect(w.indexOf('persist(); // before the first await')).toBeLessThan(w.indexOf('await '));
+    expect(w.indexOf('persist({ lastPage: pageBefore, nextClicked: true })')).toBeLessThan(w.indexOf('next.click()'));
+    expect(w).toMatch(/if \(pending\.length\) await post\(\{\}\);[^\n]*\n[\s\S]*next\.click\(\)/);
+    expect(w).toContain('await clearWalkState();');
+    for (const k of ['runId', 'account', 'cap', 'rows', 'filters', 'lastPage', 'started']) expect(w).toMatch(new RegExp(`${k}[:,]`));
+    // LinkedIn going back to an earlier page without a full load ends the walk too
+    expect(w).toMatch(/NBL\.pageNumber\(location\.href\) <= pageBefore[\s\S]*WalkStop\('end'/);
+  });
+
+  it('a slow page shows "Waiting for LinkedIn to load page N… Xs"; 60 s without new cards stops as stalled', () => {
+    const w = fn('startWalk');
+    expect(content).toMatch(/STALL_MS: 60000/);
+    expect(w).toContain('Waiting for LinkedIn to load ${want}');
+    expect(w).toContain('`page ${pageBefore + 1}`');
+    expect(w).toContain('say(`${label}… ${Math.round(waited / 1000)}s`)');
+    expect(w).toMatch(/new WalkStop\('stalled', `[^`]*Reload the page/);
+    expect(w).toMatch(/if \(turned === 'stalled'\) throw stalled\(want\)/);
+    expect(w).toMatch(/if \(loaded === 'stalled'\) throw stalled\(want\)/);
+  });
+
+  it('review fixes: heartbeat while paused / waiting; closed run ends quietly; stale state ignored; Start waits for recovery', () => {
+    const w = fn('startWalk');
+    // 1. an empty post at least every 2 minutes, from check() and inside the hidden-tab pause loop
+    expect(content).toMatch(/HEARTBEAT_MS: 120000/);
+    const hb = w.slice(w.indexOf('const heartbeat = async'), w.indexOf('const check = async'));
+    expect(hb).toContain('Date.now() - lastPostAt < LIST.HEARTBEAT_MS');
+    expect(hb).toMatch(/rows: \[\] \}/);
+    expect(hb).not.toMatch(/final: true|ui\.prompt/);
+    const chk = w.slice(w.indexOf('const check = async'), w.indexOf('const pause = async'));
+    expect(chk.indexOf('await heartbeat()')).toBeLessThan(chk.indexOf('while (document.hidden)'));
+    expect(chk.slice(chk.indexOf('while (document.hidden)'))).toContain('await heartbeat()');
+    expect(w).toMatch(/if \(r\.ok\) \{\s*lastPostAt = Date\.now\(\);/);
+    // 2. a final post refused because the run is closed returns before the Retry prompt
+    const p = w.slice(w.indexOf('const post = async'), w.indexOf('const pageInfo'));
+    const closed = p.indexOf("final && r.status === 409 && /finished|closed|abandoned/i");
+    expect(closed).toBeGreaterThan(0);
+    expect(closed).toBeLessThan(p.indexOf('ui.prompt('));
+    expect(w).toContain("message: [stop.message, closedNote].filter(Boolean).join(' ')");
+    // 3. state older than 15 minutes is cleared and ignored
+    expect(content).toMatch(/STATE_MAX_AGE_MS: 15 \* 60000/);
+    const r = fn('recoverWalkNow');
+    expect(r.indexOf('await clearWalkState()')).toBeLessThan(r.indexOf('LIST.STATE_MAX_AGE_MS'));
+    expect(r.indexOf('LIST.STATE_MAX_AGE_MS')).toBeLessThan(r.indexOf("type: 'captureList'"));
+    // 4. Start is disabled and refused until recovery has finished, whatever it did
+    expect(fn('recoverWalk')).toMatch(/try \{\s*await recoverWalkNow\(\);\s*\} finally \{\s*recovering = false;/);
+    expect(content).toMatch(/if \(recovering\) \{\s*goBtn\.disabled = true;/);
+  });
+
+  it('the background keeps the state per tab in chrome.storage.session', () => {
+    const bg = readFileSync(path.join(root, 'extension/background.js'), 'utf8');
+    for (const h of ['walkSave', 'walkLoad', 'walkClear']) expect(bg).toMatch(new RegExp(`async ${h}\\(`));
+    expect(bg).toMatch(/chrome\.storage\.session\.set\(\{ \[`walk\.\$\{tab\}`\]/);
+    expect(bg).toContain('.then(() => h(msg, sender))');
+    expect(bg).not.toMatch(/chrome\.storage\.local\.set\([^)]*walk/);
   });
 });
 
@@ -343,7 +487,7 @@ describe('extension safeguards (static checks, so they cannot quietly regress)',
     const handlerAt = listBranch.lastIndexOf("goBtn.addEventListener('click'", callAt);
     expect(handlerAt).toBeGreaterThan(0);
     const handler = listBranch.slice(handlerAt, callAt);
-    expect(handler).toContain('if (!e.isTrusted || walk || starting) return;');
+    expect(handler).toContain('if (!e.isTrusted || walk || starting || recovering) return;');
     // the double-click guard is set before the first await
     expect(handler.indexOf('starting = true')).toBeLessThan(handler.indexOf('await '));
     // the floating button only opens the panel

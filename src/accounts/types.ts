@@ -165,8 +165,11 @@ export interface HeadcountSnapshot {
 
 export const LIST_PAGE_KINDS = ['people-tab', 'search'] as const;
 export type ListPageKind = (typeof LIST_PAGE_KINDS)[number];
-/** `counts-only`: set by the server for a "Capture headcount only" post (zero rows, final) — not a walk */
-export const LIST_STOP_REASONS = ['end', 'cap', 'cancelled', 'checkpoint', 'rate-limit', 'login', 'stalled', 'error', 'counts-only'] as const;
+/**
+ * `counts-only`: set by the server for a "Capture headcount only" post (zero rows, final) — not a walk.
+ * `abandoned`: set by the server for an open run with no activity for 10 minutes (the tab reloaded or closed mid-walk).
+ */
+export const LIST_STOP_REASONS = ['end', 'cap', 'cancelled', 'checkpoint', 'rate-limit', 'login', 'stalled', 'error', 'counts-only', 'abandoned'] as const;
 export type ListStopReason = (typeof LIST_STOP_REASONS)[number];
 /** one walk over a LinkedIn people list (company People tab or a search) by the extension */
 export interface ListRun {
@@ -181,6 +184,8 @@ export interface ListRun {
   named: number;
   anonymous: number;
   stopReason: ListStopReason | '';
+  /** last activity: the start or the latest post */
+  updatedAt: string;
 }
 /** a "LinkedIn Member" row (no name) seen in a list run — counts toward headcount, never becomes a contact */
 export interface AnonRow {

@@ -303,6 +303,11 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX account_org_facts_acc ON account_org_facts(account_id);
   `,
+  // list runs: last activity (start or any post), so open runs that never finish can be closed as `abandoned`
+  `
+  ALTER TABLE account_list_runs ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+  UPDATE account_list_runs SET updated_at = started_at;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -723,6 +723,67 @@ describe('accounts + Chrome extension API', () => {
     expect(org2.headcount.linkedin.queries.map((q: any) => [q.label, q.count])).toEqual([['marketing', 300]]);
   });
 
+  it('list runs that never finish are closed as `abandoned`: on a new run for the account, and at server start', async () => {
+    const { base, token } = await setup();
+    const pair = await req('POST', `${base}/api/ext/pair`, { token, body: {} });
+    const cap = JSON.parse(Buffer.from(pair.json.code.slice(4), 'base64url').toString()).t as string;
+    const ext = (body: unknown) => req('POST', `${base}/ext/capture-list`, { body, headers: { 'X-NB-Capture': cap, Origin: EXT_ORIGIN } });
+    const page = { kind: 'search', url: 'https://www.linkedin.com/search/results/people/?keywords=marketing&currentCompany=%5B%221%22%5D', keywords: 'marketing' };
+    const row = (idx: number, slug: string) => ({ idx, lines: [`Person ${slug}`, 'Brand Manager at Ledgerly'], href: `https://www.linkedin.com/in/${slug}-example` });
+    const stale = '11111111-1111-4111-8111-111111111111';
+    const fresh = '22222222-2222-4222-8222-222222222222';
+    const next = '33333333-3333-4333-8333-333333333333';
+
+    const a = await ext({ runId: stale, accountName: 'Ledgerly', page, rows: [row(0, 'pat-one')] });
+    expect(a.status).toBe(200);
+    const accountId = a.json.account.id as string;
+    expect((await ext({ runId: fresh, accountId, page, rows: [row(0, 'pat-two')] })).status).toBe(200);
+    // the stale run's tab reloaded 11 minutes ago: no activity since
+    const old = new Date(Date.now() - 11 * 60_000).toISOString();
+    store!.db.prepare('UPDATE account_list_runs SET updated_at = ?, started_at = ? WHERE id = ?').run(old, old, stale);
+    // the extension may not claim `abandoned` itself
+    expect((await ext({ runId: next, accountId, page, rows: [], final: true, stopReason: 'abandoned' })).status).toBe(400);
+
+    // a new run for the same account closes the stale one, never the one still active
+    expect((await ext({ runId: next, accountId, page, rows: [row(0, 'pat-three')] })).status).toBe(200);
+    expect(store!.accounts.getListRun(stale)).toMatchObject({ stopReason: 'abandoned', rowsSeen: 1, named: 1 });
+    expect(store!.accounts.getListRun(stale)!.finishedAt).not.toBe('');
+    expect(store!.accounts.getListRun(fresh)).toMatchObject({ finishedAt: '', stopReason: '' });
+    // a late post to the abandoned run is refused with a clear reason; its rows are kept
+    const late = await ext({ runId: stale, accountId, page, rows: [row(1, 'pat-four')] });
+    expect(late.status).toBe(409);
+    expect(late.json.error).toMatch(/10 minutes without activity/);
+
+    // an empty post (the extension's heartbeat while paused / waiting) is activity too
+    const back = new Date(Date.now() - 9 * 60_000).toISOString();
+    store!.db.prepare('UPDATE account_list_runs SET updated_at = ? WHERE id = ?').run(back, fresh);
+    expect((await ext({ runId: fresh, accountId, page, rows: [] })).status).toBe(200);
+    expect(store!.accounts.getListRun(fresh)!.updatedAt > back).toBe(true);
+    expect(store!.accounts.abandonStaleListRuns({ now: new Date(Date.now() + 2 * 60_000) })).toEqual([]);
+    expect(store!.accounts.getListRun(fresh)).toMatchObject({ finishedAt: '', rowsSeen: 1 });
+    // every post is activity; an idle run anywhere is closed at server start (here: the repo call the server makes)
+    const r = store!.accounts.getListRun(fresh)!;
+    expect(r.updatedAt >= r.startedAt).toBe(true);
+    expect(store!.accounts.abandonStaleListRuns()).toEqual([]);
+    const closed = store!.accounts.abandonStaleListRuns({ now: new Date(Date.now() + 11 * 60_000) });
+    expect(closed.map((x) => x.id).sort()).toEqual([fresh, next]);
+    expect(closed.every((x) => x.stopReason === 'abandoned' && x.finishedAt)).toBe(true);
+  });
+
+  it('server start closes idle open list runs as `abandoned`', async () => {
+    const { base } = await setup();
+    const acc = store!.accounts.create({ name: 'Ledgerly' });
+    const run = store!.accounts.startListRun(acc.id, { pageKind: 'search', url: 'https://www.linkedin.com/search/results/people/?keywords=brand' });
+    const old = new Date(Date.now() - 30 * 60_000).toISOString();
+    store!.db.prepare('UPDATE account_list_runs SET updated_at = ?, started_at = ? WHERE id = ?').run(old, old, run.id);
+    expect(base).toBeTruthy();
+    await server!.close();
+    server = await startExplorerServer({
+      store: store!, dbPath: path.join(dir, 'network.db'), outDir: path.join(dir, 'outputs'), template: '# dossier', researchModel: 'sonnet', htmlTemplate: TEMPLATE,
+    });
+    expect(store!.accounts.getListRun(run.id)).toMatchObject({ stopReason: 'abandoned' });
+  });
+
   it('manages accounts and members from the page', async () => {
     const { base, token } = await setup();
     const created = await req('POST', `${base}/api/accounts`, { token, body: { name: 'Initech', domain: 'initech.example' } });

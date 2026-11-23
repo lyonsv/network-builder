@@ -244,6 +244,14 @@ const handlers = {
     await setStatus({ kind: r.kind, message: r.message });
     return { ...r, queued: true };
   },
+  // a batch from a list walk (company People tab / people search). Not queued: if it fails, the page pauses the walk
+  // and shows the error. No windows or tabs are opened for lists — the walk runs only in the tab you are looking at.
+  async captureList({ body }) {
+    const r = await call('/ext/capture-list', { method: 'POST', body });
+    if (r.ok) await setStatus({ kind: 'ok', message: 'Connected' });
+    else if (r.kind === 'offline' || r.kind === 'unpaired') await setStatus({ kind: r.kind, message: r.message });
+    return r;
+  },
   async flush() {
     return flush();
   },

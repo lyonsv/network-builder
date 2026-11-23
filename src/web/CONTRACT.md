@@ -416,3 +416,458 @@ export function startExplorerServer(opts: {
   tier rows, cards with role, connection, ↳ manager) + person drawer (role, department, level, reports to, notes,
   captured profile, remove). Selection bar gains "Add to account ▾" (uses `scopeToShown`). Person detail shows
   "Accounts" chips. The "Chrome extension…" dialog shows the extension folder, the pairing code (copy) and Reset.
+
+## v9 — Marketing org map
+
+Phase 1 (data model only; no UI, no AI). Types in `src/accounts/types.ts` (v9 block), identity in
+`src/accounts/identity.ts`, SQL in `src/db/accounts.ts`.
+
+- Migration (array index 5, comment "7"; `SCHEMA_VERSION` 6): `contacts += kind ('full'|'light', default 'full'),
+  sources_json (SourceRef[])`; `contact_aliases(alias_id PK, contact_id, url, added_at)`; `account_members += subfunction
+  ('' = automatic), team, entity, country (ISO alpha-2 or ''), responsibilities, noise ('' auto | 'none' | NoiseFlag),
+  sources_json, confidence REAL, reports_to_source ('' | user | inferred | web), reports_to_confidence REAL,
+  reports_to_reason, inference_json (MemberInference, written by the Phase 2 job)`; existing non-empty `reports_to` →
+  `reports_to_source = 'user'`. New tables, all `ON DELETE CASCADE` from `accounts`: `account_headcounts(id, account_id,
+  taken_at, source linkedin-people|linkedin-search|web|user, scope company|function|query, label, count, url,
+  evidence_url, quote, confidence, run_id)`, `account_list_runs(id uuid, account_id, page_kind people-tab|search, url,
+  keywords, started_at, finished_at, rows_seen, named, anonymous, stop_reason end|cap|cancelled|checkpoint|rate-limit|
+  login|stalled|error)`, `account_anon_rows(run_id → list_runs cascade, idx, headline, location; PK run+idx)`,
+  `account_org_facts(id, account_id, kind team|entity|reporting|leadership|hiring|headcount|other, text, evidence_url
+  (http(s), required), quote, confidence, found_at, run_id)`.
+- Vocabulary: `SUBFUNCTIONS` (+ `SUBFUNCTION_LABELS`), `SENIORITIES` (+ `SENIORITY_TIER` → TIERS), `NOISE_FLAGS`,
+  `SOURCE_KINDS`, `SourceRef {kind, at, url?, evidenceUrl?, quote?, runId?}` (deduped by kind + url + runId),
+  `ReportsToSource`, `Confidence01` (0..1; stated in a source 0.9, same team + seniority gap 0.6, title only 0.3;
+  `confidenceBadge`: high ≥ 0.75, medium ≥ 0.45, else low), `MemberInference`, `HeadcountSnapshot`, `ListRun`,
+  `AnonRow`, `OrgFact`, `LightContactInput {fullName, url?, title?, headline?, company?, location?, source}`.
+- `Contact += kind, sources` (a light contact has `captureCount` 0 and a minimal `CapturedProfile` with empty sections).
+  `AccountMemberRow +=` the new columns (`inference?` parsed). `AccountMember +=` `kind ('full'|'light'|'connection')`,
+  resolved `subfunction` (user → inference → `subfunctionFromTitle`, a stub returning 'other' until Phase 2),
+  `autoSubfunction`, `seniority` (inference → `seniorityFromTitle`, coarse from the tier until Phase 2), `noise`
+  (resolved; '' = clean, 'none' override → ''), `autoNoise` (false = set by hand, so `noise ''` + `autoNoise false` =
+  the user said "not noise"), `team/entity/country/responsibilities` (user → inference), `sources`,
+  `confidence`, `reportsToSource`, `reportsToConfidence`, `reportsToReason`, `inference?`.
+- Identity (`identity.ts`, pure): `profileRef(url) → {canonical, url, id, slug, kind: vanity|urn} | null` (URN = slug
+  `/^ACo[A-Za-z0-9_-]{8,}$/`, case-sensitive; `url` keeps a URN's case for navigation, `id = personId(lower-cased
+  canonical)`); `normalizePersonName` (pronouns, emoji, punctuation, `Dr./Prof./MBA/PhD` dropped; ß→ss, accents
+  stripped, ae/oe/ue → a/o/u; lower-case) + `sameName`; `titlesCompatible` (either blank, or ≥ 50% token overlap of
+  the shorter title after stopwords); `profileUrlsConflict` (both vanity or both URN, different ids → different people).
+- Repo: `resolveId` follows `contact_aliases` (used by `getContact`, `contacts`, `knownPerson`, `addMembers`,
+  `idForProfileUrl` after the people lookup). `upsertLightContacts(accountId, inputs)` (one tx) → `{added, updated,
+  merged, skipped: [{input, reason}], warnings: [{id, reason}]}`: (1) known URL (alias/connection) → that person, or
+  for a no-URL row the same name-only id; (2) else exactly one member of the account with `sameName` +
+  `titlesCompatible` and no URL conflict → reuse it (`merged`; a new URL becomes an alias); several → a new contact
+  plus a `possible duplicate` warning; (3) else a new `light` contact (`id = profileRef.id`, or `personId('', name,
+  accountId)` without a URL; title/company from `splitHeadline`). Existing contacts only get blanks filled; a
+  connection matched by URL is filed as-is (no contact row). `added` = new on this account, `updated` = already there
+  by URL/id. `saveContact(profile, source?)` sets `kind = 'full'` and merges sources. `mergeContacts(lightId, intoId)`
+  (only from a light contact) → `{warnings}`: memberships move (both on an account → `into`'s non-empty values win;
+  reporting line: `into`'s when its source is `user` (even if cleared), else a `user` line on the light row, else
+  whichever has one; sources unioned), `reports_to` pointers follow, self-lines cleared, a loop is broken at a non-user
+  edge (if every edge is the user's, the first is cleared and a warning returned), aliases written, light row deleted.
+  `ingestCapture` folds exactly one same-name light member (no URL conflict, `titlesCompatible` titles) into the
+  capture and records `SourceRef{kind:'extension-profile'}` on contact and member; same-name rows with conflicting
+  titles (or several matches) are not merged and come back in `CaptureResult.warnings`.
+- Reporting provenance: any `reportsTo` set via `updateMember`/`addMembers` (incl. clearing it) → `reports_to_source =
+  'user'`, confidence 1, reason ''. `reportsToSource: 'auto'` (not combinable with `reportsTo`) hands it back to
+  automatic: clears the line, source, confidence and reason. `updateMember` resolves aliases for the member id and
+  `reportsTo`, so a merged light id still works. `confirmReportsTo` flips inferred|web → user. `applyInferredReportsTo(accountId, id,
+  managerId, conf, reason, 'inferred'|'web')` → false when the line is the user's; same-account / self / cycle checks
+  as manual edits. `removeMember` clears lines (and their provenance) that pointed at the removed person.
+- Repo extras: `addHeadcount/headcounts`, `startListRun/updateListRun/getListRun/listRuns`, `addAnonRows` (idempotent by
+  run+idx, returns new rows) / `anonRows`, `addOrgFacts` (skips exact kind+text+evidence_url duplicates) / `orgFacts`,
+  `aliasesOf`, `addMemberSources`.
+- Member validation (`MemberPatch`): `subfunction` ∈ SUBFUNCTIONS or '', `team` ≤ 120, `entity` ≤ 200, `country`
+  two letters (upper-cased) or '', `responsibilities` ≤ 1000, `noise` '' | 'none' | NoiseFlag.
+- `AccountSummary.captured` now counts only members with a full captured profile; new `light` counts members known
+  only from a list row / added by hand.
+- Page API (session token): `PUT /api/accounts/:id/members/:pid` also accepts `subfunction, team, entity, country,
+  responsibilities, noise` (strings), `reportsToSource: 'auto'` (reset to automatic; anything else 400) and
+  `confirmReportsTo: true` (400 when there is no line). New `POST
+  /api/accounts/:id/contacts {contacts: LightContactInput-ish[] (1–500; fullName required ≤ 200; url, title, headline,
+  company, location optional strings, length-capped), role?}` → `{added, updated, merged, skipped, warnings, view,
+  accounts}`; the source is forced to `{kind:'manual'}`; `role` applies to newly added members only. 400 on bad input,
+  404 unknown account, 401 without token. Light contacts live only in `contacts` — never in `people`, lenses, the
+  People view, network search or exports.
+
+### v9 Phase 2 — classifier fixes + Haiku org inference
+
+- `src/accounts/classify.ts` (deterministic, EN + DE): department rules now put HR / employer-branding marketing
+  ("HR Marketing", "Employer Branding", "Personalmarketing") → `people`, and marketing hybrids ("Partner Marketing",
+  "Marketing Technology Lead", "Demand Generation", "Event Manager", DE `Marketing / Kommunikation /
+  Unternehmenskommunikation / Pressesprecher(in) / Produktmarketing / Markenführung / Veranstaltung / Kampagnen`) →
+  `marketing`, before IT / data / engineering / sales; "Geschäftsführer(in)" → `executive`. "Growth Engineer" stays
+  engineering. "Partner Marketing Manager" / "Product Owner" are no longer read as firm partners / owners.
+  `tierFromTitle` adds DE words: Geschäftsführer(in)/Vorstand → exec; Leiter(in)/Leitung/Abteilungs-/Bereichsleiter →
+  director; Teamleiter(in)/Gruppenleiter(in)/Teamlead → manager; Referent(in)/Spezialist(in)/Sachbearbeiter(in),
+  Werkstudent(in)/Praktikant(in)/Trainee/Azubi/Intern and "Junior …" → ic.
+  New: `seniorityFromTitle` (fine ladder: svp vs vp, senior-director vs director vs head, senior-manager vs manager vs
+  lead, senior-ic, junior, intern; Bereichsleiter → senior-director, Leiter(in) → director, Teamleiter(in) → manager;
+  always consistent with `SENIORITY_TIER[tierFromTitle]`), `subfunctionFromTitle` ('other' for non-marketing titles;
+  CMO and senior generic marketing heads → `leadership`), `noiseFromTitle(title)` → `hr-marketing`,
+  `sales-hybrid` ("Sales & Marketing", "Marketing und Vertrieb") or '' (vendor-funded moved to a tag in Phase 2b).
+  Also: "Telekommunikation" is not comms (`(?<!tele)kommunikation`); bare "event(s)" no longer makes a title marketing
+  (only "Event Manager", "Event Marketing", "Eventmanager(in)"); "Presse-", "Öffentlichkeitsarbeit" → comms-pr;
+  "manager(in)" matches inside DE compounds ("Kommunikationsmanagerin" → manager); "Assistant to the CMO" / "Assistenz
+  der Geschäftsführung" are not exec; "lead" in "lead generation / lead gen / lead management …" is not a seniority word. `not-marketing` / `stale` come only from the AI or the user.
+- View: `AccountMember.noise` = user override → inference (even '' = clean) → rules (see Phase 2b).
+- `src/llm/org-infer.ts` (Haiku, `claude -p` with `tools: []` → `--strict-mcp-config --tools ''`; never MCP):
+  `buildOrgClassifyPrompt(account, batch)` (people as `p0..pN`, **no names**: title, headline, location, company,
+  entity hint, ≤ 600 chars of about + current role description) → per id `{subfunction, seniority, noise, team, entity,
+  country, responsibilities (≤ 240, only from the given text), confidence, reason}` (`ORG_CLASSIFY_SCHEMA`);
+  `buildOrgReportingPrompt(account, roster, todo)` over ≤ 400 rows (most senior kept; `{id, title, seniority,
+  subfunction, entity?, country?, location?, reportsTo?}` where `reportsTo` marks a confirmed user/web line) → `{edges:
+  [{id, managerId|null, confidence, reason}]}` (`ORG_REPORTING_SCHEMA`). `normalizeInference` (bad enums → other /
+  unknown / '', country two letters or '', confidence clamped). `suggestManagersRuleBased(members, targets?)` (pure):
+  most senior in the same (entity, sub-function) 0.6 (0.5 if one step apart) → most senior marketing person in the
+  entity 0.45 → overall head 0.3; the manager is always strictly more senior. `cleanEdges` drops unknown ids, self
+  lines, people not asked for, and loops (against confirmed lines; the more confident edge wins).
+  `runOrgInference({account, members, ids?, model='haiku', batchSize=40, concurrency=2, signal, costs, onProgress})` →
+  `{classified: Map<id, MemberInference>, edges: OrgEdge[] ({id, managerId|null, confidence, reason, source:
+  'llm'|'rules'}), costUsd (incl. failed attempts), costIncomplete, failedBatches, reportingFallback}`; missing ids are
+  retried once; a failed batch leaves those people's earlier inference; a failed reporting call (and people beyond the
+  400-row roster) fall back to the rules. People with a noise flag (the user's, else this run's inference, else the
+  title rule) are left out of the reporting step entirely: no manager, and nobody reports to them. The prompt prefers a
+  manager in the same entity, then the same sub-function, then the same country, then the head of marketing.
+  `onProgress` counts people throughout (classify: people done; reporting: 0 then all). Abort → AbortError carrying the
+  spend so far. `ORG_INFER_USD_PER_100 = 0.06`, `ORG_INFER_MIN_USD = 0.005` (per run), `estimateOrgInferUsd(n) =
+  max(0.005, n/100 × 0.06)` (0 for n = 0).
+- Repo: `applyInference(accountId, [id, MemberInference][])` writes `inference_json` only → count.
+  `replaceInferredReportsTo(accountId, ids, edges)` (one tx) clears those people's `inferred` lines, then applies edges
+  as `inferred` via `applyInferredReportsTo`; `user` and `web` lines are never touched; invalid edges are skipped →
+  `{applied, skipped}`.
+- Costs: `CostStage += 'org'`; `ExplorerCosts.org?` (in `total`); `DbStats.spend.org`.
+  `ExplorerState.estimates.orgInferUsdPer100`.
+- Queue: `JobQueueState.orgJob?: {accountId, kind: 'infer'|'research', phase ('classify'|'reporting' for infer), done,
+  total (people, start to finish), pausedUntil?, pausedManual?} | null` (SSE `queue` events while it runs).
+- Page API (session token; paid — only ever started by these POSTs, nothing auto-runs, nothing in MCP):
+  `POST /api/accounts/:id/org/infer {ids?: string[]}` (default: every member; ids must be on the account, aliases
+  resolved) → `{started, estimateUsd, queue}`; one org job at a time (409); 404 unknown account; 400 bad / foreign ids or
+  an empty account. On finish: inference stored, suggested lines replaced, cost added to the ledger as `org`, `accounts`
+  event with notice "Classified N people; M reporting lines suggested". Errors → `notice` (error); spend still recorded.
+  `POST /api/accounts/:id/org/cancel {}` → `{cancelled, queue}` (aborts this account's running job; its results are
+  discarded, the spend is recorded). Server option `orgInferFn` (tests), `orgModel` (default haiku).
+
+### v9 Phase 2b — vendor-funded is a tag; `other-employer` noise
+
+User decision (2026-11-23): only people who work for the account (or one of its entities) are in the org; among them,
+vendor-funded roles are part of the org.
+- Vocabulary: `NOISE_FLAGS += 'other-employer'` (appended; `vendor-funded` stays in the list so stored values and
+  `PUT …/members/:pid {noise: 'vendor-funded'}` remain valid). `OrgNoise = Exclude<NoiseFlag, 'vendor-funded'>`,
+  `ORG_NOISE_FLAGS` = the flags that exclude someone from the org. `MemberInference.vendorFunded?: boolean`.
+- `classify.ts`: `vendorFundedFromTitle(title, company?)` → boolean (the old vendor-funded patterns: an explicit
+  "funded by / sponsored by / vendor-funded" phrase, or "… marketing … for|@|– <Vendor> Inc|Corp|GmbH|…" when a company
+  is known and is not that vendor). `isOtherEmployer(company, account, entities?, companyUrl?, companyPages?)` → true only when the
+  current company is CLEARLY not the account. Names compared (`employerNames`, as `companyCore` = normalised, legal and
+  generic words such as group / gruppe / holding / international / global / se / ag / gmbh dropped): the account name,
+  aliases, domain stem, LinkedIn slug, the entities the user set on members, and every LinkedIn company page already
+  captured onto the account (`accountCompanyPages`: people-tab list-walk URLs). `sameEmployer` matches when equal
+  ignoring spaces, a 2-letter name is the whole first word ("HP" ~ "HP Deutschland GmbH"), a ≥ 3-char name appears as
+  whole words of the other, or the two share a prefix of ≥ 5 chars ("LedgerlyPay", slug "ledgerlyag"); the company
+  text and its `/company/` slug are both tried. A `companyUrl` equal to the account's page or a captured page counts as
+  the account. A blank or vague company ("Self-employed …", "Freelance …", "Selbstständig/Selbständig",
+  "Confidential", …) or an account with nothing to compare is never other-employer.
+- View (`resolveOrgPlacement`, used by `buildAccountView`): `AccountMember.noise: OrgNoise | ''` (never
+  `vendor-funded`) = user override ('none' → '') → inference (even '' = clean) → `other-employer` if `isOtherEmployer`,
+  else `noiseFromTitle`. The other-employer rule only looks at the company of a captured **full** profile's current
+  experience entry (+ its `companyUrl`): never a company guessed from a headline, a list-walk row, a light contact or a
+  connection's headline profile (being in the company's own list is stronger evidence). New
+  `AccountMember.vendorFunded: boolean` (tag) = user override `vendor-funded` → inference (`vendorFunded`, or a pre-2b
+  `noise: 'vendor-funded'`) → `vendorFundedFromTitle(title, display company)`; false whenever the resolved noise is not
+  ''. Tagged people stay in `members` and every headcount; their `subfunction` = the user's, else `partner-marketing`.
+  **Stored `noise = 'vendor-funded'`** are kept as stored, no migration. A hand-set one always reads as noise '' + the
+  tag + `partner-marketing` (`autoNoise false`) — user intent wins over the heuristic, whatever the company. An older
+  `inference_json` holding it reads the same way, except when the captured current employer is clearly another
+  company (then `other-employer`). Setting `noise` to '' resets a member to automatic.
+- Org inference: the classify prompt lists the account's known entities, asks for `noise` ∈ '' | `ORG_NOISE_FLAGS`
+  (other-employer = current company clearly not this company or its entities; blank/vague company is not) and a new
+  `vendorFunded` boolean (works here, role funded by / dedicated to a vendor → in the org, noise '',
+  partner-marketing). `ORG_CLASSIFY_SCHEMA` requires `vendorFunded`; its `noise` enum has no `vendor-funded`.
+  `normalizeInference` reads a model's `noise: 'vendor-funded'` as the tag, forces `partner-marketing` when tagged, and
+  never tags someone with a noise flag. The reporting step skips noise-flagged people (incl. other-employer); tagged
+  people are in the roster and get managers. The server passes `account.entities` = the members' user-set entities plus the captured company pages.
+
+### v9 Phase 3 — extension list walk + `POST /ext/capture-list`
+
+- Extension 0.3.0 (no new permissions; `content_scripts.js = [list-reader.js, content.js]`). On
+  `/company/<slug>/people/` and `/search/results/people/` a floating **⇣ Map to Network Builder** button opens a panel
+  (account picker preselected by `linkedinUrl`, cap 300 default / 500 max, keywords from the URL, a ToS warning).
+  Only a trusted click on **Start mapping** starts a walk (`startWalk` has exactly one call site; a `starting` flag set
+  before the first await blocks double starts). The walk runs in the
+  visible tab only: pauses while `document.hidden`; 2.5 s + 0–1.5 s jitter between loads, +1.5 s per load that brought
+  nothing (≤ 8 s), 4 such loads in a row → `end` (or `stalled` if LinkedIn still shows Show more / Next); search pages
+  via the visible Next button, one per 4–7 s. Stops at the cap, on Cancel / closing the panel / leaving the page /
+  a change of the URL's search params other than `page` (new search, keywords or filters) (`cancelled`), and before every step on a checkpoint / captcha / sign-in / "unusual activity" / limit page
+  (`checkpoint`, `login`, `rate-limit`) or zero results (`end`). Daily cap 1,000 rows per local date in
+  `chrome.storage.local` `nb.listRows.<yyyy-mm-dd>`. No `chrome.windows` / `chrome.tabs` for lists; no queue (a failed
+  post pauses the walk with Retry).
+- `extension/list-reader.js` (pure DOM, `globalThis.NBList`; tested with happy-dom): `pageKind`, `companySlug`,
+  `keywordsOf`, `resultCards` (known LinkedIn selectors, else outermost `main li` / `[role=listitem]` with exactly one
+  `/in/` link or a "LinkedIn Member" first line), `readCard → {lines, href}` (visible text only: skips visually-hidden / `[hidden]` /
+  inline `display:none` / buttons / inputs / media; first `/in/<slug>` link, query stripped), `headerText`,
+  `facetsText` ("What they do" module), `stopReason` (URL, captcha iframes, then the visible text — hidden parts and
+  `code`/`script`/`style` skipped, no truncation — of banner / toast / dialog / alert / `aria-live` containers and of
+  `main` minus the result cards, so a headline can't stop a walk and a late banner can't be missed; the walk scans at
+  most once a second and on every URL change), `noResults`, `loadMoreButton` (label must say "more results" /
+  "weitere Ergebnisse anzeigen", never an insight module's "Show more"), `nextButton`.
+- `src/accounts/list-capture.ts` (pure): `parseListCard({lines, href}) → {fullName, url, headline, title, company,
+  location, degree, anonymous}` (degree / mutual-connection / button / "View …'s profile" lines dropped, pronouns
+  stripped from the name, "at|@|bei" split, URN case kept; company = a `Current:`/`Aktuell:` line → the headline → the
+  account's name when `pageUrl` filters on `currentCompany` (opts `{pageUrl, accountName}`); a `Past:`/`Früher:` line is
+  never used; `cleanCompany` cuts at " - ", " | ", " · ", ", ", " @", " (" and emoji and drops text truncated with "..."
+  (the cut-off part is returned as `hint`, not stored); anonymous = no `/in/`
+  link or named "LinkedIn Member" → name and URL blanked); `parsePeopleHeader(text) → number | null` (EN/DE "associated
+  members|members|results|employees|Mitglieder|Ergebnisse…", separators `,` `.` space NBSP narrow-NBSP, `K`/`M`);
+  `parseFunctionFacets(text) → {label, count}[]` (only the "What they do" block; "412 Marketing", "Marketing 412",
+  "Marketing (412)" or alternating lines; ≤ 50, unique labels).
+- `GET /ext/accounts` items gain `linkedinUrl`.
+- `POST /ext/capture-list` (capture token + extension origin, unchanged model) body `{runId (UUID, chosen by the
+  extension), accountId? | accountName?, page: {kind: 'people-tab'|'search', url (https linkedin.com), keywords?,
+  companyUrl?}, rows: [{idx (0…99,999, position in the walk), lines: string[] (≤ 40 × ≤ 1,000 chars), href?}] (≤ 100,
+  may be empty), header? (≤ 2,000), facets? (≤ 20,000), final?: boolean, stopReason?: ListStopReason}` →
+  `{account: {id, name}, createdAccount, run: ListRun, added, updated, merged, skipped, anonymous (new anonymous rows),
+  totalRows}`. Rules: an existing run keeps its account (other `accountId` → 409) and a finished run refuses posts
+  (409); a new run resolves accountId (404 if gone) → name/alias → company URL match → creates the named account
+  (with that LinkedIn page) → else 400. A run holds ≤ 1,000 rows (`rowsSeen` ≥ 1,000 → 409; rows with idx ≥ 1,000
+  are dropped). Named rows → `upsertLightContacts` with `SourceRef{kind:'extension-list', url: run.url, runId}`;
+  anonymous rows → `addAnonRows` (idempotent by idx). `header` → one headcount row (`source` linkedin-people |
+  linkedin-search, `scope` company only for a People tab URL with no result-set filters, else query; `label` = the
+  keywords when they are the only filter, else `name: value · …` of the filters ('' for an unfiltered search). Filters
+  = the allow-list `LIST_FILTER_PARAMS` (`listFilters(url)`: keywords, currentCompany, pastCompany, company, geoUrn,
+  network, title, industry, schoolFilter, profileLanguage, serviceCategory, firstName, lastName, facet* …); page,
+  origin, spellCorrectionEnabled, prioritizeMessage and other UI flags are ignored. The extension's "search changed"
+  guard (`NBList.filterKey`) compares the same allow-list, so paging never ends a run;
+  quote = header text, confidence 0.9); `facets` (People tab only) → `scope:'function'` rows; both replace this run's
+  earlier rows of that scope (`replaceRunHeadcounts`), but a header or facets text that parses to nothing (e.g. on a
+  final post from a changed page) leaves them as they are. The run's `rowsSeen` = max idx + 1, `named` = distinct account members whose sources carry
+  the run id, `anonymous` = its anonymous rows; `final` sets `finishedAt` and `stopReason` (default `end`) and emits
+  `accounts` with notice "Mapped N people + M anonymous from a LinkedIn list to <account> (stopped: <reason>)"; other
+  batches emit `accounts` without a notice. Re-posting a batch adds nothing.
+- Repo: `startListRun(…, {id?})` (UUID; duplicate → error), `runMemberCount(accountId, runId)`, `anonCount(runId)`,
+  `replaceRunHeadcounts(accountId, runId, scopes, rows)` (one tx). Server constants `LIST_ROWS_PER_REQUEST = 100`,
+  `LIST_ROWS_PER_RUN = 1000`.
+
+### v9 Phase 4 — web org research (`claude -p` + WebSearch/WebFetch)
+
+- `src/llm/org-research.ts`. Passes (`ORG_RESEARCH_PASS_IDS`, always run in this order, sequentially):
+  `seed` (Company site — leadership/management pages per country site, about/locations, imprint/legal entities,
+  marketing & comms contacts; **sonnet**, ≤ 8 searches / 6 fetches), `press` (newsroom, press contacts, appointments),
+  `jobs` (careers + job ads: team names, "reports to / berichtet an", hiring entity + location, team size), `events`
+  (speaker pages, podcasts, awards, agency case studies), `headcount` (employee counts, annual report, team-size
+  statements) — the last four **haiku**, ≤ 4–5 searches / 2–3 fetches. Each pass has `minSearches` (seed 5, press /
+  jobs / events 3, headcount 2): the prompt asks for that many DISTINCT searches unless results are clearly exhausted.
+  Seed and press carry a checklist of the leadership layer below the C-level (Head of / Leiter(in) Marketing, Brand,
+  Communications / PR, Digital / E-Commerce, CRM, Product / Trade Marketing, country leads) to search for before stopping. Every pass calls `runClaude` with `tools:
+  ['WebSearch','WebFetch']` (→ `--strict-mcp-config --allowedTools WebSearch WebFetch --tools WebSearch,WebFetch`, no MCP,
+  never `--bare`), `retries: 1`, schema `ORG_RESEARCH_SCHEMA`.
+- `buildOrgResearchPrompt(account, pass, known, today)`: name, aliases, domain, the LinkedIn company URL as context only,
+  known entities / countries, people already on the account (≤ 80, marketing + most senior first: "confirm, don't
+  repeat"), the pass focus and budget. Rules: never search or cite linkedin.com; `site:` is ignored (put the domain /
+  company in the query as words); German-speaking accounts (`isDach`: .de/.at/.ch domain, a DACH legal form in
+  name/aliases/entities, DE/AT/CH countries, DACH places in member locations) also search in German ("Leitung
+  Marketing", "Unternehmenskommunikation", "Pressekontakt", "Stellenanzeige … berichtet an", "Impressum
+  Geschäftsführer"); record legal entity + ISO country per person/fact (group marketing may sit in a service entity);
+  current people only; never invent URLs/names/numbers; when the company's own site confirms a person first seen in a
+  third-party article, cite the company's page.
+- Output (`ORG_RESEARCH_SCHEMA`): `{people: [{name, title, entity, country, subfunction ('' | SUBFUNCTIONS), evidenceUrl,
+  quote, date}], facts: [{kind (ORG_FACT_KINDS), text, entity, country, subject, manager, evidenceUrl, quote,
+  confidence}], headcounts: [{label, scope: 'company'|'function', count, evidenceUrl, quote}], searchesRun, rateLimited}`.
+- **Evidence rule** (`normalizeOrgResearch`): an item is dropped unless `evidenceUrl` is http(s), ≤ 2,000 chars and not on
+  linkedin.com / *.linkedin.com / lnkd.in, and `quote` is non-empty (clipped to 300). People also need a plausible
+  personal name (≥ 2 words, no digits/@/URL; honorifics stripped repeatedly — "Frau Dr. Prof. X" → "X"; rejected when a
+  WHOLE word is a team / mailbox word such as team, press(e), Pressestelle, Pressebüro, marketing, Marketingteam, office,
+  kontakt, contact, Redaktion, Abteilung, (Unternehmens)kommunikation, communications, info, newsroom, media — so
+  surnames like "Presser" or "Teamann" stay); duplicate names in one answer are kept once, preferring evidence on the
+  account's domain (`normalizeOrgResearch(raw, domain)`). Bad enums → '' (sub-function) / 'other' (fact kind); country two letters upper-case
+  or ''; fact confidence clamped to 0–0.9 (default 0.5); `subject`/`manager` only on `reporting` facts; headcounts need
+  a whole count 1–10,000,000. `dropped` counts discarded items.
+- `runOrgResearchPass({account, pass, known, model?, signal?, timeoutMs?, today?})` → `{pass, status: 'ok' |
+  'rate_limited' | 'error', data?, error?, model, costUsd (incl. failed attempts), costIncomplete?, durationMs}`. Never
+  rejects except AbortError (carries spend). Rate-limited = CLI error text matching `CLI_RATE_LIMIT_RE` (now exported
+  from dossier.ts), or the model set `rateLimited` and returned nothing (or ran no searches).
+- `webPersonConfidence(person, account, pass, today)`: 0.9 when the evidence is on the account's own domain or a
+  subdomain (`isOwnDomain`); 0.6 from the press pass; 0.4 for other third-party pages and for sources dated > 24
+  months ago. Member confidence only goes up, so an own-site confirmation lifts a person first found in an article.
+- Estimates (calibrated on a live run: seed $0.135, Haiku press $0.078): per pass `ORG_RESEARCH_PASSES[p].usd` (seed
+  $0.10–0.60, others $0.05–0.20 each); `ORG_RESEARCH_USD_ESTIMATE = {min: 0.3, max: 1.4}` = all five; `estimateOrgResearchUsd(passes)`.
+  `ExplorerState.estimates.orgResearchUsd` and `.orgResearchPassUsd` (by pass id).
+- Repo: `applyWebFindings(accountId, id, {entity?, country?, subfunction?, confidence?, at?})` → false if not a member.
+  Fills only **blank** `entity` / `country` / `subfunction` of the stored inference (`model: 'web'` when it creates one);
+  user columns are never written (they win at view time anyway); member `confidence` only goes up. Note: a later org
+  inference run replaces `inference_json`, but its prompt sees the resolved entity as a hint.
+- Page API (session token; paid — only these POSTs start it; nothing in MCP):
+  `POST /api/accounts/:id/org/research {passes?: PassId[]}` (default all; unknown / empty / non-array → 400; sorted to
+  the canonical order, deduped) → `{started: n, passes, estimate: {min, max}, queue}`; 404 unknown account; 409 while any
+  org job (infer or research) runs. `orgJob = {accountId, kind: 'research', phase: <pass id>, done: passes finished,
+  total: passes, pausedUntil, pausedManual}`. The seed pass runs on `researchModel`, the rest on `orgModel` (haiku).
+  Each pass gets a fresh `known` (so later passes see earlier findings). Spend → ledger stage `org` after every call
+  (`markIncomplete` when unknown).
+  - Rate-limited pass: wait `backoffMs` (default 1m, 2m, 5m, 10m; `pausedUntil` set, `notice` warn) and retry the **same**
+    pass; after the schedule is used up `pausedManual: true` + notice "… Click Resume …" and the job waits.
+    `POST /api/accounts/:id/org/resume {}` → `{resumed, queue}` ends the wait (manual or timed) and resets the backoff;
+    `resumed: false` when this account's research job isn't waiting. Any Resume (timed or manual wait) and any
+    successful pass reset the backoff to its first step.
+  - Failed pass (`error`) → notice error, the job continues with the next pass.
+  - Results are written **after each pass** (an `accounts` event without notice): people →
+    `upsertLightContacts([{fullName, title, company: entity || account name, source: {kind:'web', at, url: evidenceUrl,
+    evidenceUrl, quote}}], {matchNameOnly: true})` (no LinkedIn URL; when exactly ONE member of the account has that
+    name it is the person whatever the titles say; several same-name members → a new contact + a "possible duplicate"
+    warning, listed in the done notice; re-runs add nothing; web sources dedupe by evidence URL) then `applyWebFindings` with `webPersonConfidence`; facts → `addOrgFacts` (entity /
+    country appended to the text as "(entity, CC)" when not already in it; `runId` = `web-<hex>` per job; exact
+    duplicates skipped); headcounts → `addHeadcount({source:'web', scope, label, count, url = evidenceUrl, evidenceUrl,
+    quote, confidence: 0.9 on the account's own domain else 0.6})`, skipped when a web headcount with the same label +
+    count + evidence URL exists; `reporting` facts whose `subject` and `manager` each match exactly one member by name
+    and fact confidence ≥ `ORG_RESEARCH_MIN_EDGE_CONFIDENCE` (0.6) → `applyInferredReportsTo(…, min(confidence, 0.9),
+    'web: “quote” url', 'web')` — never over a `user` line (it returns false), loops
+    rejected. A bad item is skipped, never the pass.
+  - Done → `accounts` event with notice "Web research done — N new people; M confirmed; F facts; H headcounts; E
+    reporting lines; D items without evidence dropped; possible duplicates to check: names…; failed: …". `POST …/org/cancel` aborts the running call or wait:
+    notice "Web research cancelled — findings from finished passes are kept." (they are). Deleting the account mid-run
+    stops the job quietly. Server option `orgResearchFn` (tests).
+- `titlesCompatible` (identity.ts) now canonicalises title phrases before comparing: chief … officer ↔ CEO / CMO / CCO /
+  CDO / CRO / COO / CFO / CTO, vice president ↔ VP (SVP, EVP), public relations ↔ PR, managing director /
+  Geschäftsführer(in) ↔ MD, Leiter(in) / Leitung ↔ head, (Unternehmens)kommunikation ↔ (corporate) communications,
+  Marke ↔ brand.
+
+### v9 Phase 5 — marketing org map (`src/accounts/org.ts`) + "Marketing org" view
+
+- `buildOrgMap(view: AccountView, src: OrgMapSources) → OrgMap` (pure; `orgMapSources(repo, accountId)` loads
+  `{headcounts, runs (newest first), facts}`; MCP reuses both in Phase 6). Types (`OrgMap`, `OrgNode`) in
+  `src/accounts/types.ts`.
+  - **Scope**: a member is in scope when the user set department `marketing`; else (automatic department) when it is
+    `marketing`, or one of their sources is `web` or an `extension-list` run that `isMarketingRun` (keywords / URL
+    filters match marketing, communication, Kommunikation, PR, Presse, brand, Marke, Werbung, advertising, campaign,
+    Kampagne). A department set by hand to anything else is out. In scope + a noise flag → `flagged: [{id, noise}]`
+    (never `vendor-funded`: tagged people stay in `members` and every count); the rest → `members` (sorted most senior
+    first).
+  - **Tree**: each org member hangs under `reportsTo`; a manager outside the org (e.g. the CEO, or a flagged person)
+    becomes a `context: true` node and its own chain is followed up. `edge = {source (reportsToSource, '' → 'user'),
+    confidence, reason}`. `roots` = nodes with reports and no manager; children sorted by seniority then name.
+  - **unplaced**: org members with no manager in the tree and no reports, grouped `{subfunction, entity, ids}`
+    (SUBFUNCTIONS order, blank entity last).
+  - **headcount**: `captured {total, named, light, full, connections, vendorFunded, bySubfunction, bySeniority}` over
+    `members`; `linkedin {company?, marketing?, functions, queries}`: company / function counts are `HeadcountTotal
+    {label, count, takenAt, pages}` = the latest snapshot of each distinct page (`snapshotPage`: `company/<slug>`,
+    else host + path) for that label, summed over pages (entity pages add up; re-reading a page replaces it); queries
+    are the latest snapshot per source + page + label — never summed. `queries` are search / filtered-list result
+    counts (query-scoped, not the org). `marketing` = the "What they do" label `Marketing` (else one containing it).
+    `anonymous` = sum over distinct lists (`runListKey`: page kind + host/path + `listFilters`, so paging / UI flags
+    don't make a new list) of the latest run's anonymous count. `web` = latest web snapshot per scope + label.
+    `coverage = members / marketing.count` (`coverageBasis 'function'`), else `/ latest marketing-query count`
+    (`'query'`), else absent; above 1 it is capped at 1 with `coverageOver: true` (the page shows "100%+").
+  - `entities [{entity, country, n}]` (org members with either set), `facts` (most confident first), `runs` (≤ 10).
+- Server: every page-facing AccountView (`GET /api/accounts/:id` and the `view` in all account write responses) now
+  carries `org: OrgMap`. SSE `accounts` events carry `costs`; the `queue` event sent when an org job ends carries
+  `costs` (so the spend chip catches failed / cancelled runs). No new endpoints.
+- Page (`explorer.html`, live mode only — snapshot shows no accounts): the org card has a switch **All departments |
+  Marketing org** (localStorage `nb.orgView`; "All departments" unchanged). Marketing org view, rendered only from
+  `view.org` (filters hide; the tree is never rebuilt client-side):
+  1. Actions: "✦ Classify & suggest reporting lines (≈ $X)" (X = max(0.005, members/100 × `orgInferUsdPer100`)) and
+     "🌐 Research on the web (≈ $min–max)" — each opens a confirm dialog with the estimate, then POSTs `…/org/infer` /
+     `…/org/research`; disabled while any `queue.orgJob` runs. Progress line from `queue.orgJob` (classify n/total,
+     reporting; research pass label (i/total)), "paused until …" / paused (rate limit) with **Resume now** (`…/org/resume`)
+     and **Cancel** (`…/org/cancel`); the header shows the same job chip (Resume when `pausedManual`). "Load from
+     LinkedIn ↗" opens the unfiltered `<linkedinUrl>/people/` in a new tab (Phase 6; hint: Capture headcount only there, then search "marketing" and walk the results) (the walk is started there, from the
+     extension's button — never from this page). The spend chip lists `org`.
+  2. Headcount strip: LinkedIn "What they do → Marketing", query counts (labelled list / search, query-scoped), captured
+     (full / light / connections / vendor-funded), anonymous, flagged, web hints, coverage — each with a date, source
+     link and tooltip.
+  3. Sub-function × seniority table with inline bars (click a cell or row total = filter; click again = clear).
+  4. Filters (memory only): sub-function chips, seniority, entity/country (+ "No entity known"), source kind, minimum
+     confidence (member confidence and suggested-line confidence; unassessed passes), text search. Non-matching managers
+     of matching people stay visible, dimmed. No bulk actions in this view (nothing acts on hidden people).
+  5. Tree: indented, collapsible; cards show name, title, sub-function, seniority, entity · country, vendor-funded tag,
+     role, connection, `light ↗` (open on LinkedIn to capture the full profile), confidence badge, source icons.
+     `inferred` / `web` edges are dashed with a confidence badge + reason and **✓ Confirm** (`{confirmReportsTo:true}`),
+     **Change…** (`{reportsTo}`; "— no manager (set by you)" = `''`), **↺** (`{reportsToSource:'auto'}`); errors (e.g. a
+     reporting loop) show inline on the card. "No known manager" groups by sub-function → entity with **Set manager…**
+     and **✕ Not marketing** (`{noise:'not-marketing'}`). Flagged group collapsed at the bottom with **In the org**
+     (`{noise:'none'}`) and **↺ Automatic** (`{noise:''}`) for hand-set flags.
+  6. Web structure facts (kind, text, confidence, evidence link with quote tooltip) and the last LinkedIn list walks.
+- Drawer: reporting-line provenance under "Reports to" (set by you / suggested by AI / from web research, confidence,
+  reason, ✓ Confirm, ↺ Reset to automatic) and a "Marketing org" section: sub-function (auto shown as "Auto: …"),
+  seniority (read-only), "In the org?" (auto / not noise / vendor-funded tag / each excluding flag), team, country,
+  legal entity, responsibilities, member confidence + AI reason, and the sources list (kind, date, evidence link,
+  quote).
+
+#### Phase 5 review fixes
+
+- Scope: `isMarketingRun` also matches LinkedIn's Marketing function filter (`facetCurrentFunction` / `functionFacet`
+  containing id `15`); `brand` only as a word or marketing compound (not "Brandschutz", "Brandenburg").
+- Page performance: member lookups go through a Map (rebuilt per view); the per-card manager pickers are filled only
+  on focus / mousedown / keydown (one cached sorted list per view); descendant counts are cached.
+- Confidence filter: "High only (assessed)" hides people with no confidence; "Medium or better" shows them; the filter
+  row shows "not assessed: N (hidden|shown)".
+- Classifier: support clauses ("Assistant / Executive Assistant to …", "Assistenz der GF", "Referent(in) der / für die
+  Geschäftsführung", "Office Manager(in) der …") are dropped when the title names its own role ("Marketing Managerin &
+  Referentin der Geschäftsführung" → marketing / manager); alone they are ICs. Vendor-funded also when the title ENDS
+  with another company + legal suffix ("Portfolio Marketing Manager Globex Inc."); a member with no company is
+  compared against the account name (they are on its list).
+- List rows: `cleanPersonName` strips pronouns, emoji and trailing LinkedIn badges ("is hiring", "stellt (gerade)
+  ein", "Premium", "Verified/Verifiziert", "Open to work", "• 2nd/3rd+") from names.
+- `upsertLightContacts`: a `light` contact seen again in an `extension-list` row takes the newest non-empty name /
+  title / headline / company / location (contact row + its minimal profile). Full captures, connections, member
+  fields and web / manual rows are untouched (blanks only, as before).
+- Org inference: `ORG_MIN_EDGE_CONFIDENCE = 0.45` — weaker suggestions are not stored as lines (also enforced by the
+  server); they stay in `MemberInference.possibleManager {id, confidence, reason}` and the drawer shows "possible
+  manager: X (low)" with a button to set it. The reporting prompt says regional / entity / country leads manage only
+  their own region / entity / country and that people stay unplaced when their real head isn't captured. Rules:
+  entity-based suggestions need a known entity, and no rule suggests a manager in another known country.
+- Extension 0.3.1: People tab panel button **Capture headcount only** (trusted click; reads the visible "N associated
+  members" and the visible "What they do" counts — live (2026-11) only the top 5 functions, no "Show more", and the
+  job-function filter does not filter the page, so Marketing may be absent; on older layouts with a "Show more" it is
+  clicked at most once as a fallback (`NBList.facetsExpandButton`),
+  no walking / scrolling / paging) → one `POST /ext/capture-list` with `rows: []`, `final: true`. The response gains
+  `headcount: {members: number | null, functions: n}`; the notice for such a post is "Saved LinkedIn headcount for
+  <account>: N members, F “What they do” counts".
+
+#### Phase 5 second review fixes
+
+- `POST /ext/capture-list`: "What they do" is stored (scope `function`) only from an UNFILTERED People tab (the same
+  rule as a `company` header); on a filtered tab (keywords / facets) it counts the result set and is ignored
+  (`headcount.functions: 0`). The org map also ignores older `function` rows whose URL carries filters.
+- A run whose first and only post is final with zero rows ("Capture headcount only") gets `stopReason: 'counts-only'`
+  (appended to `LIST_STOP_REASONS`). The org map leaves counts-only runs out of `runs`, and picks the latest run per list
+  for the anonymous count only among runs that read rows (`rowsSeen > 0`).
+- Classifier: Referent(in) / Office Manager(in) are exec support only when followed by to/of/for/der/des/für (die)
+  + Geschäftsführung / Geschäftsleitung / Unternehmensleitung / GF / Vorstand / CEO / Managing Director / MD / board;
+  "Referentin für Marketing", "Office Manager für Marketing & Events" are specialists in that function.
+- Light-row refresh: skipped for contacts with a `manual` source (the user typed those values) and when the posting
+  run started before the run of the contact's newest list sighting (a late Retry of an old run never wins).
+
+### v9 Phase 6 — MCP + docs (v9 complete)
+
+- MCP (`src/mcp/accounts.ts`), 22 tools. The MCP `view()` attaches `org = buildOrgMap(view, orgMapSources(repo, id))`
+  (the same pure functions as the page; no AI, nothing under `src/llm/` is imported by the MCP server — tested).
+  - New **`network_get_org_map {account, function: 'marketing' (default, only value), detail: 'full' (default) |
+    'summary'}`**, `readOnlyHint`. Text = `orgMapMarkdown(view, org, detail)` (`src/accounts/brief.ts`): headcount table
+    (captured / LinkedIn Marketing function / company / coverage / query counts / anonymous / flagged / web), sub-function
+    × seniority table, reporting tree (indented; edge tags via `edgeTag`: `[confirmed]` for `user`, `[inferred 0.6]`,
+    `[web 0.9]`; context nodes marked), "No known manager" groups, flagged, entities, structure facts with evidence URL;
+    `full` adds edge reasons, ids, possible managers, responsibilities, quotes and list walks (falls back to `summary`
+    when over the size cap). No data → a "not mapped yet" pointer to the explorer workflow.
+    `structuredContent = {account {id, name}, function, org: OrgMap, people: [{id, full_name, title, url, kind,
+    is_connection, in_org, subfunction, auto_subfunction, seniority, team, entity, country, responsibilities, noise,
+    vendor_funded, confidence, reports_to, reports_to_source, reports_to_confidence, reports_to_reason, line, sources}]}`
+    for everyone in the org, flagged, or a context node in the tree.
+  - `network_get_account`: `accountMarkdown` adds `## Marketing org` (after the org chart, when `view.org` has data —
+    `hasOrgData`): counts, coverage, flagged / unplaced, top two tree levels, pointer to `network_get_org_map`.
+    `structuredContent.marketing_org = {in_org, flagged, linkedin_marketing, coverage} | null`. The page's
+    "Copy for AI" (`GET /api/accounts/:id/brief`) gets the same section, since the server's view carries `org`.
+  - `network_account_update_person` also takes `subfunction` (SUBFUNCTIONS | ''), `team`, `entity`, `country`,
+    `responsibilities`, `noise` (NOISE_FLAGS | 'none' | ''), `confirm_reports_to: boolean` (→ `confirmReportsTo`; ignored
+    when `reports_to` is set in the same call, which is already the user's). Same `updateMember` validation as the page.
+  - `network_account_add_people`: `people` is optional; new `contacts: [{full_name, url?, title?, headline?, company?,
+    location?, evidence_url?}]` (≤ 200) → `upsertLightContacts` with source `{kind: 'mcp', at, evidenceUrl?}`
+    (`evidence_url` must be http(s)); at least one of `people` / `contacts`. `structuredContent.light` =
+    `LightUpsertResult`. A repeat call adds nothing (dedupe by URL, or name + compatible title).
+  - Size: `summary` puts flagged / entities / facts first, the tree to 3 levels, ≤ 10 people per unplaced group (≤ 20
+    flagged) with "… N more"; its `structuredContent` = `{account, function, detail, org}` with `org.runs` left out and no
+    `people`. `full` caps `people` at 200 (org members first) + `people_total`, `people_truncated`. Text over 25k chars
+    is cut by `cap()` with an explicit org-map note.
+  - `confirm_reports_to` with no line (and no `reports_to` in the call) fails before anything is saved; `country` must
+    match `/^([A-Za-z]{2})?$/`.
+  - No infer / research / list-walk tools. Server instructions say these are started by the user in the explorer /
+    extension.
+- Docs: README "Map a marketing org" (workflow, live LinkedIn findings, costs, LinkedIn risk, GDPR), docs/MCP.md,
+  extension/README.md (walk the people search; headcount from the unfiltered People tab; per entity page), AGENTS.md
+  layout + costs, CHANGELOG 0.4.0; package + desktop version 0.4.0.

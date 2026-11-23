@@ -18,13 +18,13 @@ child env). Data is one local SQLite file.
 | `src/index.ts` | commander wiring: default (explorer / first-run setup), `serve`, `import`, `lists`, `export`, `db`, `lens list/rescore/rm`, `mcp` |
 | `src/cli/` | `explore.ts` main flow, `setup.ts` first-run wizard, `db.ts` subcommands, `interactive.ts` CSV picker |
 | `src/db/` | `schema.ts` (append-only migrations via `PRAGMA user_version`), `store.ts` (all SQL), `hash.ts` (lens input hashes → staleness) |
-| `src/llm/` | `claude.ts` (subprocess runner, retries, `buildArgs`), `enrich.ts` (headline profiles), `dossier.ts` (light/deep web profiles), `lens.ts` (scoring rubric + Haiku pass + Sonnet rerank), `ahoy.ts` (Ahoy check / proposal plan / send) |
+| `src/llm/` | `claude.ts` (subprocess runner, retries, `buildArgs`), `enrich.ts` (headline profiles), `dossier.ts` (light/deep web profiles), `lens.ts` (scoring rubric + Haiku pass + Sonnet rerank), `ahoy.ts` (Ahoy check / proposal plan / send), `org-infer.ts` (Haiku org classification + suggested reporting lines; no names sent), `org-research.ts` (web org research: evidence URL + quote required, no LinkedIn sources, DE queries, backoff/resume) |
 | `src/io/` | `csv.ts` (any CSV; LinkedIn exports incl. "Notes:" preamble), `explorer-export.ts` (CRM / full / Ahoy files — mirrored in the page) |
 | `src/web/` | `explorer.html` (single-file vanilla UI, no deps), `explorer-server.ts` (node:http API + SSE), `http-common.ts` (security), `CONTRACT.md` (**the API/data-model spec — update it with every change**) |
-| `src/accounts/` | ABX accounts: `types.ts` (vocab), `classify.ts` (title → department/tier, no AI), `capture.ts` (parse extension captures; raw-text fallback), `ingest.ts` (capture → contact → account), `view.ts` (org chart, warm paths, gaps), `brief.ts` (the LLM markdown) |
+| `src/accounts/` | ABX accounts: `types.ts` (vocab), `classify.ts` (title → department/tier, no AI), `capture.ts` (parse extension captures; raw-text fallback), `list-capture.ts` (parse list-walk cards, header counts, "What they do"), `identity.ts` (URN/vanity, name matching), `ingest.ts` (capture → contact → account), `view.ts` (org chart, warm paths, gaps), `org.ts` (`buildOrgMap`: marketing scope, reporting tree, headcounts; pure, used by the page and MCP), `brief.ts` (the LLM markdown, incl. `orgMapMarkdown`) |
 | `src/db/accounts.ts` | `AccountsRepo` (`store.accounts`): accounts, captured contacts (+ history), membership |
-| `src/mcp/` | stdio MCP server (`network-builder mcp`): 21 `network_*` tools + 3 prompts + `account://` resources (account tools in `accounts.ts`); see `docs/MCP.md` |
-| `extension/` | Chrome MV3 extension (plain JS, no build): `content.js` (button + panel + DOM reader on linkedin.com/in/*), `background.js` (pairing, `/ext/*` client, offline queue), `popup.*` |
+| `src/mcp/` | stdio MCP server (`network-builder mcp`): 22 `network_*` tools + 3 prompts + `account://` resources (account tools in `accounts.ts`); see `docs/MCP.md` |
+| `extension/` | Chrome MV3 extension (plain JS, no build): `content.js` (profile button + panel + DOM reader on linkedin.com/in/*; list-walk panel on People tabs / people search), `list-reader.js` (pure DOM helpers for lists, tested with happy-dom against fictional fixtures), `background.js` (pairing, `/ext/*` client, offline queue for profiles), `popup.*` |
 | `desktop/` | macOS Electron shell (own pnpm root + lockfile, so CLI installs never pull Electron): `src/main.ts`, `scripts/build.mjs` (main + fully-bundled server `dist-server/bin.mjs`), `scripts/icon.mjs`, `scripts/install.mjs` (→ /Applications + Dock), `electron-builder.yml` (unsigned, ad-hoc) |
 | `test/` | vitest; `test/fixtures/*.csv` are fictional |
 
@@ -39,9 +39,9 @@ CI (`.github/workflows/ci.yml`) runs install --frozen-lockfile, typecheck, test,
 
 ## Product rules (from the user — do not break)
 
-1. **Paid AI work is human-triggered.** Web profiles (light/deep), lens creation/scoring and Ahoy calls are started by the
-   user in the explorer (or an explicit CLI command / explicit request). Never auto-research; the MCP server exposes no
-   paid actions. Cheap re-scoring of *stale* people after the user's own research is fine when asked.
+1. **Paid AI work is human-triggered.** Web profiles (light/deep), lens creation/scoring, Ahoy calls and org
+   classification / web org research are started by the user in the explorer (or an explicit CLI command / explicit
+   request). Never auto-research; the MCP server exposes no paid actions. Cheap re-scoring of *stale* people after the user's own research is fine when asked.
 2. **Lens removals are deliberate.** A person pinned *out* of a lens is the user's judgement — never suggest restoring
    them, never show them outside the lens's "Removed" tab, exports or MCP results, and re-scores must not override pins.
 3. **CRM writes go through Ahoy proposals only** (`create_proposal`), which the user approves in the Ahoy app. Never
@@ -49,8 +49,12 @@ CI (`.github/workflows/ci.yml`) runs install --frozen-lockfile, typecheck, test,
 4. **Selection survives filtering**, so every bulk action asks before touching selected people the filters hide
    (`scopeToShown` in the page). Keep that for new actions.
 5. **Captured LinkedIn people never enter the network.** They live in `contacts`, not `people`, so lenses, the People
-   view, network search and exports stay your connections only. The extension reads only the profile on screen, only
-   on click (no crawling), and spends no money.
+   view, network search and exports stay your connections only. The extension reads only what is on the screen.
+   Full profiles: one click per person. Lists (company People tab, people search): only after a click on that page, in
+   the visible foreground tab, at human pace with jitter, capped per run (300 default, 500 max) and per day, stops on
+   any checkpoint/captcha/login/limit page, cancellable; out-of-network "LinkedIn Member" rows are kept only as
+   anonymous counts. No hidden fields, no background or minimized-window walking, no money spent. The `/ext/*` auth
+   model (capture token, `chrome-extension://` origin only) stays as it is.
 6. **Scores reward evidence, not keywords** (see `LENS_RUBRIC` in `src/llm/lens.ts`): institutional roles and named
    investments beat self-applied headline labels; for "potential …" goals, *capacity* (exits, C-level at scaled
    companies, boards) counts and "no investments found" is neutral.
@@ -81,7 +85,8 @@ CI (`.github/workflows/ci.yml`) runs install --frozen-lockfile, typecheck, test,
   --port 47990`, `NB_EXPLORER_TEMPLATE=src/web/explorer.html`) and drive headless Chrome over CDP; never test against
   the user's live explorer or database. pty tests need a real window size (TIOCSWINSZ) or clack renders 1 column.
 - **Costs:** web search is rate-limited; light profiles ≈ $0.02 (8 parallel is fine, 16 trips limits), deep ≈ $0.17,
-  lens ≈ $0.30/1,000 + $0.50/100 re-checked, Ahoy check ≈ $0.005/person. Two searches rarely identify junior people.
+  lens ≈ $0.30/1,000 + $0.50/100 re-checked, Ahoy check ≈ $0.005/person, org classify ≈ $0.02 for 48 people,
+  org web research ≈ $0.21 for 2 passes (≈ $0.30–1.40 per full run). Two searches rarely identify junior people.
 
 ## Desktop app
 

@@ -55,7 +55,8 @@ outrank a partner at a fund. Then you curate the list in a fast local web app an
   Claude plan the campaign from one MCP call. [Details →](#-accounts-abx-and-the-chrome-extension)
 - 🧩 **Chrome extension.** A **＋ Network Builder** button on LinkedIn profiles files a decision maker, with their full
   profile, under an account in one click. It works even when they aren't a connection, and saves profiles until the app
-  is running.
+  is running. On a company's People tab or a people search, **⇣ Map to Network Builder** files the whole list (names,
+  headlines, headcount) under an account, at human pace and within caps.
 - 🔗 **Ahoy CRM, live.** See who's already in your CRM, pick the right record when several match, and send new people
   plus research notes to Ahoy as proposals you approve.
 - 📤 **Export to your CRM.** HubSpot/Salesforce-friendly CSVs, an **Ahoy** import bundle (companies, contacts and
@@ -217,10 +218,11 @@ Then ask Claude Code things like:
 - *"Save the top 20 as 'Q4 outreach' and export it for Ahoy."*
 - *"Plan an ABX campaign for Ledgerly. Who's the champion, and what's my warm path in?"*
 
-It has 21 tools:
+It has 22 tools:
 - search, people, past and current companies, lenses, lists and stats;
 - adding and removing people from lenses, the score cut-off, saving lists and exporting;
 - accounts (ABX): the full account context in one call, key people, roles, reporting lines and the brief;
+- the marketing org map of an account (`network_get_org_map`), plus setting org fields and confirming reporting lines;
 - three prompts (`warm_intro`, `lens_shortlist`, `abx_campaign`), and an `account://<id>` resource per account.
 
 It reads your local database live, so it works alongside the explorer. Anything that costs AI money (web profiles,
@@ -244,11 +246,69 @@ Ways to add people:
 1. **From LinkedIn** with the [Chrome extension](extension/README.md). Click **＋ Network Builder** on any profile,
    connection or not. The full profile (about, experience with descriptions, education, skills) is saved. People who
    aren't connections stay under the account and never enter your network, lenses or exports.
+   To map a whole team, run a LinkedIn people search (e.g. "marketing" at that company) and click
+   **⇣ Map to Network Builder** (see [Map a marketing org](#map-a-marketing-org) below). It reads the visible list in
+   that tab only after you press Start, at human pace,
+   up to 300 rows a run (500 max) and 1,000 a day, and stops on any LinkedIn security check or limit page.
+   Everyone it sees is saved as a light contact (name, headline, link); "LinkedIn Member" rows are kept only as counts.
+   Full profiles stay one click per person. LinkedIn's terms restrict automated browsing, so use it sparingly.
 2. **From your network.** Select people in **People**, then **Add to account ▾**.
 3. **From Claude**, with `network_account_add_people`.
 
 Then ask Claude Code: *"Plan an ABX campaign for Ledgerly"* (the `abx_campaign` prompt). It calls `network_get_account`,
 which returns the brief, buying committee, org chart, full profiles and warm paths in one go.
+
+### Map a marketing org
+
+For one account, the **Marketing org** view (switch at the top of the org chart) shows everyone in marketing, how big
+the team is, how it's structured (sub-functions, teams, legal entities, a reporting tree) and what each person does.
+Every inferred fact shows where it came from and how sure it is. Everything uses free sources: your browser, and web
+search and Claude through your own Claude Code login.
+
+1. **Headcount.** Open the company's **People** tab on LinkedIn, *without* a keyword search. Make the member count and
+   the **What they do** box visible, then click **⇣ Map to Network Builder → Capture headcount only**. It saves
+   "N associated members" and the visible What they do counts (Marketing, Sales, …) and reads no people.
+   LinkedIn's People tab now lists only the **top 5** "What they do" functions (no Show more), and its job-function
+   filter doesn't filter the page. So the LinkedIn marketing count exists only when Marketing is in that top 5;
+   otherwise the map shows the company total and no coverage percentage. (LinkedIn Premium's company **Insights** tab
+   shows headcount by function; it could be a future source, but nothing reads it today.)
+2. **Walk the people.** Run a LinkedIn people search for the team (e.g. *marketing*, *Kommunikation*, *brand*, filtered
+   to the company) and click **Start mapping**. Each named row becomes a light contact on the account; "LinkedIn
+   Member" rows are only counted.
+   - LinkedIn now sends a keyword search on a company's People tab to the people search results (10 per page with a
+     **Next** button). Those pages show no results count, which is why the headcount comes from step 1. Filtering the
+     People tab by keyword just redirects, so walk the search instead.
+   - **Group companies** have a LinkedIn page per entity. Do steps 1 and 2 for each entity page and pick the same
+     account each time; the counts add up and entities are kept apart.
+3. **✦ Classify & suggest reporting lines.** In the Marketing org view. Claude (Haiku) sorts everyone into
+   sub-functions and seniority, flags noise (HR/employer marketing, sales hybrids, people at another employer; a
+   vendor-funded marketer stays in the org with a tag) and suggests who reports to whom, with a confidence and a reason.
+4. **🌐 Research on the web.** Searches company pages, press releases, job ads and interviews (never LinkedIn) for the
+   marketing leaders, team structure, entities and "reports to" statements. Each finding needs an evidence URL and a
+   quote. It backs off when web search is rate-limited and waits for you to **Resume**.
+5. **Confirm the lines.** Suggested lines are dashed, with a confidence badge and reason. **✓ Confirm**, **Change…** or
+   **↺** each one; your choice always wins over later suggestions. Fix anyone's sub-function, team, entity or "in the
+   org?" in their drawer.
+
+Then ask Claude: *"Summarise Ledgerly's marketing org and who we should talk to"*. `network_get_org_map` returns the
+tree (each line tagged `[confirmed]`, `[inferred 0.6]` or `[web 0.9]`), headcounts captured vs LinkedIn, sub-functions,
+flagged people and evidence.
+
+**Costs** (measured in live tests): classifying 48 people cost about **$0.02**; web research cost about **$0.21** for
+two passes, and a full run is estimated at **$0.30–1.40** per account. Both show an estimate and ask before they start.
+The LinkedIn steps cost nothing.
+
+**LinkedIn risk.** LinkedIn's terms restrict automated browsing and it may limit accounts that browse a lot. The walk is
+capped (300 rows a run by default, 500 max, 1,000 a day), runs only in the visible tab after your click, at human pace,
+and stops on any security check. Map one team at a time and stop if you see a check.
+
+**GDPR and privacy.** The org map is personal data about people who didn't sign up for it:
+- It stays local, in your SQLite file. Classification sends titles only (no names); web research sends the company
+  and the people already known, and keeps only what public pages state, each with its source.
+- It only uses what is visible to you: list rows on your screen and public web pages with a source link. No hidden
+  fields, no paid data brokers, no enrichment of emails or phone numbers.
+- When you contact someone you found this way, tell them where you got their details (GDPR Art. 14). If they object,
+  remove them from the account; a later list walk can add them again, so check after re-walking.
 
 ## 🔗 Ahoy CRM integration
 
@@ -290,6 +350,9 @@ field names.
 - **What leaves your machine:** only the AI calls Claude Code makes on your behalf.
   - Headlines go to Claude for scoring.
   - Names, titles and companies go into web searches for the profiles **you** start.
+  - For a marketing org map you start: the account's people's titles (never their names) go to Claude for
+    classification; web research sends the company name and the known people's names and titles to Claude, which
+    searches the web for the company. See [Map a marketing org](#map-a-marketing-org).
   - If you use the Ahoy integration, the people you select are looked up in (and, as approved proposals, written to)
     your own Ahoy CRM.
 - The local server listens on `127.0.0.1` only, checks Host and Origin, and needs a per-session token. Other websites

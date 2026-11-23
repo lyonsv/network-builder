@@ -1,7 +1,31 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
+- **Marketing org map** (Accounts → **Marketing org**): for one account, everyone in marketing, the team's size
+  (captured vs LinkedIn's "What they do → Marketing" count when Marketing is among the top 5 functions LinkedIn shows,
+  else the company total), sub-function × seniority, legal entities, and a reporting
+  tree where every suggested line shows its source and confidence. See the README's "Map a marketing org".
+  - **Chrome extension 0.3.1:** walks a LinkedIn people search (or People tab list) after your click, in the visible
+    tab only, at human pace, capped per run and per day, and stops on any security check. **Capture headcount only**
+    reads the People tab's member count and the visible "What they do" numbers (usually the top 5). Listed people become *light contacts* on the
+    account; "LinkedIn Member" rows are kept only as counts.
+  - **✦ Classify & suggest reporting lines** (Haiku, titles only, about $0.02 for 48 people) and **🌐 Research on the
+    web** (company pages, press, job ads, never LinkedIn; every finding has an evidence URL and quote; about $0.21 for
+    two passes, an estimated $0.30–1.40 for a full run). Both are started by you and show an estimate first.
+  - **✓ Confirm / Change… / ↺** on every suggested line; your choices always win over later suggestions.
+  - Identity and dedupe across list rows, full captures and connections (URN vs vanity URLs, name + title).
+  - Vendor-funded marketers stay in the org with a tag; people at another employer are flagged and not counted.
+  - Live LinkedIn findings: a keyword search on a People tab now redirects to people search results (10 per page, no
+    results count), so the headcount comes from "Capture headcount only" on the unfiltered People tab, and group
+    companies are walked per entity page.
+- **MCP:** new read-only `network_get_org_map` (tree with `[confirmed]` / `[inferred 0.6]` / `[web 0.9]` tags,
+  headcounts, sub-functions, flagged people, evidence). `network_get_account` adds a short "Marketing org" section.
+  `network_account_update_person` sets sub-function, team, entity, country, responsibilities and noise, and
+  `confirm_reports_to` accepts a suggested line. `network_account_add_people` takes `contacts` (light contacts, deduped).
+  No paid actions over MCP. 22 tools.
+- Schema migration 6: light contacts and their sources, org fields on account members, reporting-line provenance,
+  headcount snapshots, list runs and org facts.
 - **Desktop app:** if the explorer server can't start (e.g. the database is newer than the app), the window now shows
   the error instead of spinning forever.
 - **Explorer header:** People / Accounts are now clear tabs beside the logo, and a 🧩 button shows the Chrome

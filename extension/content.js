@@ -3,6 +3,9 @@
  * On a profile page (linkedin.com/in/<slug>) it adds a "Network Builder" button next to Message / More. Clicking it
  * opens a small panel to file the person under an account. Only the profile you are looking at is read, only when you
  * click — no crawling, no background page loads.
+ *
+ * On a company's People tab or people-search results it adds a "Map to Network Builder" button. A click opens a panel;
+ * only its Start button walks the list, in this tab, at human pace, within the caps (see "lists" below).
  */
 (() => {
   if (window.__nbLoaded) return;
@@ -551,6 +554,490 @@
     }
   }
 
+  // ---------- lists: map a team from a company's People tab or a people search ----------
+  // Safeguards (AGENTS.md rule 5): starts only from a click on the Start button in this panel; walks only this tab,
+  // which must stay in front (it pauses while the tab is hidden); human pace with jitter and back-off; capped per run
+  // and per day; stops at once on a checkpoint / captcha / sign-in / limit page; Cancel stops immediately. It reads
+  // only the visible text of each result card plus its /in/ link (list-reader.js). It never opens profiles, windows
+  // or tabs. "LinkedIn Member" rows are sent without a name and kept only as anonymous counts.
+  const LIST = {
+    BASE_MS: 2500, // between loads, plus a random 0–1.5 s
+    JITTER_MS: 1500,
+    PACE_STEP_MS: 1500, // added after each load that brought nothing new …
+    MAX_PACE_MS: 8000, // … up to this
+    MAX_NO_GROWTH: 4, // loads in a row with nothing new → end of list (or "stalled" if LinkedIn still offers more)
+    GROWTH_TIMEOUT_MS: 10000,
+    PAGE_MIN_MS: 4000, // search results: at most one page per 4–7 s
+    PAGE_JITTER_MS: 3000,
+    BATCH: 25, // rows per post to Network Builder
+    CAP_DEFAULT: 300,
+    CAP_MAX: 500,
+    DAILY: 1000,
+  };
+  const STOP_TEXT = {
+    end: 'Reached the end of the list.',
+    cap: 'Stopped at your cap.',
+    cancelled: 'Stopped.',
+    checkpoint: 'LinkedIn showed a security check, so the walk stopped. Complete it yourself, and wait a while before mapping again.',
+    login: 'LinkedIn asked you to sign in, so the walk stopped.',
+    'rate-limit': 'LinkedIn says you have reached a limit, so the walk stopped. Try again another day.',
+    stalled: 'LinkedIn stopped loading more results, so the walk stopped.',
+    error: 'The walk stopped because of an error.',
+  };
+  const NBL = globalThis.NBList;
+  const listKind = () => (NBL ? NBL.pageKind(location.pathname) : '');
+  const today = () => {
+    const d = new Date();
+    return `nb.listRows.${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  async function rowsToday() {
+    try {
+      const k = today();
+      return Number((await chrome.storage.local.get(k))[k]) || 0;
+    } catch {
+      return 0;
+    }
+  }
+  async function addRowsToday(n) {
+    try {
+      const k = today();
+      const cur = Number((await chrome.storage.local.get(k))[k]) || 0;
+      await chrome.storage.local.set({ [k]: cur + n });
+    } catch {
+      /* the daily count is best effort; the run cap still applies */
+    }
+  }
+
+  class WalkStop {
+    constructor(reason, message) {
+      this.reason = reason;
+      this.message = message || '';
+    }
+  }
+  const rand = (n) => Math.floor(Math.random() * n);
+
+  let listHost = null;
+  let listShadow = null;
+  let listBtn = null;
+  let walk = null; // the running walk: { cancelled, … }
+
+  function closeListPanel() {
+    if (walk) {
+      walk.cancelled = true; // closing the panel stops a running walk
+      if (walk.resolvePrompt) walk.resolvePrompt('stop');
+    }
+    if (listHost) listHost.remove();
+    listHost = listShadow = null;
+  }
+
+  async function openListPanel() {
+    if (listHost) return;
+    const kind = listKind();
+    if (!kind) return;
+    listHost = el('div', { id: 'nb-list-host' });
+    listShadow = listHost.attachShadow({ mode: 'open' });
+    listShadow.append(el('style', { text: STYLE }));
+    document.documentElement.append(listHost);
+
+    const slug = NBL.companySlug(location.pathname);
+    const keywords = NBL.keywordsOf(location.href);
+    const companyUrl = slug ? `https://www.linkedin.com/company/${slug}` : '';
+    const statusSlot = el('div');
+    const acctInput = el('input', { type: 'text', list: 'nb-list-accts', maxlength: '120', placeholder: 'Account name', autocomplete: 'off' });
+    const dl = el('datalist', { id: 'nb-list-accts' });
+    const capInput = el('input', { type: 'number', min: '1', max: String(LIST.CAP_MAX), step: '1', value: String(LIST.CAP_DEFAULT) });
+    const usage = el('div', { class: 'hint muted' });
+    const goBtn = el('button', { class: 'go', type: 'button', text: 'Start mapping' });
+    const stopBtn = el('button', { class: 'sec', type: 'button', text: 'Cancel', style: 'display:none' });
+    // People tab only: read the member count + "What they do" counts that are on screen (no walking, no scrolling)
+    const hcBtn = kind === 'people-tab'
+      ? el('button', { class: 'sec', type: 'button', text: 'Capture headcount only',
+        title: 'Reads the member count and the “What they do” counts on this page (one click on its “Show more”, nothing else) and saves them — no people are read' })
+      : null;
+    const progress = el('div', { class: 'found muted' });
+    const result = el('div');
+    const what = kind === 'people-tab' ? `People tab of ${slug}` : 'People search results';
+    const panel = el('div', { class: 'panel', role: 'dialog', 'aria-label': 'Map this list to Network Builder' },
+      el('header', {}, el('b', { text: 'Map this list to Network Builder' }), el('button', { class: 'x', 'aria-label': 'Close', onclick: closeListPanel, text: '×' })),
+      el('div', { class: 'body' },
+        el('div', { class: 'who' }, el('div', { class: 'n', text: what }),
+          el('div', { class: 'muted', text: keywords ? `Keywords: “${keywords}”` : 'No keyword filter. Tip: search the People tab for “marketing” first, so only that team is read.' })),
+        statusSlot,
+        banner('warn', 'Keep this tab in front while it runs. LinkedIn may limit accounts that browse a lot; stop if you see a security check.'),
+        el('label', { text: 'Account' }), acctInput, dl,
+        el('label', { text: 'Most rows this run' }), capInput, usage,
+        el('div', { class: 'row' }, goBtn, stopBtn, hcBtn),
+        hcBtn ? el('div', { class: 'hint muted', text: keywords
+          ? 'Headcount only: with a keyword filter the count is for this search and “What they do” isn’t saved. Clear the search to read the company figures.'
+          : 'Headcount only: saves “N associated members” and the “What they do” counts (incl. Marketing) shown here.' }) : null,
+        progress,
+        result,
+      ),
+    );
+    listShadow.append(panel);
+    panel.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !walk) closeListPanel();
+    });
+
+    const used = await rowsToday();
+    usage.textContent = `Up to ${LIST.CAP_MAX} per run and ${LIST.DAILY.toLocaleString()} a day · ${used.toLocaleString()} read today.`;
+    let accounts = [];
+    statusSlot.replaceChildren(banner('info', 'Checking Network Builder…'));
+    const acc = await send({ type: 'accounts' });
+    if (!listShadow) return;
+    if (acc.ok) {
+      statusSlot.replaceChildren();
+      accounts = acc.data.accounts || [];
+      dl.replaceChildren(...accounts.map((a) => el('option', { value: a.name })));
+      const hit = companyUrl && accounts.find((a) => (a.linkedinUrl || '').replace(/\/$/, '') === companyUrl);
+      if (hit) acctInput.value = hit.name;
+    } else {
+      statusSlot.replaceChildren(banner('err', acc.message));
+    }
+
+    stopBtn.addEventListener('click', () => {
+      if (walk) {
+        walk.cancelled = true;
+        if (walk.resolvePrompt) walk.resolvePrompt('stop');
+        stopBtn.disabled = true;
+        stopBtn.textContent = 'Stopping…';
+      }
+    });
+
+    // "Capture headcount only": one trusted click → read what's on screen (at most one click on What they do's
+    // "Show more") → one post with zero rows. Never walks, scrolls or pages.
+    let hcBusy = false;
+    if (hcBtn) {
+      hcBtn.addEventListener('click', async (e) => {
+        if (!e.isTrusted || walk || starting || hcBusy) return;
+        hcBusy = true;
+        hcBtn.disabled = goBtn.disabled = true;
+        result.replaceChildren();
+        try {
+          const name = acctInput.value.replace(/\s+/g, ' ').trim();
+          if (!name) {
+            result.replaceChildren(banner('err', 'Pick an account (or type a name for a new one).'));
+            acctInput.focus();
+            return;
+          }
+          const stop = NBL.stopReason(document, location.href);
+          if (stop) {
+            result.replaceChildren(banner('err', STOP_TEXT[stop] || 'LinkedIn is showing a check or limit page.'));
+            return;
+          }
+          const more = NBL.facetsExpandButton(document);
+          if (more) {
+            more.click();
+            await new Promise((r) => setTimeout(r, 1200));
+          }
+          const header = NBL.headerText(document);
+          const facets = NBL.facetsText(document);
+          if (!header && !facets) {
+            result.replaceChildren(banner('err', 'No member count or “What they do” box on screen. Scroll so both are visible (flip the insights carousel to “What they do” if needed) and try again.'));
+            return;
+          }
+          const hit = accounts.find((a) => a.name.toLowerCase() === name.toLowerCase());
+          const r = await send({ type: 'captureList', body: {
+            runId: crypto.randomUUID(),
+            ...(hit ? { accountId: hit.id } : { accountName: name }),
+            page: { kind, url: location.href.split('#')[0], keywords: NBL.keywordsOf(location.href), ...(companyUrl ? { companyUrl } : {}) },
+            rows: [], header, facets, final: true, stopReason: 'end',
+          } });
+          if (!listShadow) return;
+          if (!r.ok) {
+            result.replaceChildren(banner('err', r.message || 'Network Builder didn’t accept the counts.'));
+            return;
+          }
+          const hc = r.data.headcount || {};
+          const noMkt = !/marketing/i.test(facets);
+          result.replaceChildren(banner(noMkt ? 'warn' : 'ok',
+            `Saved for ${r.data.account.name}: ${hc.members != null ? `${hc.members.toLocaleString()} members` : 'no member count'} · ${hc.functions || 0} “What they do” counts.` +
+            (noMkt ? ' Marketing wasn’t visible — show it in the “What they do” box (Show more / carousel arrow), then capture again.' : '')));
+        } finally {
+          hcBusy = false;
+          if (hcBtn.isConnected) hcBtn.disabled = goBtn.disabled = false;
+        }
+      });
+    }
+
+    // the ONLY place a walk starts: a real click on this button
+    let starting = false;
+    goBtn.addEventListener('click', async (e) => {
+      if (!e.isTrusted || walk || starting) return;
+      starting = true; // before any await: a double click must not start two walks
+      goBtn.disabled = true;
+      const name = acctInput.value.replace(/\s+/g, ' ').trim();
+      if (!name) {
+        result.replaceChildren(banner('err', 'Pick an account (or type a name for a new one).'));
+        acctInput.focus();
+        starting = false;
+        goBtn.disabled = false;
+        return;
+      }
+      const usedNow = await rowsToday();
+      if (usedNow >= LIST.DAILY) {
+        result.replaceChildren(banner('err', `You have read ${usedNow.toLocaleString()} rows today, the daily limit. Try again tomorrow.`));
+        starting = false;
+        goBtn.disabled = false;
+        return;
+      }
+      const capWanted = Math.max(1, Math.min(LIST.CAP_MAX, Math.floor(Number(capInput.value) || LIST.CAP_DEFAULT)));
+      const cap = Math.min(capWanted, LIST.DAILY - usedNow);
+      capInput.value = String(capWanted);
+      const hit = accounts.find((a) => a.name.toLowerCase() === name.toLowerCase());
+      goBtn.disabled = true;
+      acctInput.disabled = capInput.disabled = true;
+      stopBtn.style.display = '';
+      stopBtn.disabled = false;
+      stopBtn.textContent = 'Cancel';
+      result.replaceChildren();
+      const ui = {
+        phase: (t) => (progress.textContent = t),
+        prompt: (message) =>
+          new Promise((resolve) => {
+            walk.resolvePrompt = resolve;
+            result.replaceChildren(banner('err', `${message} The walk is paused.`, { label: 'Retry', fn: () => resolve('retry') }));
+          }).then((choice) => {
+            if (walk) walk.resolvePrompt = null;
+            result.replaceChildren();
+            return choice;
+          }),
+      };
+      const walkDone = startWalk({ account: hit ? { id: hit.id, name: hit.name } : { name }, cap, kind, companyUrl, ui });
+      starting = false; // startWalk has set `walk` synchronously
+      const out = await walkDone;
+      walk = null;
+      if (!listShadow) return;
+      stopBtn.style.display = 'none';
+      goBtn.disabled = false;
+      goBtn.textContent = 'Start again';
+      acctInput.disabled = capInput.disabled = false;
+      const r = out.data;
+      const reason = (out.reason === 'cap' ? `Stopped at ${cap} rows. ` : STOP_TEXT[out.reason] ? STOP_TEXT[out.reason] + ' ' : '') + (out.message ? out.message + ' ' : '');
+      if (r) {
+        result.replaceChildren(banner(['end', 'cap', 'cancelled'].includes(out.reason) ? 'ok' : 'warn',
+          `${reason}${r.run.named} ${r.run.named === 1 ? 'person' : 'people'}${r.run.anonymous ? ` + ${r.run.anonymous} anonymous` : ''} on ${r.account.name}.`));
+      } else {
+        result.replaceChildren(banner('err', `${reason}Nothing more was sent.`));
+      }
+      usage.textContent = `Up to ${LIST.CAP_MAX} per run and ${LIST.DAILY.toLocaleString()} a day · ${(await rowsToday()).toLocaleString()} read today.`;
+    });
+  }
+
+  /** the paced walk (ported from the connections exporter's loop). → { reason, message, data: last server answer } */
+  async function startWalk({ account, cap, kind, companyUrl, ui }) {
+    const run = { id: crypto.randomUUID(), cancelled: false, rows: 0, resolvePrompt: null };
+    walk = run;
+    const startPath = location.pathname;
+    // the list's result-set filters (keywords, company, location, …) — paging and LinkedIn's UI flags aside; a new
+    // search or changed filters ends this run
+    const filtersOf = (href) => NBL.filterKey(href);
+    const startFilters = filtersOf(location.href);
+    const page = { kind, url: location.href.split('#')[0], keywords: NBL.keywordsOf(location.href), ...(companyUrl ? { companyUrl } : {}) };
+    const acctRef = account.id ? { accountId: account.id } : { accountName: account.name };
+    let seenEls = new WeakSet(); // cards already read on this page (search: reset per page)
+    const seenHrefs = new Set();
+    let pending = [];
+    let last = null;
+    let phase = '';
+    const say = (t) => {
+      phase = t;
+      ui.phase(`${t} · ${run.rows} read`);
+    };
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let lastStopScan = 0;
+    let lastScanHref = '';
+    /** throws WalkStop when the walk must end now; waits (paused) while the tab is hidden */
+    const check = async () => {
+      if (run.cancelled) throw new WalkStop('cancelled');
+      if (Date.now() - lastStopScan >= 1000 || location.href !== lastScanHref) {
+        lastStopScan = Date.now();
+        lastScanHref = location.href;
+        const s = NBL.stopReason(document, location.href);
+        if (s) throw new WalkStop(s);
+      }
+      if (listKind() !== kind || (kind === 'people-tab' && location.pathname !== startPath)) throw new WalkStop('cancelled', 'You left the list page.');
+      if (filtersOf(location.href) !== startFilters) throw new WalkStop('cancelled', 'The search or its filters changed. Start a new run for the new list.');
+      if (document.hidden) {
+        const was = phase;
+        say('Paused: this tab is in the background. Switch back to it to continue');
+        while (document.hidden) {
+          if (run.cancelled) throw new WalkStop('cancelled');
+          await sleep(500);
+        }
+        say(was);
+      }
+    };
+    const pause = async (ms) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        await check();
+        await sleep(Math.min(250, end - Date.now()));
+      }
+      await check();
+    };
+    const waitFor = async (pred, ms) => {
+      let start = Date.now();
+      while (Date.now() - start < ms) {
+        if (document.hidden) {
+          await check(); // pauses; hidden time doesn't count
+          start = Date.now();
+        }
+        await check();
+        if (pred()) return true;
+        await sleep(500);
+      }
+      return pred();
+    };
+
+    /** read new cards on screen into `pending`; stops at the cap */
+    const harvest = () => {
+      for (const card of NBL.resultCards(document, location.href)) {
+        if (seenEls.has(card)) continue;
+        const c = NBL.readCard(card, location.href);
+        if (!c.lines.length) continue; // not rendered yet: read it on the next pass
+        seenEls.add(card);
+        if (c.href) {
+          if (seenHrefs.has(c.href)) continue;
+          seenHrefs.add(c.href);
+        }
+        if (run.rows >= cap) throw new WalkStop('cap');
+        pending.push({ idx: run.rows++, lines: c.lines, href: c.href });
+      }
+      if (run.rows >= cap) throw new WalkStop('cap');
+    };
+
+    /** send what's pending (≤100 per request); on failure pause and ask: Retry, or Cancel → stop */
+    const post = async (extra, { final = false } = {}) => {
+      while (true) {
+        const rows = pending.slice(0, 100);
+        const lastChunk = pending.length <= 100;
+        const body = { runId: run.id, ...acctRef, page, rows, ...extra, ...(final && lastChunk ? { final: true } : {}) };
+        const r = await send({ type: 'captureList', body });
+        if (r.ok) {
+          pending = pending.slice(rows.length);
+          last = r.data;
+          if (rows.length) await addRowsToday(rows.length);
+          if (lastChunk) return;
+          continue;
+        }
+        if (r.status === 409 && !final) throw new WalkStop('cap', r.message);
+        if (final && (run.cancelled || r.kind === 'reload')) return; // nothing more we can do
+        const choice = await ui.prompt(r.message || 'Network Builder didn’t accept the rows.');
+        if (choice !== 'retry') {
+          if (final) return;
+          throw new WalkStop('cancelled');
+        }
+      }
+    };
+    const pageInfo = () => ({ header: NBL.headerText(document), ...(kind === 'people-tab' ? { facets: NBL.facetsText(document) } : {}) });
+
+    let stop = null;
+    try {
+      say('Starting');
+      await check();
+      await post(pageInfo()); // creates the run on the account; checks pairing before anything is read
+      say('Reading the list');
+      const any = await waitFor(() => {
+        harvest();
+        return run.rows > 0 || NBL.noResults(document);
+      }, 15000);
+      if (!any) throw new WalkStop('end', 'No results on this page.');
+      let noGrowth = 0;
+      let paceMs = 0;
+      while (true) {
+        await check();
+        harvest();
+        if (pending.length >= LIST.BATCH) await post({});
+        const before = run.rows;
+        if (kind === 'people-tab') {
+          await pause(LIST.BASE_MS + rand(LIST.JITTER_MS) + paceMs);
+          say(noGrowth ? `Nothing new yet, trying again (${noGrowth}/${LIST.MAX_NO_GROWTH})` : 'Loading more');
+          const more = NBL.loadMoreButton(document);
+          if (more) more.click();
+          else {
+            const cards = NBL.resultCards(document, location.href);
+            const lastCard = cards[cards.length - 1];
+            if (lastCard) lastCard.scrollIntoView({ block: 'end' });
+            window.scrollTo(0, document.documentElement.scrollHeight);
+          }
+          await waitFor(() => {
+            harvest();
+            return run.rows > before;
+          }, LIST.GROWTH_TIMEOUT_MS);
+        } else {
+          // search results: read this page (scrolled into view), then the visible "Next" button, same tab
+          window.scrollTo(0, document.documentElement.scrollHeight);
+          await pause(1000);
+          harvest();
+          const next = NBL.nextButton(document);
+          if (!next) throw new WalkStop('end');
+          say('Next page');
+          await pause(LIST.PAGE_MIN_MS + rand(LIST.PAGE_JITTER_MS) + paceMs);
+          const firstBefore = NBL.resultCards(document, location.href)[0];
+          const hrefBefore = location.href;
+          next.click();
+          const turned = await waitFor(() => location.href !== hrefBefore || NBL.resultCards(document, location.href)[0] !== firstBefore, LIST.GROWTH_TIMEOUT_MS);
+          if (turned) seenEls = new WeakSet(); // a new page (LinkedIn may reuse card elements); people are de-duplicated by link
+          await waitFor(() => {
+            harvest();
+            return run.rows > before;
+          }, LIST.GROWTH_TIMEOUT_MS);
+        }
+        if (run.rows > before) {
+          noGrowth = 0;
+        } else {
+          noGrowth++;
+          paceMs = Math.min(LIST.MAX_PACE_MS, paceMs + LIST.PACE_STEP_MS); // back off instead of hammering LinkedIn
+          if (noGrowth >= LIST.MAX_NO_GROWTH) {
+            const offersMore = kind === 'people-tab' ? NBL.loadMoreButton(document) : NBL.nextButton(document);
+            throw new WalkStop(offersMore ? 'stalled' : 'end');
+          }
+        }
+      }
+    } catch (e) {
+      stop = e instanceof WalkStop ? e : new WalkStop('error', String((e && e.message) || e));
+    }
+    // tell Network Builder how it ended (header/facets again only if we're still on a normal list page)
+    say('Finishing');
+    const onList = ['end', 'cap', 'cancelled', 'stalled'].includes(stop.reason) && listKind() === kind;
+    try {
+      await post({ stopReason: stop.reason, ...(onList ? pageInfo() : {}) }, { final: true });
+    } catch {
+      /* a final post that can't be delivered leaves the run unfinished; the rows already sent are kept */
+    }
+    ui.phase('');
+    return { reason: stop.reason, message: stop.message, data: last };
+  }
+
+  /** the floating "Map to Network Builder" button on list pages; never starts anything by itself */
+  function ensureListButton() {
+    const kind = listKind();
+    if (!kind) {
+      if (listBtn) listBtn.remove();
+      listBtn = null;
+      if (listHost && !walk) closeListPanel();
+      return;
+    }
+    if (listBtn && document.contains(listBtn)) return;
+    listBtn = el('button', {
+      type: 'button',
+      id: 'nb-list-btn',
+      title: 'Map the people in this list to an account in Network Builder',
+      style: 'position:fixed;right:20px;bottom:20px;z-index:2147482000;border:0;border-radius:20px;padding:10px 16px;color:#fff;' +
+        'background:linear-gradient(135deg,#5b5bf0,#8b4fe0 60%,#c04fd0);font:600 14px -apple-system,system-ui,sans-serif;' +
+        'box-shadow:0 4px 16px rgba(0,0,0,.2);cursor:pointer;',
+      text: '⇣ Map to Network Builder',
+    });
+    listBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.isTrusted) openListPanel();
+    });
+    document.documentElement.append(listBtn);
+  }
+
   // LinkedIn is a single-page app: re-check when the URL or the page changes
   let scheduled = false;
   const schedule = () => {
@@ -559,6 +1046,7 @@
     setTimeout(() => {
       scheduled = false;
       ensureButton();
+      ensureListButton();
     }, 400);
   };
   new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });

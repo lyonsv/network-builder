@@ -13,6 +13,12 @@ import { errorCost } from '../llm/claude';
 import { buildDossier, DOSSIER_ESTIMATES } from '../llm/dossier';
 import { LENS_RERANK_USD_PER_100, LENS_USD_PER_1000, scoreLens } from '../llm/lens';
 import { AHOY_CHECK_USD_PER_PERSON, AHOY_SEND_USD_PER_PROPOSAL, checkAhoy, planAhoySend, sendAhoyProposal } from '../llm/ahoy';
+import { ORG_INFER_USD_PER_100, ORG_MIN_EDGE_CONFIDENCE, estimateOrgInferUsd, runOrgInference } from '../llm/org-infer';
+import {
+  ORG_RESEARCH_MIN_EDGE_CONFIDENCE, ORG_RESEARCH_PASSES, ORG_RESEARCH_PASS_IDS, ORG_RESEARCH_USD_ESTIMATE, estimateOrgResearchUsd, isOwnDomain, runOrgResearchPass, webPersonConfidence,
+  type OrgResearchData, type OrgResearchKnown, type OrgResearchPassId,
+} from '../llm/org-research';
+import { sameName } from '../accounts/identity';
 import { withLedger } from '../db/store';
 import type {
   CostTracker,
@@ -43,16 +49,23 @@ import {
 } from './http-common';
 import { renderExplorerHtml } from './template';
 import { AccountError, type AccountPatch, type MemberPatch } from '../db/accounts';
-import { CaptureError } from '../accounts/capture';
+import { CaptureError, canonicalCompanyUrl } from '../accounts/capture';
 import { accountMarkdown } from '../accounts/brief';
 import { ingestCapture } from '../accounts/ingest';
-import { accountSummaries, buildAccountView } from '../accounts/view';
-import type { AccountSummary, CapturePayload, CommitteeRole } from '../accounts/types';
+import { buildOrgMap, orgMapSources } from '../accounts/org';
+import { accountCompanyPages, accountSummaries, buildAccountView } from '../accounts/view';
+import {
+  COMMITTEE_ROLES, LIST_PAGE_KINDS, LIST_STOP_REASONS, SENIORITIES, type Account, type AccountSummary, type CapturePayload, type CommitteeRole, type LightContactInput,
+  type ListPageKind, type ListStopReason, type SourceRef,
+} from '../accounts/types';
+import { listFilters, parseFunctionFacets, parseListCard, parsePeopleHeader, type ListCardPayload } from '../accounts/list-capture';
 
 export type DossierFn = typeof buildDossier;
 export type ScoreFn = typeof scoreLens;
 export type AhoyCheckFn = typeof checkAhoy;
 export type AhoyProposalFn = typeof sendAhoyProposal;
+export type OrgInferFn = typeof runOrgInference;
+export type OrgResearchFn = typeof runOrgResearchPass;
 
 export interface ExplorerServerOptions {
   store: Store;
@@ -72,6 +85,12 @@ export interface ExplorerServerOptions {
   /** Ahoy hooks (tests) */
   ahoyCheckFn?: AhoyCheckFn;
   ahoyProposalFn?: AhoyProposalFn;
+  /** org inference hook (tests); default runOrgInference (Haiku) */
+  orgInferFn?: OrgInferFn;
+  /** model for org inference and the Haiku web-research passes (default haiku) */
+  orgModel?: string;
+  /** web org-research pass hook (tests); default runOrgResearchPass (seed pass on `researchModel`, the rest on `orgModel`) */
+  orgResearchFn?: OrgResearchFn;
   /** model for light dossiers (default haiku) */
   lightModel?: string;
   /** first-pass lens model (default haiku) */
@@ -106,6 +125,9 @@ export interface ExplorerServer {
 const DEPTH_RANK: Record<DossierDepth, number> = { light: 1, deep: 2 };
 const LIST_ID = /^[a-z0-9-]{1,64}$/;
 const LENS_ID = /^[a-z0-9-]{1,80}$/;
+/** list walks from the extension: rows per POST /ext/capture-list, rows per run (the extension caps runs at 500) */
+export const LIST_ROWS_PER_REQUEST = 100;
+export const LIST_ROWS_PER_RUN = 1000;
 
 const stripPrompt = ({ prompt: _p, ...l }: SavedList & { prompt?: string | null }): SavedList => l;
 
@@ -188,6 +210,10 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
   let ahoyJob: JobQueueState['ahoyJob'] = null;
   let ahoyPromise: Promise<void> | null = null;
   let lensPromise: Promise<void> | null = null;
+  // ---- account org-map job (one at a time) ----
+  let orgJob: JobQueueState['orgJob'] = null;
+  let orgPromise: Promise<void> | null = null;
+  let orgController: AbortController | null = null;
 
   const queueState = (): JobQueueState => ({
     queued: queued.map(({ id, depth }) => ({ id, depth })),
@@ -196,6 +222,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     pausedManual,
     lensJob: lensJob ? { ...lensJob } : null,
     ahoyJob: ahoyJob ? { ...ahoyJob } : null,
+    orgJob: orgJob ? { ...orgJob } : null,
     seq,
   });
   const bump = () => {
@@ -234,6 +261,9 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       lensRerankUsdPer100: LENS_RERANK_USD_PER_100,
       ahoyCheckUsdPerPerson: AHOY_CHECK_USD_PER_PERSON,
       ahoySendUsdPerProposal: AHOY_SEND_USD_PER_PROPOSAL,
+      orgInferUsdPer100: ORG_INFER_USD_PER_100,
+      orgResearchUsd: ORG_RESEARCH_USD_ESTIMATE,
+      orgResearchPassUsd: Object.fromEntries(ORG_RESEARCH_PASS_IDS.map((p) => [p, ORG_RESEARCH_PASSES[p].usd])),
     },
     dbPath: opts.dbPath,
     accounts: accountList(),
@@ -260,9 +290,10 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     emit({ type: 'accounts', accounts: accountList() });
     emit({ type: 'reload', reason: 'the database was changed by another network-builder process' });
   };
-  const emitQueue = () => {
+  /** `withCosts`: also send the spend (when an org job ends, so the page's spend chip catches failed / cancelled runs) */
+  const emitQueue = (withCosts = false) => {
     bump();
-    emit({ type: 'queue', queue: queueState() });
+    emit({ type: 'queue', queue: queueState(), ...(withCosts ? { costs: costSnapshot() } : {}) });
   };
 
   const bestDepth = (id: string): number => {
@@ -793,10 +824,15 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     if (!a) throw new HttpError(404, 'no such account');
     return a;
   };
-  const accountView = (id: string) => buildAccountView(store.accounts, accountOr404(id), people);
+  /** the account view the page gets: + the marketing org map (`buildOrgMap`, pure; MCP reuses it) */
+  const accountView = (id: string) => {
+    const v = buildAccountView(store.accounts, accountOr404(id), people);
+    return { ...v, org: buildOrgMap(v, orgMapSources(store.accounts, id)) };
+  };
   const accountsChanged = (changed?: string, notice?: string) => {
     const all = accountList();
-    emit({ type: 'accounts', accounts: all, ...(changed ? { changed } : {}), ...(notice ? { notice } : {}) });
+    // costs ride along so the page's spend chip follows org jobs (stage `org`)
+    emit({ type: 'accounts', accounts: all, ...(changed ? { changed } : {}), ...(notice ? { notice } : {}), costs: costSnapshot() });
     return all;
   };
   const strOpt = (v: unknown, field: string): string | undefined => {
@@ -824,7 +860,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
   };
   const memberPatch = (b: Record<string, unknown>): MemberPatch => {
     const p: MemberPatch = {};
-    for (const k of ['department', 'tier', 'role', 'reportsTo', 'notes'] as const) {
+    for (const k of ['department', 'tier', 'role', 'reportsTo', 'notes', 'subfunction', 'team', 'entity', 'country', 'responsibilities', 'noise', 'reportsToSource'] as const) {
       const v = strOpt(b[k], k);
       if (v !== undefined) (p as Record<string, string>)[k] = v;
     }
@@ -855,13 +891,375 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
   };
   const updateMember = (id: string, pid: string, b: Record<string, unknown>) => {
     accountOr404(id);
-    acct(() => store.accounts.updateMember(id, pid, memberPatch(b)));
+    if (b.confirmReportsTo !== undefined && typeof b.confirmReportsTo !== 'boolean') throw new HttpError(400, '`confirmReportsTo` must be a boolean');
+    const patch = memberPatch(b);
+    acct(() => {
+      store.accounts.updateMember(id, pid, patch);
+      if (b.confirmReportsTo === true && patch.reportsTo === undefined) store.accounts.confirmReportsTo(id, pid);
+    });
     return { view: accountView(id), accounts: accountsChanged(id) };
+  };
+  /** people typed in / pasted by hand without a capture → light contacts (source `manual`) */
+  const addLightContacts = (id: string, b: Record<string, unknown>) => {
+    accountOr404(id);
+    if (!Array.isArray(b.contacts)) throw new HttpError(400, '`contacts` must be an array');
+    if (!b.contacts.length) throw new HttpError(400, 'no contacts to add');
+    if (b.contacts.length > 500) throw new HttpError(400, 'too many contacts (max 500 per request)');
+    const role = strOpt(b.role, 'role') as CommitteeRole | '' | undefined;
+    if (role && !COMMITTEE_ROLES.includes(role)) throw new HttpError(400, `role must be one of: ${COMMITTEE_ROLES.join(', ')}`);
+    const at = new Date().toISOString();
+    const caps = { fullName: 200, url: 2000, title: 300, headline: 500, company: 200, location: 200 } as const;
+    const inputs: LightContactInput[] = b.contacts.map((c, i) => {
+      if (!c || typeof c !== 'object' || Array.isArray(c)) throw new HttpError(400, `contacts[${i}] must be an object`);
+      const o = c as Record<string, unknown>;
+      const out: Record<string, string> = {};
+      for (const [k, max] of Object.entries(caps)) {
+        const v = o[k];
+        if (v === undefined || v === null) continue;
+        if (typeof v !== 'string') throw new HttpError(400, `contacts[${i}].${k} must be a string`);
+        if (v.length > max) throw new HttpError(400, `contacts[${i}].${k} is too long (max ${max} chars)`);
+        out[k] = v;
+      }
+      if (!out.fullName?.trim()) throw new HttpError(400, `contacts[${i}].fullName is required`);
+      return { ...out, fullName: out.fullName, source: { kind: 'manual', at } } as LightContactInput;
+    });
+    const r = acct(() => store.accounts.upsertLightContacts(id, inputs));
+    if (role) for (const pid of r.added) acct(() => store.accounts.updateMember(id, pid, { role }));
+    return { ...r, view: accountView(id), accounts: accountsChanged(id) };
   };
   const removeMember = (id: string, pid: string) => {
     accountOr404(id);
     if (!store.accounts.removeMember(id, pid)) throw new HttpError(404, 'that person isn’t on this account');
     return { view: accountView(id), accounts: accountsChanged(id) };
+  };
+
+  // ---- org map: Haiku classification + suggested reporting lines (paid; only from a POST by the page) ----
+  const orgInferFn = opts.orgInferFn ?? runOrgInference;
+  const orgBusy = () => {
+    if (orgPromise) throw new HttpError(409, 'an org job is already running — wait for it to finish or cancel it');
+  };
+  const orgInfer = (id: string, b: Record<string, unknown>) => {
+    orgBusy();
+    const account = accountOr404(id);
+    const view = accountView(id);
+    const onAccount = new Set(view.members.map((m) => m.id));
+    let ids: string[];
+    if (b.ids === undefined || b.ids === null) ids = [...onAccount];
+    else {
+      ids = parseIds(b.ids, true)!.map((x) => store.accounts.resolveId(x));
+      const off = ids.filter((x) => !onAccount.has(x));
+      if (off.length) throw new HttpError(400, `${off.length} of \`ids\` ${off.length === 1 ? 'is' : 'are'} not on this account`);
+      ids = [...new Set(ids)];
+    }
+    if (!ids.length) throw new HttpError(400, 'no people on this account to classify');
+    const estimateUsd = estimateOrgInferUsd(ids.length);
+    const ctl = new AbortController();
+    const onShutdown = () => ctl.abort();
+    controller.signal.addEventListener('abort', onShutdown, { once: true });
+    orgController = ctl;
+    orgJob = { accountId: id, kind: 'infer', phase: 'classify', done: 0, total: ids.length, pausedUntil: null, pausedManual: false };
+    emitQueue();
+    orgPromise = (async () => {
+      try {
+        const r = await orgInferFn({
+          // entities the user set, and company pages walked into this account, count as the account (Phase 2b)
+          account: {
+            ...account,
+            entities: [
+              ...new Set([
+                ...store.accounts.members(id).map((m) => m.entity),
+                ...accountCompanyPages(store.accounts, id).map((u) => {
+                  const slug = /\/company\/([^/?#]+)/i.exec(u)?.[1] ?? '';
+                  return slug ? `LinkedIn page linkedin.com/company/${slug}` : '';
+                }),
+              ].filter(Boolean)),
+            ],
+          },
+          members: view.members,
+          ids,
+          model: opts.orgModel ?? 'haiku',
+          signal: ctl.signal,
+          costs,
+          onProgress: ({ phase, done, total }) => {
+            orgJob = { accountId: id, kind: 'infer', phase, done, total, pausedUntil: null, pausedManual: false };
+            emitQueue();
+          },
+        });
+        costs.add('org', r.costUsd);
+        if (ctl.signal.aborted || !store.accounts.get(id)) return;
+        const onNow = new Set(store.accounts.members(id).map((m) => m.personId));
+        const n = store.accounts.applyInference(id, [...r.classified].filter(([pid]) => onNow.has(pid)));
+        const { applied } = store.accounts.replaceInferredReportsTo(
+          id,
+          ids.filter((pid) => onNow.has(pid)),
+          // weak guesses are never stored as lines (runOrgInference keeps them as `possibleManager`)
+          r.edges.filter((e) => onNow.has(e.id) && (!e.managerId || (onNow.has(e.managerId) && e.confidence >= ORG_MIN_EDGE_CONFIDENCE))),
+        );
+        const extra = [
+          r.failedBatches ? `${r.failedBatches} batch${r.failedBatches > 1 ? 'es' : ''} failed` : '',
+          r.reportingFallback ? 'reporting lines from title rules' : '',
+        ].filter(Boolean);
+        accountsChanged(id, `Classified ${n} ${n === 1 ? 'person' : 'people'}; ${applied} reporting line${applied === 1 ? '' : 's'} suggested${extra.length ? ` (${extra.join('; ')})` : ''}`);
+      } catch (e) {
+        const ec = errorCost(e);
+        if (ec.usd > 0) costs.add('org', ec.usd);
+        if (ec.incomplete) costs.markIncomplete();
+        if (isAbortError(e) || ctl.signal.aborted) {
+          if (!controller.signal.aborted) emit({ type: 'notice', level: 'info', message: 'Org inference cancelled — nothing was changed.' });
+        } else emit({ type: 'notice', level: 'error', message: `Org inference failed: ${(e as Error)?.message ?? e}` });
+      } finally {
+        controller.signal.removeEventListener('abort', onShutdown);
+        orgJob = null;
+        orgPromise = null;
+        orgController = null;
+        if (!controller.signal.aborted) emitQueue(true);
+      }
+    })();
+    return { started: ids.length, estimateUsd, queue: queueState() };
+  };
+  const orgCancel = (id: string) => {
+    accountOr404(id);
+    const cancelled = Boolean(orgController && orgJob?.accountId === id);
+    if (cancelled) orgController!.abort();
+    return { cancelled, queue: queueState() };
+  };
+
+  // ---- org map: web research (paid; sequential passes; only from a POST by the page) ----
+  const orgResearchFn = opts.orgResearchFn ?? runOrgResearchPass;
+  /** set while a research job waits out a rate-limit pause; POST …/org/resume calls it */
+  let orgResume: (() => void) | null = null;
+  const abortError = () => Object.assign(new Error('Aborted'), { name: 'AbortError' });
+  /** wait `ms` (null = until resumed); resolves early on resume ('resumed'), else 'timeout'; rejects on abort */
+  const orgWait = (ms: number | null, signal: AbortSignal) =>
+    new Promise<'resumed' | 'timeout'>((resolve, reject) => {
+      let t: NodeJS.Timeout | undefined;
+      const cleanup = () => {
+        if (t) clearTimeout(t);
+        signal.removeEventListener('abort', onAbort);
+        orgResume = null;
+      };
+      const done = (how: 'resumed' | 'timeout') => {
+        cleanup();
+        resolve(how);
+      };
+      const onAbort = () => {
+        cleanup();
+        reject(abortError());
+      };
+      if (signal.aborted) return onAbort();
+      signal.addEventListener('abort', onAbort, { once: true });
+      if (ms !== null) t = setTimeout(() => done('timeout'), ms);
+      orgResume = () => done('resumed');
+    });
+  /** what the account already holds: marketing people first, most senior first */
+  const researchKnown = (id: string): OrgResearchKnown => {
+    const ms = [...accountView(id).members].sort(
+      (a, b) =>
+        Number(b.department === 'marketing') - Number(a.department === 'marketing') ||
+        SENIORITIES.indexOf(a.seniority) - SENIORITIES.indexOf(b.seniority),
+    );
+    const uniq = (xs: string[]) => [...new Set(xs.filter(Boolean))];
+    return {
+      people: ms.map((m) => ({ name: m.fullName, title: m.title })),
+      entities: uniq(ms.map((m) => m.entity)),
+      countries: uniq(ms.map((m) => m.country)),
+      locations: uniq(ms.map((m) => m.location)).slice(0, 50),
+    };
+  };
+  /** write one pass's findings (each item on its own: one bad item never loses the rest) */
+  const persistResearch = (id: string, account: Account, pass: OrgResearchPassId, data: OrgResearchData, runId: string) => {
+    const at = new Date().toISOString();
+    const out = { added: 0, updated: 0, facts: 0, headcounts: 0, edges: 0, skipped: 0, duplicates: [] as string[] };
+    const tryItem = (fn: () => void) => {
+      try {
+        fn();
+      } catch (e) {
+        if (!(e instanceof AccountError)) throw e;
+        out.skipped++;
+      }
+    };
+    for (const p of data.people) {
+      tryItem(() => {
+        const source: SourceRef = { kind: 'web', at, url: p.evidenceUrl, evidenceUrl: p.evidenceUrl, quote: p.quote };
+        const r = store.accounts.upsertLightContacts(id, [{ fullName: p.name, title: p.title, company: p.entity || account.name, source }], { matchNameOnly: true });
+        if (r.warnings.length) out.duplicates.push(p.name);
+        const pid = r.added[0] ?? r.updated[0] ?? r.merged[0];
+        if (!pid) return void out.skipped++;
+        if (r.added.length) out.added++;
+        else out.updated++;
+        store.accounts.applyWebFindings(id, pid, {
+          entity: p.entity, country: p.country, subfunction: p.subfunction, confidence: webPersonConfidence(p, account, pass, at.slice(0, 10)), at,
+        });
+      });
+    }
+    for (const f of data.facts) {
+      const where = [f.entity && !f.text.includes(f.entity) ? f.entity : '', f.country].filter(Boolean).join(', ');
+      tryItem(() => {
+        out.facts += store.accounts.addOrgFacts(id, [
+          { kind: f.kind, text: where ? `${f.text} (${where})` : f.text, evidenceUrl: f.evidenceUrl, quote: f.quote, confidence: f.confidence, runId, foundAt: at },
+        ]).added;
+      });
+    }
+    const existing = store.accounts.headcounts(id).filter((h) => h.source === 'web');
+    for (const h of data.headcounts) {
+      if (existing.some((e) => e.label === h.label && e.count === h.count && e.evidenceUrl === h.evidenceUrl)) continue;
+      tryItem(() => {
+        existing.push(
+          store.accounts.addHeadcount(id, {
+            source: 'web', scope: h.scope, label: h.label, count: h.count, url: h.evidenceUrl, evidenceUrl: h.evidenceUrl, quote: h.quote,
+            confidence: isOwnDomain(h.evidenceUrl, account.domain) ? 0.9 : 0.6, runId, takenAt: at,
+          }),
+        );
+        out.headcounts++;
+      });
+    }
+    // "A reports to B" naming two people on the account (exactly one match each) → a 'web' line at the fact's confidence
+    // (capped at 0.9, only from 0.6 = clearly implied); never over a user line
+    const reporting = data.facts.filter((f) => f.kind === 'reporting' && f.subject && f.manager && f.confidence >= ORG_RESEARCH_MIN_EDGE_CONFIDENCE);
+    if (reporting.length) {
+      const members = accountView(id).members;
+      const one = (name: string) => {
+        const hits = members.filter((m) => sameName(m.fullName, name));
+        return hits.length === 1 ? hits[0]!.id : '';
+      };
+      for (const f of reporting) {
+        const subj = one(f.subject);
+        const mgr = one(f.manager);
+        if (!subj || !mgr || subj === mgr) continue;
+        tryItem(() => {
+          if (store.accounts.applyInferredReportsTo(id, subj, mgr, Math.min(0.9, f.confidence), `web: “${f.quote.slice(0, 300)}” ${f.evidenceUrl}`, 'web')) out.edges++;
+        });
+      }
+    }
+    return out;
+  };
+
+  const orgResearch = (id: string, b: Record<string, unknown>) => {
+    orgBusy();
+    accountOr404(id);
+    let passes: OrgResearchPassId[];
+    if (b.passes === undefined || b.passes === null) passes = [...ORG_RESEARCH_PASS_IDS];
+    else {
+      const ok = new Set<string>(ORG_RESEARCH_PASS_IDS);
+      if (!Array.isArray(b.passes) || !b.passes.length || b.passes.length > 20 || b.passes.some((p) => typeof p !== 'string' || !ok.has(p)))
+        throw new HttpError(400, `passes must be a non-empty array of: ${ORG_RESEARCH_PASS_IDS.join(', ')}`);
+      // canonical order (seed first), each once
+      passes = ORG_RESEARCH_PASS_IDS.filter((p) => (b.passes as string[]).includes(p));
+    }
+    const estimate = estimateOrgResearchUsd(passes);
+    const runId = `web-${randomBytes(6).toString('hex')}`;
+    const ctl = new AbortController();
+    const onShutdown = () => ctl.abort();
+    controller.signal.addEventListener('abort', onShutdown, { once: true });
+    orgController = ctl;
+    const setJob = (phase: string, done: number, extra: { pausedUntil?: string | null; pausedManual?: boolean } = {}) => {
+      orgJob = { accountId: id, kind: 'research', phase, done, total: passes.length, pausedUntil: null, pausedManual: false, ...extra };
+      emitQueue();
+    };
+    setJob(passes[0]!, 0);
+    orgPromise = (async () => {
+      const tot = { added: 0, updated: 0, facts: 0, headcounts: 0, edges: 0, dropped: 0, duplicates: [] as string[] };
+      const failed: string[] = [];
+      let level = 0;
+      let gone = false;
+      try {
+        for (let i = 0; i < passes.length && !gone; i++) {
+          const pass = passes[i]!;
+          const label = ORG_RESEARCH_PASSES[pass].label;
+          for (;;) {
+            if (ctl.signal.aborted) throw abortError();
+            const account = store.accounts.get(id);
+            if (!account) {
+              gone = true;
+              break;
+            }
+            setJob(pass, i);
+            const r = await orgResearchFn({
+              account,
+              pass,
+              known: researchKnown(id),
+              model: pass === 'seed' ? opts.researchModel : (opts.orgModel ?? 'haiku'),
+              signal: ctl.signal,
+            });
+            if (r.costUsd > 0) costs.add('org', r.costUsd);
+            if (r.costIncomplete) costs.markIncomplete();
+            if (r.status === 'rate_limited') {
+              if (level < backoff.length) {
+                const delay = backoff[level++] ?? 60_000;
+                setJob(pass, i, { pausedUntil: new Date(Date.now() + delay).toISOString() });
+                emit({ type: 'notice', level: 'warn', message: `Web research is rate-limited — pausing for ${Math.max(1, Math.round(delay / 60_000))} min, then retrying “${label}”.` });
+                if ((await orgWait(delay, ctl.signal)) === 'resumed') level = 0;
+              } else {
+                setJob(pass, i, { pausedManual: true });
+                emit({ type: 'notice', level: 'warn', message: 'Web research keeps hitting the rate limit — paused. Click Resume when you want to try again.' });
+                await orgWait(null, ctl.signal);
+                level = 0;
+              }
+              continue; // the same pass again
+            }
+            if (r.status === 'error' || !r.data) {
+              failed.push(label);
+              emit({ type: 'notice', level: 'error', message: `Web research “${label}” failed: ${r.error ?? 'no result'}` });
+              break;
+            }
+            level = 0;
+            if (!store.accounts.get(id)) {
+              gone = true;
+              break;
+            }
+            const s = persistResearch(id, account, pass, r.data, runId);
+            tot.added += s.added;
+            tot.updated += s.updated;
+            tot.facts += s.facts;
+            tot.headcounts += s.headcounts;
+            tot.edges += s.edges;
+            tot.dropped += r.data.dropped;
+            tot.duplicates.push(...s.duplicates);
+            accountsChanged(id);
+            break;
+          }
+        }
+        if (gone) return;
+        const parts = [
+          `${tot.added} new ${tot.added === 1 ? 'person' : 'people'}`,
+          tot.updated ? `${tot.updated} confirmed` : '',
+          `${tot.facts} fact${tot.facts === 1 ? '' : 's'}`,
+          tot.headcounts ? `${tot.headcounts} headcount${tot.headcounts === 1 ? '' : 's'}` : '',
+          tot.edges ? `${tot.edges} reporting line${tot.edges === 1 ? '' : 's'}` : '',
+          tot.dropped ? `${tot.dropped} item${tot.dropped === 1 ? '' : 's'} without evidence dropped` : '',
+          tot.duplicates.length
+            ? `possible duplicate${tot.duplicates.length === 1 ? '' : 's'} to check: ${[...new Set(tot.duplicates)].slice(0, 5).join(', ')}${new Set(tot.duplicates).size > 5 ? ', …' : ''}`
+            : '',
+          failed.length ? `failed: ${failed.join(', ')}` : '',
+        ].filter(Boolean);
+        accountsChanged(id, `Web research done — ${parts.join('; ')}`);
+      } catch (e) {
+        const ec = errorCost(e);
+        if (ec.usd > 0) costs.add('org', ec.usd);
+        if (ec.incomplete) costs.markIncomplete();
+        if (isAbortError(e) || ctl.signal.aborted) {
+          if (!controller.signal.aborted) {
+            emit({ type: 'notice', level: 'info', message: 'Web research cancelled — findings from finished passes are kept.' });
+            if (store.accounts.get(id)) accountsChanged(id);
+          }
+        } else emit({ type: 'notice', level: 'error', message: `Web research failed: ${(e as Error)?.message ?? e}` });
+      } finally {
+        controller.signal.removeEventListener('abort', onShutdown);
+        orgResume = null;
+        orgJob = null;
+        orgPromise = null;
+        orgController = null;
+        if (!controller.signal.aborted) emitQueue(true);
+      }
+    })();
+    return { started: passes.length, passes, estimate, queue: queueState() };
+  };
+  /** end a rate-limit pause of the research job now (after the backoff schedule ran out it waits for this) */
+  const orgResumeJob = (id: string) => {
+    accountOr404(id);
+    const resumed = Boolean(orgResume && orgJob?.accountId === id && orgJob.kind === 'research');
+    if (resumed) orgResume!();
+    return { resumed, queue: queueState() };
   };
 
   // ---- Chrome extension ----
@@ -949,6 +1347,159 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     };
   };
 
+  /**
+   * A batch of rows from a list walk (company People tab / people search). Named rows → light contacts on the account
+   * (source `extension-list`), "LinkedIn Member" rows → anonymous rows of the run, header/facets → headcount rows of the
+   * run (replaced on re-post). Idempotent per run: the same batch again adds nothing. Free and local.
+   */
+  const extCaptureList = (b: Record<string, unknown>) => {
+    const runId = strOpt(b.runId, 'runId') ?? '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runId)) throw new HttpError(400, '`runId` must be a UUID');
+    const pg = b.page;
+    if (!pg || typeof pg !== 'object' || Array.isArray(pg)) throw new HttpError(400, '`page` is required');
+    const page = pg as Record<string, unknown>;
+    const kind = strOpt(page.kind, 'page.kind') as ListPageKind | undefined;
+    if (!kind || !LIST_PAGE_KINDS.includes(kind)) throw new HttpError(400, `\`page.kind\` must be one of: ${LIST_PAGE_KINDS.join(', ')}`);
+    const pageUrl = strOpt(page.url, 'page.url') ?? '';
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(pageUrl);
+    } catch {
+      throw new HttpError(400, '`page.url` must be a linkedin.com URL');
+    }
+    if (pageUrl.length > 2000 || parsedUrl.protocol !== 'https:' || !/(^|\.)linkedin\.com$/i.test(parsedUrl.hostname)) {
+      throw new HttpError(400, '`page.url` must be a linkedin.com URL');
+    }
+    const keywords = (strOpt(page.keywords, 'page.keywords') ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const companyUrl = (strOpt(page.companyUrl, 'page.companyUrl') ?? '').slice(0, 2000);
+    if (!Array.isArray(b.rows)) throw new HttpError(400, '`rows` must be an array');
+    if (b.rows.length > LIST_ROWS_PER_REQUEST) throw new HttpError(400, `too many rows (max ${LIST_ROWS_PER_REQUEST} per request)`);
+    const rows: ListCardPayload[] = b.rows.map((r, i) => {
+      if (!r || typeof r !== 'object' || Array.isArray(r)) throw new HttpError(400, `rows[${i}] must be an object`);
+      const o = r as Record<string, unknown>;
+      if (!Number.isInteger(o.idx) || (o.idx as number) < 0 || (o.idx as number) >= 100_000) throw new HttpError(400, `rows[${i}].idx must be a whole number ≥ 0`);
+      if (!Array.isArray(o.lines) || o.lines.length > 40 || !o.lines.every((l) => typeof l === 'string' && l.length <= 1000)) {
+        throw new HttpError(400, `rows[${i}].lines must be up to 40 strings`);
+      }
+      if (o.href !== undefined && (typeof o.href !== 'string' || o.href.length > 2000)) throw new HttpError(400, `rows[${i}].href must be a string`);
+      return { idx: o.idx as number, lines: o.lines as string[], href: (o.href as string | undefined) ?? '' };
+    });
+    const header = strOpt(b.header, 'header');
+    const facets = strOpt(b.facets, 'facets');
+    if ((header?.length ?? 0) > 2000 || (facets?.length ?? 0) > 20_000) throw new HttpError(400, '`header` / `facets` text is too long');
+    if (b.final !== undefined && typeof b.final !== 'boolean') throw new HttpError(400, '`final` must be a boolean');
+    const stopReason = strOpt(b.stopReason, 'stopReason') ?? '';
+    if (stopReason && !LIST_STOP_REASONS.includes(stopReason as ListStopReason)) throw new HttpError(400, `\`stopReason\` must be one of: ${LIST_STOP_REASONS.join(', ')}`);
+
+    // the run (and its account): an existing run keeps its account; a new one resolves it like a profile capture
+    let run = store.accounts.getListRun(runId.toLowerCase());
+    const accountId = strOpt(b.accountId, 'accountId') || '';
+    let createdAccount = false;
+    let account;
+    if (run) {
+      account = accountOr404(run.accountId);
+      if (accountId && accountId !== run.accountId) throw new HttpError(409, 'this list run belongs to another account');
+      if (run.finishedAt) throw new HttpError(409, 'this list run has already finished — start a new one');
+    } else if (accountId) {
+      account = store.accounts.get(accountId);
+      if (!account) throw new HttpError(404, 'that account no longer exists — pick another one');
+    } else {
+      const name = (strOpt(b.accountName, 'accountName') ?? '').replace(/\s+/g, ' ').trim();
+      account = (name ? store.accounts.find(name) : undefined) ?? store.accounts.match(name, companyUrl);
+      if (!account) {
+        if (!name) throw new HttpError(400, 'pick an account (or type a name for a new one)');
+        const cu = canonicalCompanyUrl(companyUrl);
+        account = acct(() => store.accounts.create({ name, ...(cu && !store.accounts.match('', cu) ? { linkedinUrl: cu } : {}) }));
+        createdAccount = true;
+      }
+    }
+    const newRun = !run;
+    if (!run) run = acct(() => store.accounts.startListRun(account.id, { id: runId, pageKind: kind, url: parsedUrl.href, keywords }));
+    if (run.rowsSeen >= LIST_ROWS_PER_RUN) throw new HttpError(409, `this list run already has ${LIST_ROWS_PER_RUN.toLocaleString('en-US')} rows (the most one run may send)`);
+    const batch = rows.filter((r) => r.idx < LIST_ROWS_PER_RUN); // a run never holds more than 1,000 rows
+
+    const at = new Date().toISOString();
+    const source = { kind: 'extension-list' as const, at, url: run.url, runId: run.id };
+    const named: LightContactInput[] = [];
+    const anon: { idx: number; headline: string; location: string }[] = [];
+    for (const r of batch) {
+      const c = parseListCard({ lines: r.lines, href: r.href, pageKind: kind, pageUrl: parsedUrl.href, accountName: account.name });
+      if (c.anonymous) anon.push({ idx: r.idx, headline: c.headline, location: c.location });
+      else named.push({ fullName: c.fullName, url: c.url, headline: c.headline, title: c.title, company: c.company, location: c.location, source });
+    }
+    const up = named.length ? acct(() => store.accounts.upsertLightContacts(account.id, named)) : { added: [], updated: [], merged: [], skipped: [], warnings: [] };
+    const newAnon = anon.length ? acct(() => store.accounts.addAnonRows(run!.id, anon)) : 0;
+
+    // header + "What they do" → headcount rows of this run (a re-post replaces them)
+    const hcSource = kind === 'people-tab' ? 'linkedin-people' : 'linkedin-search';
+    // company-wide only for a People tab with no filters at all; anything filtered is a query, labelled with its filters
+    const filters = listFilters(parsedUrl.href); // result-set filters only (no page / origin / spelling flags)
+    const scope = kind === 'people-tab' && !filters.length ? 'company' : 'query';
+    const label = (filters.length === 1 && filters[0]![0] === 'keywords' ? filters[0]![1] : filters.map(([k, v]) => `${k}: ${v}`).join(' · '))
+      .replace(/\s+/g, ' ').trim().slice(0, 200);
+    let headerCount: number | null = null;
+    if (header !== undefined) {
+      const n = parsePeopleHeader(header);
+      headerCount = n;
+      // an empty / unreadable header (e.g. on the final post) keeps the run's earlier snapshot
+      if (n !== null) {
+        acct(() => store.accounts.replaceRunHeadcounts(account.id, run!.id, [scope], [
+          { source: hcSource, scope, count: n, label, url: parsedUrl.href, quote: header.replace(/\s+/g, ' ').trim().slice(0, 200), confidence: 0.9 },
+        ]));
+      }
+    }
+    let facetRows = 0;
+    // "What they do" on a FILTERED People tab (keywords / facets) counts the filtered result set, not the company's
+    // functions: never stored, so it can't replace the company-wide figure
+    if (facets !== undefined && kind === 'people-tab' && scope === 'company') {
+      const fs = parseFunctionFacets(facets);
+      facetRows = fs.length;
+      if (fs.length) {
+        acct(() => store.accounts.replaceRunHeadcounts(account.id, run!.id, ['function'], fs.map((f) => (
+          { source: 'linkedin-people' as const, scope: 'function' as const, count: f.count, label: f.label, url: parsedUrl.href, confidence: 0.9 }
+        ))));
+      }
+    }
+
+    const maxIdx = batch.reduce((m, r) => Math.max(m, r.idx + 1), 0);
+    // "Capture headcount only" (extension): the run's first and only post, final, zero rows → marked `counts-only`
+    // (left out of the org map's runs and of the anonymous count)
+    const countsOnly = newRun && b.final === true && !batch.length;
+    run = acct(() => store.accounts.updateListRun(run!.id, {
+      rowsSeen: Math.min(LIST_ROWS_PER_RUN, Math.max(run!.rowsSeen, maxIdx)),
+      named: store.accounts.runMemberCount(account.id, run!.id),
+      anonymous: store.accounts.anonCount(run!.id),
+      ...(b.final === true ? { finishedAt: at, stopReason: (countsOnly ? 'counts-only' : stopReason || 'end') as ListStopReason } : {}),
+    }));
+    if (up.added.length || up.updated.length || up.merged.length) store.accounts.touch(account.id);
+    const changed = up.added.length + up.merged.length + newAnon + facetRows > 0 || header !== undefined || b.final === true || createdAccount;
+    if (changed) {
+      const why = run.stopReason && run.stopReason !== 'end' ? ` (stopped: ${run.stopReason})` : '';
+      const hc = [headerCount !== null ? `${headerCount.toLocaleString('en')} members` : '', facetRows ? `${facetRows} “What they do” counts` : ''].filter(Boolean);
+      accountsChanged(
+        account.id,
+        b.final !== true
+          ? undefined
+          : countsOnly
+            ? `Saved LinkedIn headcount for ${account.name}: ${hc.join(', ') || 'no numbers found'}`
+            : `Mapped ${run.named} ${run.named === 1 ? 'person' : 'people'}${run.anonymous ? ` + ${run.anonymous} anonymous` : ''} from a LinkedIn list to ${account.name}${why}`,
+      );
+    }
+    return {
+      account: { id: account.id, name: account.name },
+      createdAccount,
+      run,
+      added: up.added.length,
+      updated: up.updated.length,
+      merged: up.merged.length,
+      skipped: up.skipped.length,
+      anonymous: newAnon,
+      totalRows: run.rowsSeen,
+      /** what this post stored as headcount: the header's count (null = none read) and the number of function counts */
+      headcount: { members: headerCount, functions: facetRows },
+    };
+  };
+
   // ---- snapshot ----
   let snapshotChain: Promise<unknown> = Promise.resolve();
   const snapshot = (): Promise<string> => {
@@ -972,20 +1523,20 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
   const handleExtension = async (req: IncomingMessage, res: ServerResponse, url: URL, method: string) => {
     checkExtensionRequest(req, port);
     const route = `${method} ${url.pathname}`;
-    const known = ['GET /ext/ping', 'GET /ext/accounts', 'GET /ext/lookup', 'POST /ext/capture'];
+    const known = ['GET /ext/ping', 'GET /ext/accounts', 'GET /ext/lookup', 'POST /ext/capture', 'POST /ext/capture-list'];
     if (!known.includes(route)) throw new HttpError(known.some((k) => k.endsWith(` ${url.pathname}`)) ? 405 : 404, 'not found');
     const stored = store.getMeta('ext_token') ?? '';
     if (!stored || !safeEqual(String(req.headers['x-nb-capture'] ?? ''), stored)) {
       throw new HttpError(401, 'not paired (or the pairing was reset) — in Network Builder open Accounts → Chrome extension and pair again');
     }
-    if (route !== 'POST /ext/capture') notifyIfChanged();
+    if (!route.startsWith('POST ')) notifyIfChanged();
     extSeen();
     switch (route) {
       case 'GET /ext/ping':
         return sendJson(res, 200, { ok: true, app: 'network-builder', accounts: store.accounts.list().length });
       case 'GET /ext/accounts':
         return sendJson(res, 200, {
-          accounts: accountList().map((a) => ({ id: a.id, name: a.name, status: a.status, memberCount: a.memberCount })),
+          accounts: accountList().map((a) => ({ id: a.id, name: a.name, status: a.status, memberCount: a.memberCount, linkedinUrl: store.accounts.get(a.id)?.linkedinUrl ?? '' })),
         });
       case 'GET /ext/lookup':
         return sendJson(res, 200, extLookup(url));
@@ -994,6 +1545,12 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
         if (closing) throw new HttpError(503, 'Network Builder is shutting down');
         notifyIfChanged();
         return sendJson(res, 200, extCapture(body));
+      }
+      case 'POST /ext/capture-list': {
+        const body = await readJsonBody(req);
+        if (closing) throw new HttpError(503, 'Network Builder is shutting down');
+        notifyIfChanged();
+        return sendJson(res, 200, extCaptureList(body));
       }
     }
   };
@@ -1017,8 +1574,12 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       }
     };
     const m = /^\/api\/(lists|lenses)\/([^/]+)(\/refresh)?$/.exec(url.pathname);
-    const am = /^\/api\/accounts\/([^/]+)(?:\/(brief|members)(?:\/([^/]+))?)?$/.exec(url.pathname);
-    if (m) {
+    const am = /^\/api\/accounts\/([^/]+)(?:\/(brief|members|contacts)(?:\/([^/]+))?)?$/.exec(url.pathname);
+    const om = /^\/api\/accounts\/([^/]+)\/org\/(infer|cancel|research|resume)$/.exec(url.pathname);
+    if (om) {
+      param = dec(om[1]!);
+      routePath = `/api/accounts/:id/org/${om[2]}`;
+    } else if (m) {
       param = dec(m[2]!);
       routePath = `/api/${m[1]}/:id${m[3] ?? ''}`;
     } else if (am) {
@@ -1036,7 +1597,9 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       'POST /api/ahoy/check', 'POST /api/ahoy/resolve', 'POST /api/ahoy/plan', 'POST /api/ahoy/send',
       'GET /api/accounts', 'POST /api/accounts', 'GET /api/accounts/:id', 'PUT /api/accounts/:id', 'DELETE /api/accounts/:id',
       'GET /api/accounts/:id/brief', 'POST /api/accounts/:id/members', 'PUT /api/accounts/:id/members/:pid',
-      'DELETE /api/accounts/:id/members/:pid', 'POST /api/ext/pair',
+      'DELETE /api/accounts/:id/members/:pid', 'POST /api/accounts/:id/contacts', 'POST /api/ext/pair',
+      'POST /api/accounts/:id/org/infer', 'POST /api/accounts/:id/org/cancel',
+      'POST /api/accounts/:id/org/research', 'POST /api/accounts/:id/org/resume',
     ];
     if (!known.includes(route)) {
       if (known.some((k) => k.endsWith(` ${routePath}`))) throw new HttpError(405, 'method not allowed');
@@ -1142,6 +1705,24 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       case 'DELETE /api/accounts/:id/members/:pid':
         await readJsonBody(req);
         return sendJson(res, 200, removeMember(param, param2));
+      case 'POST /api/accounts/:id/contacts':
+        return sendJson(res, 200, addLightContacts(param, await readJsonBody(req)));
+      case 'POST /api/accounts/:id/org/infer': {
+        const body = await readJsonBody(req);
+        if (closing) throw new HttpError(503, 'server is shutting down');
+        return sendJson(res, 200, orgInfer(param, body));
+      }
+      case 'POST /api/accounts/:id/org/cancel':
+        await readJsonBody(req);
+        return sendJson(res, 200, orgCancel(param));
+      case 'POST /api/accounts/:id/org/research': {
+        const body = await readJsonBody(req);
+        if (closing) throw new HttpError(503, 'server is shutting down');
+        return sendJson(res, 200, orgResearch(param, body));
+      }
+      case 'POST /api/accounts/:id/org/resume':
+        await readJsonBody(req);
+        return sendJson(res, 200, orgResumeJob(param));
       case 'POST /api/ext/pair': {
         const body = await readJsonBody(req);
         return sendJson(res, 200, pairingCode(body.rotate === true));
@@ -1190,7 +1771,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       cancelDossiers();
       if (pauseTimer) clearTimeout(pauseTimer);
       controller.abort();
-      await Promise.allSettled([...inflight, ...(lensPromise ? [lensPromise] : []), ...(ahoyPromise ? [ahoyPromise] : [])]);
+      await Promise.allSettled([...inflight, ...(lensPromise ? [lensPromise] : []), ...(ahoyPromise ? [ahoyPromise] : []), ...(orgPromise ? [orgPromise] : [])]);
       let snap = '';
       try {
         snap = await snapshot();

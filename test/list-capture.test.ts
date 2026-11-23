@@ -1,0 +1,374 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { Window } from 'happy-dom';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { cleanCompany, cleanPersonName, listFilters, parseCount, parseFunctionFacets, parseListCard, parsePeopleHeader } from '../src/accounts/list-capture';
+
+// Everything here is fictional: Ledgerly is not a real company and nobody named is a real person.
+
+const root = path.join(import.meta.dirname, '..');
+const fixture = (f: string) => readFileSync(path.join(root, 'test/fixtures', f), 'utf8');
+
+interface NBList {
+  pageKind(p: string): string;
+  companySlug(p: string): string;
+  keywordsOf(href: string): string;
+  filterKey(href: string): string;
+  resultCards(doc: Document, base: string): Element[];
+  readCard(card: Element, base: string): { lines: string[]; href: string };
+  headerText(doc: Document): string;
+  facetsText(doc: Document): string;
+  facetsExpandButton(doc: Document): HTMLElement | null;
+  stopReason(doc: Document, href: string): string;
+  noResults(doc: Document): boolean;
+  loadMoreButton(doc: Document): Element | null;
+  nextButton(doc: Document): Element | null;
+}
+let L: NBList;
+beforeAll(() => {
+  // the extension's list reader is a plain script that sets globalThis.NBList (no build step)
+  new Function(readFileSync(path.join(root, 'extension/list-reader.js'), 'utf8'))();
+  L = (globalThis as unknown as { NBList: NBList }).NBList;
+});
+
+function page(html: string, url: string): { doc: Document; url: string } {
+  const w = new Window({ url });
+  w.document.body.innerHTML = html;
+  return { doc: w.document as unknown as Document, url };
+}
+
+describe('parseListCard (server side)', () => {
+  it('reads a vanity card: name, degree, headline split, noise dropped', () => {
+    const c = parseListCard({
+      lines: ['Riley Moss', '· 2nd', 'Head of Brand at Ledgerly | Storytelling', '12 mutual connections', 'Connect'],
+      href: 'https://www.linkedin.com/in/Riley-Moss-Example?miniProfileUrn=x',
+    });
+    expect(c).toEqual({
+      fullName: 'Riley Moss', url: 'https://www.linkedin.com/in/riley-moss-example', headline: 'Head of Brand at Ledgerly | Storytelling',
+      title: 'Head of Brand', company: 'Ledgerly', location: '', degree: '2nd', anonymous: false,
+    });
+  });
+
+  it('keeps a URN link’s case, reads a trailing degree and a location; DE "bei"; the Current: line wins for the company', () => {
+    const c = parseListCard({
+      lines: ['Jonas Müller-Brandt • 2nd', 'Leiter Marketing bei Ledgerly', 'Berlin, Germany', 'Current: Leiter Marketing bei Ledgerly Services GmbH'],
+      href: 'https://www.linkedin.com/in/ACoAABcdEfGh1234567',
+    });
+    expect(c).toMatchObject({
+      fullName: 'Jonas Müller-Brandt', url: 'https://www.linkedin.com/in/ACoAABcdEfGh1234567', degree: '2nd', title: 'Leiter Marketing',
+      company: 'Ledgerly Services GmbH', location: 'Berlin, Germany', anonymous: false,
+    });
+  });
+
+  it('LinkedIn badge text never ends up in a name (EN + DE)', () => {
+    expect(cleanPersonName('Ava Lindqvist is hiring')).toBe('Ava Lindqvist');
+    expect(cleanPersonName('Jonas Müller-Brandt stellt ein')).toBe('Jonas Müller-Brandt');
+    expect(cleanPersonName('Mia Chen Premium · 2nd')).toBe('Mia Chen');
+    expect(cleanPersonName('Dev Rao (He/Him) ✅ Verified')).toBe('Dev Rao');
+    expect(cleanPersonName('Noor Haddad • 3rd+')).toBe('Noor Haddad');
+    expect(cleanPersonName('Sam Okafor 🚀')).toBe('Sam Okafor');
+    expect(cleanPersonName('Riley Hiring')).toBe('Riley Hiring'); // a surname, not the badge
+    expect(parseListCard({ lines: ['Ben Ortiz is hiring', 'Brand Manager at Ledgerly'], href: 'https://www.linkedin.com/in/ben-ortiz-example' }).fullName).toBe('Ben Ortiz');
+  });
+
+  it('a headline without " at " uses the Current: line for the company; pronouns leave the name', () => {
+    const c = parseListCard({ lines: ['Ava Lindqvist (she/her)', 'CMO', 'Munich', 'Current: Chief Marketing Officer at Ledgerly'], href: 'https://www.linkedin.com/in/ava-lindqvist-example' });
+    expect(c).toMatchObject({ fullName: 'Ava Lindqvist', headline: 'CMO', title: 'Chief Marketing Officer', company: 'Ledgerly', location: 'Munich' });
+    expect(parseListCard({ lines: ['Dev Rao', 'Brand Specialist'], href: 'https://www.linkedin.com/in/dev-rao-example' })).toMatchObject({ title: 'Brand Specialist', company: '' });
+  });
+
+  it('"LinkedIn Member" or no profile link → anonymous, no name or URL', () => {
+    const a = parseListCard({ lines: ['LinkedIn Member', 'Senior Marketing Manager at Ledgerly', 'Hamburg, Germany'], href: 'https://www.linkedin.com/in/ACoAABcdEfGh1234567' });
+    expect(a).toMatchObject({ anonymous: true, fullName: '', url: '', headline: 'Senior Marketing Manager at Ledgerly', location: 'Hamburg, Germany' });
+    expect(parseListCard({ lines: ['Pat Example', 'Marketing'], href: '' }).anonymous).toBe(true);
+    expect(parseListCard({ lines: ['Pat Example'], href: 'https://www.linkedin.com/company/ledgerly/' }).anonymous).toBe(true);
+    expect(parseListCard({ lines: 'nope' as unknown, href: 42 as unknown }).anonymous).toBe(true);
+  });
+});
+
+describe('live findings (2026-11-23 search walk)', () => {
+  const p1 = 'https://www.linkedin.com/search/results/people/?keywords=marketing&origin=COMPANY_PAGE_CANNED_SEARCH&currentCompany=%5B%224242424%22%5D';
+  const p2 = `${p1}&page=2&spellCorrectionEnabled=true&prioritizeMessage=false`;
+
+  it('paging (page=2 + LinkedIn’s extra flags) is the same list; a changed filter is not', () => {
+    expect(L.filterKey(p2)).toBe(L.filterKey(p1));
+    expect(L.filterKey(p1)).toBe('keywords=marketing&currentCompany=["4242424"]');
+    expect(L.filterKey(p1.replace('keywords=marketing', 'keywords=brand'))).not.toBe(L.filterKey(p1));
+    expect(L.filterKey(`${p1}&geoUrn=%5B%22101282230%22%5D`)).not.toBe(L.filterKey(p1));
+    expect(L.filterKey(p1.replace('currentCompany=%5B%224242424%22%5D', 'pastCompany=%5B%224242424%22%5D'))).not.toBe(L.filterKey(p1));
+    expect(L.filterKey('not a url')).toBe('');
+    // the server labels headcounts with the same filters
+    expect(listFilters(p2)).toEqual([['keywords', 'marketing'], ['currentCompany', '["4242424"]']]);
+  });
+
+  it('a Past: line never sets the company; a currentCompany search falls back to the account', () => {
+    const lines = ['Mila Ostrowski', '· 3rd', 'Brand & Campaigns', 'Frankfurt, Germany', 'Past: Marketing Manager at Acme GmbH & Co. KG'];
+    const href = 'https://www.linkedin.com/in/mila-ostrowski-example';
+    expect(parseListCard({ lines, href })).toMatchObject({ title: 'Brand & Campaigns', company: '' });
+    expect(parseListCard({ lines, href, pageUrl: p2, accountName: 'Ledgerly' })).toMatchObject({ title: 'Brand & Campaigns', company: 'Ledgerly' });
+    // no currentCompany filter: no fallback
+    expect(parseListCard({ lines, href, pageUrl: 'https://www.linkedin.com/search/results/people/?keywords=marketing', accountName: 'Ledgerly' }).company).toBe('');
+    expect(parseListCard({ lines: ['Mila Ostrowski', 'Früher: Marketing Manager bei Acme GmbH & Co. KG'], href }).company).toBe('');
+    // Current / Aktuell beat the headline; the headline beats the fallback
+    expect(parseListCard({ lines: ['Noor Haddad', 'Marketing at Ledgerly', 'Aktuell: Head of Partner Marketing bei Ledgerly Niederlassung GmbH'], href, pageUrl: p1, accountName: 'Ledgerly' }))
+      .toMatchObject({ title: 'Head of Partner Marketing', company: 'Ledgerly Niederlassung GmbH' });
+    expect(parseListCard({ lines: ['Noor Haddad', 'Marketing Manager @Ledgerly Clouds'], href, pageUrl: p1, accountName: 'Ledgerly' })).toMatchObject({ title: 'Marketing Manager', company: 'Ledgerly Clouds' });
+  });
+
+  it('messy headline companies are trimmed to the company', () => {
+    expect(cleanCompany('Ledgerly @Ledgerly Clouds ☁️')).toEqual({ company: 'Ledgerly', hint: 'Ledgerly Clouds' });
+    expect(cleanCompany('Ledgerly - Aufbau und Leitung des Marketing-Teams für die Ledgerly Niederlassung Nord und das...').company).toBe('Ledgerly');
+    expect(cleanCompany('Ledgerly | Brand · Content').company).toBe('Ledgerly');
+    expect(cleanCompany('Ledgerly 🚀 we are hiring').company).toBe('Ledgerly');
+    expect(cleanCompany('Ledgerly Niederlassung Nord und das...').company).toBe('');
+    expect(cleanCompany('Acme GmbH & Co. KG')).toEqual({ company: 'Acme GmbH & Co. KG', hint: '' });
+    const c = parseListCard({ lines: ['Lars Feld', 'Marketingleitung bei Ledgerly - Aufbau und Leitung des Marketing-Teams für die Ledgerly Niederlassung und das...'], href: 'https://www.linkedin.com/in/lars-feld-example' });
+    expect(c).toMatchObject({ title: 'Marketingleitung', company: 'Ledgerly' });
+    expect(parseListCard({ lines: ['Lars Feld', 'Growth Marketing at Ledgerly @Ledgerly Clouds ☁️'], href: 'https://www.linkedin.com/in/lars-feld-example' }).company).toBe('Ledgerly');
+  });
+
+  it('search results count (EN/DE) is read as a header', () => {
+    expect(parsePeopleHeader('About 1,234 results')).toBe(1234);
+    expect(parsePeopleHeader('Ungefähr 1.234 Ergebnisse')).toBe(1234);
+    const { doc } = page('<main><h2><div>Ungefähr 1.234 Ergebnisse</div></h2><ul><li><a href="/in/x-example">X</a></li></ul></main>', p1);
+    expect(parsePeopleHeader(L.headerText(doc))).toBe(1234);
+  });
+});
+
+describe('header + facets (server side)', () => {
+  it('parses EN/DE header counts with every thousands separator', () => {
+    expect(parsePeopleHeader('1,234 associated members')).toBe(1234);
+    expect(parsePeopleHeader('1.234 Mitglieder')).toBe(1234);
+    expect(parsePeopleHeader('1.234 zugehörige Mitglieder')).toBe(1234);
+    expect(parsePeopleHeader('1 234 associated members')).toBe(1234);
+    expect(parsePeopleHeader('About 2,300 results')).toBe(2300);
+    expect(parsePeopleHeader('Etwa 2.300 Ergebnisse')).toBe(2300);
+    expect(parsePeopleHeader('87 results')).toBe(87);
+    expect(parsePeopleHeader('1.2K associated members')).toBe(1200);
+    expect(parsePeopleHeader('People you may know')).toBeNull();
+    expect(parsePeopleHeader(undefined)).toBeNull();
+    expect(parseCount('12,345,678')).toBe(12345678);
+  });
+
+  it('parses "What they do" in either layout and stops at the next module', () => {
+    const text = ['Where they live', '612 Germany', 'What they do', '412 Marketing', '1,023 Sales', '57', 'Media and Communication', '+ Add', 'Where they studied', '30 Example University'].join('\n');
+    expect(parseFunctionFacets(text)).toEqual([
+      { label: 'Marketing', count: 412 },
+      { label: 'Sales', count: 1023 },
+      { label: 'Media and Communication', count: 57 },
+    ]);
+    expect(parseFunctionFacets('Was sie machen\nMarketing\n1.023\nVertrieb (88)')).toEqual([
+      { label: 'Marketing', count: 1023 },
+      { label: 'Vertrieb', count: 88 },
+    ]);
+    expect(parseFunctionFacets('')).toEqual([]);
+  });
+});
+
+describe('extension list reader (DOM, fictional fixtures)', () => {
+  it('detects list pages, the company slug and keywords', () => {
+    expect(L.pageKind('/company/ledgerly/people/')).toBe('people-tab');
+    expect(L.pageKind('/search/results/people/')).toBe('search');
+    expect(L.pageKind('/in/riley-moss-example/')).toBe('');
+    expect(L.pageKind('/company/ledgerly/')).toBe('');
+    expect(L.companySlug('/company/ledgerly/people/')).toBe('ledgerly');
+    expect(L.keywordsOf('https://www.linkedin.com/company/ledgerly/people/?keywords=marketing%20ops')).toBe('marketing ops');
+  });
+
+  it('People tab: known card selectors, visible text only, header, facets, Show more', () => {
+    const { doc, url } = page(fixture('linkedin-people-tab.html'), 'https://www.linkedin.com/company/ledgerly/people/?keywords=marketing');
+    const cards = L.resultCards(doc, url).map((c) => L.readCard(c, url));
+    expect(cards).toHaveLength(3);
+    expect(cards[0]).toEqual({
+      lines: ['Riley Moss', '· 2nd', 'Head of Brand at Ledgerly | Storytelling for fintech', '12 mutual connections'],
+      href: 'https://www.linkedin.com/in/riley-moss-example',
+    });
+    expect(cards[1]!.href).toBe('');
+    expect(cards[2]!.href).toBe('https://www.linkedin.com/in/ACoAABcdEfGh1234567');
+    // no hidden fields, screen-reader copies, buttons, data-* attributes
+    const all = JSON.stringify(cards);
+    for (const bad of ['hidden-field', 'hidden-input', 'degree connection', 'Connect', 'Follow', 'urn:li:member', 'miniProfileUrn']) expect(all).not.toContain(bad);
+
+    const parsed = cards.map((c) => parseListCard(c));
+    expect(parsed.map((p) => [p.fullName, p.anonymous, p.title])).toEqual([
+      ['Riley Moss', false, 'Head of Brand'],
+      ['', true, 'Senior Marketing Manager'],
+      ['Sam Okafor', false, 'Content Lead'],
+    ]);
+
+    expect(parsePeopleHeader(L.headerText(doc))).toBe(1234);
+    expect(L.headerText(doc)).not.toContain('Total');
+    expect(parseFunctionFacets(L.facetsText(doc))).toEqual([
+      { label: 'Marketing', count: 412 },
+      { label: 'Sales', count: 1023 },
+      { label: 'Media and Communication', count: 57 },
+    ]);
+    expect(L.loadMoreButton(doc)?.textContent).toContain('Show more results');
+    expect(L.stopReason(doc, url)).toBe('');
+  });
+
+  it('search results: structural fallback finds the cards; Next button; header', () => {
+    const { doc, url } = page(fixture('linkedin-search.html'), 'https://www.linkedin.com/search/results/people/?keywords=marketing&currentCompany=%5B%221%22%5D');
+    const cards = L.resultCards(doc, url).map((c) => L.readCard(c, url));
+    expect(cards).toHaveLength(3);
+    const parsed = cards.map((c) => parseListCard(c));
+    expect(parsed[0]).toMatchObject({ fullName: 'Jonas Müller-Brandt', degree: '2nd', title: 'Leiter Marketing', company: 'Ledgerly Services GmbH', location: 'Berlin, Germany' });
+    expect(JSON.stringify(cards[0])).not.toContain('View Jonas');
+    expect(parsed[1]).toMatchObject({ anonymous: true, headline: 'Marketing Operations Specialist at Ledgerly', location: 'Hamburg, Germany' });
+    expect(parsed[2]).toMatchObject({ fullName: 'Ava Lindqvist', degree: '1st', title: 'Chief Marketing Officer', company: '', location: 'Munich, Bavaria, Germany' });
+    // the search filters on the current company, so a card without a company works at the account
+    expect(parseListCard({ ...cards[2]!, pageUrl: url, accountName: 'Ledgerly' })).toMatchObject({ company: 'Ledgerly' });
+    expect(parsePeopleHeader(L.headerText(doc))).toBe(2300);
+    expect(L.nextButton(doc)?.getAttribute('aria-label')).toBe('Next');
+    expect(L.loadMoreButton(doc)).toBeNull();
+    expect(L.facetsText(doc)).toBe('');
+  });
+
+  it('stop scan: a late banner stops the walk; card text and embedded JSON never do', () => {
+    const cards = Array.from({ length: 60 }, (_, i) =>
+      `<li><a href="https://www.linkedin.com/in/person-${i}-example">Person ${i}</a><div>${'Marketing at Ledgerly. '.repeat(40)}</div></li>`).join('');
+    const json = `<code style="display: none">${JSON.stringify({ x: 'unusual activity commercial use limit '.repeat(50) })}</code>`;
+    const url = 'https://www.linkedin.com/company/ledgerly/people/';
+    // a headline that says "unusual activity", hidden JSON blocks that mention limits → carry on
+    const quiet = page(`${json}<main><ul>${cards}<li><a href="https://www.linkedin.com/in/sec-example">Sec Example</a><div>Detecting unusual activity at Ledgerly</div></li></ul></main>`, url);
+    expect((quiet.doc.body.textContent || '').length).toBeGreaterThan(40_000);
+    expect(L.stopReason(quiet.doc, url)).toBe('');
+    // the same page with a limit toast at the very end (after 40k chars of cards) → stop
+    const late = page(`${json}<main><ul>${cards}</ul></main><div class="artdeco-toasts"><div role="alert"><p>You’ve reached the monthly limit for profile searches.</p></div></div>`, url);
+    expect(L.stopReason(late.doc, url)).toBe('rate-limit');
+    const lateCheck = page(`<main><ul>${cards}</ul><div class="msg-banner"><p>We’ve noticed some unusual activity.</p></div></main>`, url);
+    expect(L.stopReason(lateCheck.doc, url)).toBe('checkpoint');
+    // a hidden alert doesn't count
+    const hidden = page(`<main><ul>${cards}</ul></main><div role="alert" hidden>You’ve reached the monthly limit.</div>`, url);
+    expect(L.stopReason(hidden.doc, url)).toBe('');
+  });
+
+  it('headcount only: the one expand button is the "Show more" inside What they do, nothing else', () => {
+    const url = 'https://www.linkedin.com/company/ledgerly/people/';
+    const { doc } = page(
+      '<main><h2>1,250 associated members</h2><div class="where"><h4>Where they live</h4><div>800 Germany</div><div>200 France</div><button>Show more</button></div>' +
+        '<div class="insights"><h4>What they do</h4><div>90 Sales</div><div>60 Engineering</div><button aria-expanded="false">Show more</button></div>' +
+        '<ul><li><a href="/in/dev-rao-example">Dev Rao</a></li></ul><button>Show more results</button></main>',
+      url,
+    );
+    const b = L.facetsExpandButton(doc)!;
+    expect(b.closest('.insights')).not.toBeNull();
+    expect(parsePeopleHeader(L.headerText(doc))).toBe(1250);
+    const expanded = page('<main><div class="insights"><h4>What they do</h4><div>90 Sales</div><div>44 Marketing</div><button aria-expanded="true">Show less</button></div></main>', url);
+    expect(L.facetsExpandButton(expanded.doc)).toBeNull();
+    expect(parseFunctionFacets(L.facetsText(expanded.doc))).toEqual([{ label: 'Sales', count: 90 }, { label: 'Marketing', count: 44 }]);
+    expect(L.facetsExpandButton(page('<main><p>nothing here</p></main>', url).doc)).toBeNull();
+  });
+
+  it('the headcount-only action: one trusted click, zero rows, at most one expand click, no walking', () => {
+    const content = readFileSync(path.join(root, 'extension/content.js'), 'utf8');
+    const h = content.slice(content.indexOf("hcBtn.addEventListener('click'"), content.indexOf('// the ONLY place a walk starts'));
+    expect(h).toContain('if (!e.isTrusted || walk || starting || hcBusy) return;');
+    expect(h).toContain('rows: []');
+    expect(h).toContain('final: true');
+    expect(h.match(/\.click\(\)/g)).toHaveLength(1); // the What they do "Show more", once
+    expect(h).not.toMatch(/startWalk|scroll|nextButton|loadMoreButton|while \(/);
+  });
+
+  it('Show more: only a "results" button, never an insight module toggle', () => {
+    const { doc } = page('<main><div class="insights"><h4>What they do</h4><button>Show more</button></div><ul><li><a href="/in/dev-rao-example">Dev Rao</a></li></ul></main>', 'https://www.linkedin.com/company/ledgerly/people/');
+    expect(L.loadMoreButton(doc)).toBeNull();
+    const de = page('<main><ul><li><a href="/in/dev-rao-example">Dev Rao</a></li></ul><button>Weitere Ergebnisse anzeigen</button></main>', 'https://www.linkedin.com/company/ledgerly/people/');
+    expect(L.loadMoreButton(de.doc)).not.toBeNull();
+  });
+
+  it('structural fallback also finds role="listitem" cards', () => {
+    const url = 'https://www.linkedin.com/search/results/people/?keywords=brand';
+    const { doc } = page(`<main><div role="list">
+      <div role="listitem"><a href="https://www.linkedin.com/in/dev-rao-example"><span aria-hidden="true">Dev Rao</span></a><div>Brand Specialist at Ledgerly</div></div>
+      <div role="listitem"><span aria-hidden="true">LinkedIn Member</span><div>Brand Manager at Ledgerly</div></div>
+    </div></main>`, url);
+    const parsed = L.resultCards(doc, url).map((c) => parseListCard(L.readCard(c, url)));
+    expect(parsed.map((p) => [p.fullName, p.anonymous, p.title])).toEqual([['Dev Rao', false, 'Brand Specialist'], ['', true, 'Brand Manager']]);
+  });
+
+  it('a disabled Next button means the last page', () => {
+    const { doc } = page('<main><ul><li><a href="/in/dev-rao-example">Dev Rao</a></li></ul><button aria-label="Next" disabled>Next</button></main>', 'https://www.linkedin.com/search/results/people/');
+    expect(L.nextButton(doc)).toBeNull();
+  });
+
+  it('stop detectors: checkpoint / sign-in URLs, captcha frames, security and limit pages, no results', () => {
+    const blank = page('<main><p>Hi</p></main>', 'https://www.linkedin.com/company/ledgerly/people/');
+    expect(L.stopReason(blank.doc, 'https://www.linkedin.com/checkpoint/challenge/abc')).toBe('checkpoint');
+    expect(L.stopReason(blank.doc, 'https://www.linkedin.com/authwall?trk=x')).toBe('login');
+    expect(L.stopReason(blank.doc, 'https://www.linkedin.com/login')).toBe('login');
+    expect(L.stopReason(blank.doc, 'https://www.linkedin.com/uas/login')).toBe('login');
+    const cap = page('<main><iframe src="https://www.linkedin.com/checkpoint/captcha-frame"></iframe></main>', 'https://www.linkedin.com/company/ledgerly/people/');
+    expect(L.stopReason(cap.doc, cap.url)).toBe('checkpoint');
+    const sec = page('<main><h1>Let’s do a quick security check</h1></main>', 'https://www.linkedin.com/company/ledgerly/people/');
+    expect(L.stopReason(sec.doc, sec.url)).toBe('checkpoint');
+    const unusual = page('<main><p>We’ve noticed some unusual activity on your account.</p></main>', 'https://www.linkedin.com/search/results/people/');
+    expect(L.stopReason(unusual.doc, unusual.url)).toBe('checkpoint');
+    const lim = page('<main><p>You’ve reached the monthly limit for profile searches.</p></main>', 'https://www.linkedin.com/search/results/people/');
+    expect(L.stopReason(lim.doc, lim.url)).toBe('rate-limit');
+    const commercial = page('<main><p>You’ve reached the commercial use limit on search.</p></main>', 'https://www.linkedin.com/search/results/people/');
+    expect(L.stopReason(commercial.doc, commercial.url)).toBe('rate-limit');
+    const none = page('<main><h2>No results found</h2></main>', 'https://www.linkedin.com/search/results/people/');
+    expect(L.noResults(none.doc)).toBe(true);
+    expect(L.noResults(blank.doc)).toBe(false);
+  });
+});
+
+describe('extension safeguards (static checks, so they cannot quietly regress)', () => {
+  // code only: comments may mention what the code must not do
+  const code = (f: string) => readFileSync(path.join(root, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const content = readFileSync(path.join(root, 'extension/content.js'), 'utf8');
+  const reader = code('extension/list-reader.js');
+  const background = readFileSync(path.join(root, 'extension/background.js'), 'utf8');
+  const listBranch = content
+    .slice(content.indexOf('// ---------- lists:'), content.indexOf('// LinkedIn is a single-page app'))
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+  it('the list branch exists and opens no windows or tabs, and has no timers that could start it', () => {
+    expect(listBranch.length).toBeGreaterThan(1000);
+    for (const src of [listBranch, reader]) {
+      expect(src).not.toMatch(/chrome\.windows|chrome\.tabs|window\.open\(|setInterval|minimized/);
+    }
+    expect(reader).not.toMatch(/chrome\.|fetch\(|XMLHttpRequest|setTimeout|dataset|getAttribute\('data-/);
+    const handler = background.slice(background.indexOf('async captureList('), background.indexOf('async flush()'));
+    expect(handler).toContain("'/ext/capture-list'");
+    expect(handler).not.toMatch(/chrome\.windows|chrome\.tabs|enqueue/);
+  });
+
+  it('a walk starts only from a trusted click on the Start button', () => {
+    const calls = [...listBranch.matchAll(/startWalk\(/g)];
+    expect(calls).toHaveLength(2); // the definition + one call
+    const callAt = listBranch.indexOf('= startWalk(');
+    const handlerAt = listBranch.lastIndexOf("goBtn.addEventListener('click'", callAt);
+    expect(handlerAt).toBeGreaterThan(0);
+    const handler = listBranch.slice(handlerAt, callAt);
+    expect(handler).toContain('if (!e.isTrusted || walk || starting) return;');
+    // the double-click guard is set before the first await
+    expect(handler.indexOf('starting = true')).toBeLessThan(handler.indexOf('await '));
+    // the floating button only opens the panel
+    expect(listBranch).toMatch(/if \(e\.isTrusted\) openListPanel\(\);/);
+  });
+
+  it('pace, caps, hidden-pause, stop detectors and cancel are all wired in', () => {
+    expect(listBranch).toMatch(/BASE_MS: 2500/);
+    expect(listBranch).toMatch(/JITTER_MS: 1500/);
+    expect(listBranch).toMatch(/MAX_PACE_MS: 8000/);
+    expect(listBranch).toMatch(/CAP_MAX: 500/);
+    expect(listBranch).toMatch(/DAILY: 1000/);
+    expect(listBranch).toMatch(/nb\.listRows\./);
+    expect(listBranch).toMatch(/while \(document\.hidden\)/);
+    expect(listBranch).toMatch(/NBL\.stopReason\(document, location\.href\)/);
+    expect(listBranch).toMatch(/run\.cancelled = true|walk\.cancelled = true/);
+    // a new search / changed filters mid-walk ends the run
+    expect(listBranch).toMatch(/filtersOf\(location\.href\) !== startFilters/);
+  });
+
+  it('the manifest asks for no new permissions and loads the reader before content.js', () => {
+    const m = JSON.parse(readFileSync(path.join(root, 'extension/manifest.json'), 'utf8'));
+    expect(m.permissions).toEqual(['storage', 'alarms', 'notifications']);
+    expect(m.host_permissions).toEqual(['http://127.0.0.1/*']);
+    expect(m.content_scripts[0].js).toEqual(['list-reader.js', 'content.js']);
+    expect(m.description.length).toBeLessThanOrEqual(132);
+  });
+});

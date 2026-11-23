@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Store } from '../src/db/store';
 import { inputHash } from '../src/db/hash';
 import { stablePortFor } from '../src/web/http-common';
-import { startExplorerServer, type AhoyCheckFn, type AhoyProposalFn, type DossierFn, type ExplorerServer, type ScoreFn } from '../src/web/explorer-server';
+import { startExplorerServer, type AhoyCheckFn, type AhoyProposalFn, type DossierFn, type ExplorerServer, type OrgInferFn, type OrgResearchFn, type ScoreFn } from '../src/web/explorer-server';
+import { normalizeOrgResearch } from '../src/llm/org-research';
 import type { DossierRecord, ExplorerEvent, LensScore, Person } from '../src/types';
 
 const TEMPLATE = '<!doctype html><title>__NB_TITLE__</title><script id="nb-data" type="application/json">__NB_DATA__</script>';
@@ -76,7 +77,7 @@ afterEach(async () => {
   dir = '';
 });
 
-async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; ahoyCheckFn?: AhoyCheckFn; ahoyProposalFn?: AhoyProposalFn; backoffMs?: number[]; concurrency?: { light: number; deep: number }; heartbeatMs?: number } = {}) {
+async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; ahoyCheckFn?: AhoyCheckFn; ahoyProposalFn?: AhoyProposalFn; orgInferFn?: OrgInferFn; orgResearchFn?: OrgResearchFn; backoffMs?: number[]; concurrency?: { light: number; deep: number }; heartbeatMs?: number } = {}) {
   dir = mkdtempSync(path.join(os.tmpdir(), 'nb-explorer-'));
   store = Store.open(path.join(dir, 'network.db'));
   store.upsertPeople(
@@ -95,6 +96,8 @@ async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; ahoyCheckFn?
     scoreFn: o.scoreFn,
     ahoyCheckFn: o.ahoyCheckFn,
     ahoyProposalFn: o.ahoyProposalFn,
+    orgInferFn: o.orgInferFn,
+    orgResearchFn: o.orgResearchFn,
     backoffMs: o.backoffMs,
     concurrency: o.concurrency,
     heartbeatMs: o.heartbeatMs,
@@ -582,6 +585,144 @@ describe('accounts + Chrome extension API', () => {
     expect((await ext('GET', '/ext/ping', { capture: cap })).status).toBe(401);
   });
 
+  it('list walk: POST /ext/capture-list → light contacts, anonymous rows, headcounts; idempotent, capped, never in the network', async () => {
+    const { base, token, events } = await setup();
+    const ext = (body: unknown, o: { capture?: string; origin?: string } = {}) =>
+      req('POST', `${base}/ext/capture-list`, { body, headers: { ...(o.capture !== undefined ? { 'X-NB-Capture': o.capture } : {}), Origin: o.origin ?? EXT_ORIGIN } });
+    const pair = await req('POST', `${base}/api/ext/pair`, { token, body: {} });
+    const cap = JSON.parse(Buffer.from(pair.json.code.slice(4), 'base64url').toString()).t as string;
+
+    const runId = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    const page = { kind: 'people-tab', url: 'https://www.linkedin.com/company/ledgerly/people/?keywords=marketing', keywords: 'marketing', companyUrl: 'https://www.linkedin.com/company/ledgerly' };
+    const rows = [
+      { idx: 0, lines: ['Riley Moss', '· 2nd', 'Head of Brand at Ledgerly'], href: 'https://www.linkedin.com/in/riley-moss-example' },
+      { idx: 1, lines: ['Sam Okafor', 'Content Lead'], href: 'https://www.linkedin.com/in/ACoAABcdEfGh1234567' },
+      { idx: 2, lines: ['LinkedIn Member', 'Senior Marketing Manager at Ledgerly', 'Hamburg, Germany'], href: '' },
+    ];
+    const facets = 'What they do\n412 Marketing\n1,023 Sales';
+    const body = { runId, accountName: 'Ledgerly', page, rows, header: '1,234 associated members', facets };
+
+    // auth model unchanged: capture token + extension origin only
+    expect((await ext(body)).status).toBe(401);
+    expect((await ext(body, { capture: token })).status).toBe(401);
+    expect((await ext(body, { capture: cap, origin: 'https://www.linkedin.com' })).status).toBe(403);
+    expect((await req('GET', `${base}/ext/capture-list`, { headers: { 'X-NB-Capture': cap, Origin: EXT_ORIGIN } })).status).toBe(405);
+    // input limits
+    const many = Array.from({ length: 101 }, (_, i) => ({ idx: i, lines: ['LinkedIn Member'] }));
+    expect((await ext({ ...body, rows: many }, { capture: cap })).status).toBe(400);
+    expect((await ext({ ...body, runId: 'not-a-uuid' }, { capture: cap })).status).toBe(400);
+    expect((await ext({ ...body, page: { ...page, kind: 'feed' } }, { capture: cap })).status).toBe(400);
+    expect((await ext({ ...body, page: { ...page, url: 'https://evil.example/company/x/people/' } }, { capture: cap })).status).toBe(400);
+    expect((await ext({ ...body, rows: [{ idx: -1, lines: [] }] }, { capture: cap })).status).toBe(400);
+    expect((await ext({ ...body, stopReason: 'bored', final: true }, { capture: cap })).status).toBe(400);
+    expect((await ext({ ...body, accountName: undefined, page: { ...page, companyUrl: undefined } }, { capture: cap })).status).toBe(400);
+
+    const r1 = await ext(body, { capture: cap });
+    expect(r1.status).toBe(200);
+    expect(r1.json).toMatchObject({ account: { name: 'Ledgerly' }, createdAccount: true, added: 2, anonymous: 1, totalRows: 3, run: { id: runId, named: 2, anonymous: 1, rowsSeen: 3, pageKind: 'people-tab', keywords: 'marketing' } });
+    const accountId = r1.json.account.id as string;
+    expect(store!.accounts.get(accountId)!.linkedinUrl).toBe('https://www.linkedin.com/company/ledgerly');
+
+    // the same batch again: nothing new
+    const r2 = await ext(body, { capture: cap });
+    expect(r2.json).toMatchObject({ createdAccount: false, added: 0, anonymous: 0, run: { named: 2, anonymous: 1, rowsSeen: 3 } });
+    const view = (await req('GET', `${base}/api/accounts/${accountId}`, { token })).json;
+    expect(view.members.map((m: any) => [m.fullName, m.kind, m.sources[0].kind, m.sources[0].runId])).toEqual(
+      expect.arrayContaining([['Riley Moss', 'light', 'extension-list', runId], ['Sam Okafor', 'light', 'extension-list', runId]]),
+    );
+    expect(view.members).toHaveLength(2); // the anonymous row is a count, never a member
+    expect(store!.accounts.anonRows(runId)).toEqual([{ runId, idx: 2, headline: 'Senior Marketing Manager at Ledgerly', location: 'Hamburg, Germany' }]);
+
+    // header → query-scoped headcount, replaced (not added) when the run posts it again; "What they do" on this
+    // keyword-filtered tab counts the result set, so it is never stored
+    const hc = () => store!.accounts.headcounts(accountId).map((h) => [h.scope, h.label, h.count, h.source, h.runId]);
+    expect(hc()).toEqual([['query', 'marketing', 1234, 'linkedin-people', runId]]);
+    await ext({ ...body, rows: [], facets: 'What they do\n420 Marketing', header: '1,240 associated members' }, { capture: cap });
+    expect(hc()).toEqual([['query', 'marketing', 1240, 'linkedin-people', runId]]);
+
+    // an empty / unreadable header (e.g. on a final post) keeps the run's snapshot
+    await ext({ ...body, rows: [], facets: 'What they do', header: '' }, { capture: cap });
+    expect(hc()).toHaveLength(1);
+
+    // finishing: stop reason stored, notice sent, later posts to the run refused
+    const fin = await ext({ runId, accountId, page, rows: [], final: true, stopReason: 'checkpoint' }, { capture: cap });
+    expect(fin.json.run).toMatchObject({ stopReason: 'checkpoint', named: 2, anonymous: 1 });
+    expect(fin.json.run.finishedAt).not.toBe('');
+    expect((events.filter((e) => e.type === 'accounts' && (e as any).notice).pop() as any).notice).toMatch(/Mapped 2 people \+ 1 anonymous .*Ledgerly.*checkpoint/);
+    expect((await ext(body, { capture: cap })).status).toBe(409);
+    expect(store!.accounts.listRuns(accountId)[0]).toMatchObject({ id: runId, stopReason: 'checkpoint' });
+
+    // a run never holds more than 1,000 rows
+    const run2 = '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed';
+    for (let b = 0; b < 10; b++) {
+      const batch = Array.from({ length: 100 }, (_, i) => ({ idx: b * 100 + i, lines: ['LinkedIn Member', `Role ${b * 100 + i}`] }));
+      expect((await ext({ runId: run2, accountId, page, rows: batch }, { capture: cap })).status).toBe(200);
+    }
+    expect(store!.accounts.getListRun(run2)).toMatchObject({ rowsSeen: 1000, anonymous: 1000 });
+    expect((await ext({ runId: run2, accountId, page, rows: [{ idx: 1000, lines: ['LinkedIn Member'] }] }, { capture: cap })).status).toBe(409);
+    // a run stays on its account
+    const other = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Globex' } })).json.account.id;
+    expect((await ext({ runId, accountId: other, page, rows: [] }, { capture: cap })).status).toBe(409);
+
+    // headcount scope: company only for an unfiltered People tab; a keyword-less search or a filtered tab is a query
+    const scopeRun = async (rid: string, pg: Record<string, unknown>) => {
+      expect((await ext({ runId: rid, accountId, page: pg, rows: [], header: '900 results' }, { capture: cap })).status).toBe(200);
+      return store!.accounts.headcounts(accountId).filter((h) => h.runId === rid).map((h) => [h.scope, h.label, h.source]);
+    };
+    expect(await scopeRun('2c9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed', { kind: 'people-tab', url: 'https://www.linkedin.com/company/ledgerly/people/' }))
+      .toEqual([['company', '', 'linkedin-people']]);
+    expect(await scopeRun('3d9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed', { kind: 'search', url: 'https://www.linkedin.com/search/results/people/?keywords=marketing&origin=X&page=2&spellCorrectionEnabled=true' }))
+      .toEqual([['query', 'marketing', 'linkedin-search']]); // only result-set filters label it (no page / origin / UI flags)
+    expect(await scopeRun('4e9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed', { kind: 'people-tab', url: 'https://www.linkedin.com/company/ledgerly/people/?facetGeoRegion=101' }))
+      .toEqual([['query', 'facetGeoRegion: 101', 'linkedin-people']]);
+    expect(await scopeRun('5f9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed', { kind: 'search', url: 'https://www.linkedin.com/search/results/people/' }))
+      .toEqual([['query', '', 'linkedin-search']]);
+
+    // list people never enter the network
+    expect((await req('GET', `${base}/api/state`, { token })).json.people.map((p: any) => p.id).sort()).toEqual(['aaa', 'bbb', 'ccc']);
+    // the accounts list now tells the extension each account's LinkedIn page (to preselect it)
+    const accs = (await req('GET', `${base}/ext/accounts`, { headers: { 'X-NB-Capture': cap, Origin: EXT_ORIGIN } })).json.accounts;
+    expect(accs.find((a: any) => a.id === accountId).linkedinUrl).toBe('https://www.linkedin.com/company/ledgerly');
+  });
+
+  it('"Capture headcount only": a final post with zero rows stores the counts as snapshots and says so', async () => {
+    const { base, token, events } = await setup();
+    const pair = await req('POST', `${base}/api/ext/pair`, { token, body: {} });
+    const cap = JSON.parse(Buffer.from(pair.json.code.slice(4), 'base64url').toString()).t as string;
+    const id = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Ledgerly' } })).json.account.id;
+    const r = await req('POST', `${base}/ext/capture-list`, {
+      headers: { 'X-NB-Capture': cap, Origin: EXT_ORIGIN },
+      body: {
+        runId: '7c9e6679-7425-40de-944b-e07fc1f90ae7', accountId: id, rows: [], final: true, stopReason: 'end',
+        page: { kind: 'people-tab', url: 'https://www.linkedin.com/company/ledgerly/people/', keywords: '' },
+        header: '1,250 associated members', facets: 'What they do\n90 Sales\n44 Marketing',
+      },
+    });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ added: 0, totalRows: 0, headcount: { members: 1250, functions: 2 } });
+    await until(() => events.some((e) => e.type === 'accounts' && /Saved LinkedIn headcount for Ledgerly: 1,250 members, 2 “What they do” counts/.test(e.notice ?? '')));
+    const org = (await req('GET', `${base}/api/accounts/${id}`, { token })).json.org;
+    expect(org.headcount.linkedin.company.count).toBe(1250);
+    expect(org.headcount.linkedin.marketing.count).toBe(44);
+    expect(org.members).toEqual([]);
+    expect(org.runs).toEqual([]); // a counts-only capture is not a walk
+    expect((await req('GET', `${base}/api/accounts/${id}`, { token })).status).toBe(200);
+    // on a FILTERED People tab, "What they do" counts the result set: not stored (the header is a query count)
+    const f = await req('POST', `${base}/ext/capture-list`, {
+      headers: { 'X-NB-Capture': cap, Origin: EXT_ORIGIN },
+      body: {
+        runId: '9b2d1c3e-5f60-4a7b-8c9d-0e1f2a3b4c5d', accountId: id, rows: [], final: true,
+        page: { kind: 'people-tab', url: 'https://www.linkedin.com/company/ledgerly/people/?keywords=marketing', keywords: 'marketing' },
+        header: '300 associated members', facets: 'What they do\n9 Sales\n200 Marketing',
+      },
+    });
+    expect(f.json.headcount).toEqual({ members: 300, functions: 0 });
+    const org2 = (await req('GET', `${base}/api/accounts/${id}`, { token })).json.org;
+    expect(org2.headcount.linkedin.marketing.count).toBe(44);
+    expect(org2.headcount.linkedin.company.count).toBe(1250);
+    expect(org2.headcount.linkedin.queries.map((q: any) => [q.label, q.count])).toEqual([['marketing', 300]]);
+  });
+
   it('manages accounts and members from the page', async () => {
     const { base, token } = await setup();
     const created = await req('POST', `${base}/api/accounts`, { token, body: { name: 'Initech', domain: 'initech.example' } });
@@ -600,5 +741,333 @@ describe('accounts + Chrome extension API', () => {
     expect((await req('DELETE', `${base}/api/accounts/${id}/members/aaa`, { token })).json.view.members).toHaveLength(1);
     expect((await req('DELETE', `${base}/api/accounts/${id}`, { token })).json.accounts).toEqual([]);
     expect((await req('GET', `${base}/api/accounts/${id}`, { token })).status).toBe(404);
+  });
+
+  it('adds light contacts by hand and edits org fields with provenance', async () => {
+    const { base, token } = await setup();
+    const id = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Ledgerly' } })).json.account.id;
+    const url = `${base}/api/accounts/${id}/contacts`;
+    const contacts = [
+      { fullName: 'Jonas Müller-Brandt', url: 'https://www.linkedin.com/in/ACoAABjonas1234567', title: 'Head of Brand' },
+      { fullName: 'Sam Okafor', headline: 'Content Lead at Ledgerly', location: 'Munich' },
+    ];
+    expect((await req('POST', url, { body: { contacts } })).status).toBe(401);
+    expect((await req('POST', url, { token, body: { contacts: Array.from({ length: 501 }, (_, i) => ({ fullName: `P ${i}` })) } })).status).toBe(400);
+    expect((await req('POST', url, { token, body: { contacts: [{ fullName: 'X', url: 42 }] } })).status).toBe(400);
+    expect((await req('POST', url, { token, body: { contacts: [{ title: 'No name' }] } })).status).toBe(400);
+    expect((await req('POST', url, { token, body: { contacts: 'nope' } })).status).toBe(400);
+    expect((await req('POST', url, { token, body: { contacts, role: 'boss' } })).status).toBe(400);
+    expect((await req('POST', `${base}/api/accounts/nope/contacts`, { token, body: { contacts } })).status).toBe(404);
+
+    const r = await req('POST', url, { token, body: { contacts, role: 'influencer' } });
+    expect(r.status).toBe(200);
+    expect(r.json.added).toHaveLength(2);
+    expect(r.json.view.members.map((m: any) => [m.fullName, m.kind, m.role, m.sources[0].kind])).toEqual(
+      expect.arrayContaining([['Jonas Müller-Brandt', 'light', 'influencer', 'manual'], ['Sam Okafor', 'light', 'influencer', 'manual']]),
+    );
+    const again = await req('POST', url, { token, body: { contacts } });
+    expect(again.json.added).toEqual([]);
+    // light contacts never enter the network
+    expect((await req('GET', `${base}/api/state`, { token })).json.people.map((p: any) => p.id).sort()).toEqual(['aaa', 'bbb', 'ccc']);
+
+    const [jonas, sam] = r.json.added as string[];
+    const put = (pid: string, body: unknown) => req('PUT', `${base}/api/accounts/${id}/members/${pid}`, { token, body });
+    const up = await put(sam!, { reportsTo: jonas, subfunction: 'content', team: 'Editorial', entity: 'Ledgerly GmbH', country: 'DE', responsibilities: 'Blog and newsletter', noise: 'none' });
+    expect(up.status).toBe(200);
+    expect(up.json.view.members.find((m: any) => m.id === sam)).toMatchObject({
+      reportsTo: jonas, reportsToSource: 'user', subfunction: 'content', autoSubfunction: false, team: 'Editorial', entity: 'Ledgerly GmbH',
+      country: 'DE', responsibilities: 'Blog and newsletter', noise: '',
+    });
+    // every account view carries the org map (Phase 5): the page renders the tree from it, never rebuilds it
+    const org = up.json.view.org;
+    expect(org).toMatchObject({ scope: 'marketing', flagged: [], unplaced: [] });
+    expect(org.roots).toEqual([{ id: jonas, children: [{ id: sam, children: [], edge: { source: 'user', confidence: 1, reason: '' } }] }]);
+    expect(org.headcount.captured).toMatchObject({ total: 2, light: 2 });
+    expect((await req('GET', `${base}/api/accounts/${id}`, { token })).json.org.members.sort()).toEqual([jonas, sam].sort());
+    expect((await put(sam!, { subfunction: 'sales' })).status).toBe(400);
+    expect((await put(sam!, { country: 'Germany' })).status).toBe(400);
+    expect((await put(sam!, { confirmReportsTo: 'yes' })).status).toBe(400);
+    expect((await put(jonas!, { confirmReportsTo: true })).status).toBe(400); // no line to confirm
+    expect((await put(sam!, { confirmReportsTo: true })).status).toBe(200);
+    expect((await put(sam!, { reportsToSource: 'bogus' })).status).toBe(400);
+    const reset = await put(sam!, { reportsToSource: 'auto' });
+    expect(reset.json.view.members.find((m: any) => m.id === sam)).toMatchObject({ reportsTo: '', reportsToSource: '' });
+    expect(reset.json.accounts[0]).toMatchObject({ captured: 0, light: 2 });
+  });
+
+  it('org inference: started only by a token POST, one job at a time, never overrides the user, costs on the ledger, cancellable', async () => {
+    const calls: Parameters<OrgInferFn>[0][] = [];
+    let release!: () => void;
+    let mode: 'ok' | 'wait-abort' = 'ok';
+    const orgInferFn: OrgInferFn = async (o) => {
+      calls.push(o);
+      if (mode === 'wait-abort') {
+        await new Promise<void>((resolve) => o.signal!.addEventListener('abort', () => resolve(), { once: true }));
+        const e = Object.assign(new Error('Aborted'), { name: 'AbortError' });
+        throw e;
+      }
+      await new Promise<void>((r) => { release = r; });
+      o.onProgress?.({ phase: 'classify', done: 3, total: 3 });
+      o.onProgress?.({ phase: 'reporting', done: 3, total: 3 });
+      const [cmo, brand, ic] = o.members.map((m) => m.id);
+      return {
+        classified: new Map(o.ids!.map((id) => [id, { subfunction: 'brand' as const, seniority: 'ic' as const, noise: '' as const, confidence: 0.6, reason: 'stub', model: 'haiku', at: 'now' }])),
+        edges: [
+          { id: brand!, managerId: ic!, confidence: 0.6, reason: 'should be ignored (user line)', source: 'llm' as const },
+          { id: ic!, managerId: brand!, confidence: 0.6, reason: 'same team', source: 'llm' as const },
+          { id: cmo!, managerId: null, confidence: 0.3, reason: '', source: 'llm' as const },
+        ],
+        costUsd: 0.012, costIncomplete: false, failedBatches: 0, reportingFallback: false,
+      };
+    };
+    const { base, token, events } = await setup({ orgInferFn });
+    const id = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Ledgerly' } })).json.account.id;
+    const added = (await req('POST', `${base}/api/accounts/${id}/contacts`, { token, body: { contacts: [
+      { fullName: 'Ava Lindqvist', title: 'CMO' }, { fullName: 'Ben Ortiz', title: 'Director Brand' }, { fullName: 'Dev Rao', title: 'Brand Specialist' },
+    ] } })).json.added as string[];
+    const [cmo, brand, ic] = added;
+    await req('PUT', `${base}/api/accounts/${id}/members/${brand}`, { token, body: { reportsTo: cmo, subfunction: 'leadership' } });
+
+    const url = `${base}/api/accounts/${id}/org/infer`;
+    expect((await req('POST', url, { body: {} })).status).toBe(401);
+    expect((await req('GET', url, { token })).status).toBe(405);
+    expect((await req('POST', `${base}/api/accounts/nope/org/infer`, { token, body: {} })).status).toBe(404);
+    expect((await req('POST', url, { token, body: { ids: ['not-on-account'] } })).status).toBe(400);
+    expect((await req('POST', url, { token, body: { ids: 'x' } })).status).toBe(400);
+    expect(calls).toHaveLength(0);
+
+    const r = await req('POST', url, { token, body: {} });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ started: 3, queue: { orgJob: { accountId: id, kind: 'infer' } } });
+    expect(r.json.estimateUsd).toBeGreaterThan(0);
+    expect((await req('POST', url, { token, body: {} })).status).toBe(409);
+    expect((await req('GET', `${base}/api/state`, { token })).json.estimates.orgInferUsdPer100).toBeGreaterThan(0);
+    await until(() => Boolean(release));
+    release();
+    await until(() => events.some((e) => e.type === 'accounts' && /Classified 3 people; 1 reporting line suggested/.test(e.notice ?? '')));
+    await until(() => (events.filter((e) => e.type === 'queue').at(-1) as any)?.queue.orgJob === null);
+    expect(calls[0]).toMatchObject({ model: 'haiku', ids: added });
+    // the job's total is people from start to finish
+    const totals = events.flatMap((e) => (e.type === 'queue' && e.queue.orgJob ? [e.queue.orgJob.total] : []));
+    expect(totals.length).toBeGreaterThan(2);
+    expect(new Set(totals)).toEqual(new Set([3]));
+    expect(r.json.estimateUsd).toBeCloseTo(0.005); // per-run floor
+
+    const view = (await req('GET', `${base}/api/accounts/${id}`, { token })).json;
+    const m = new Map(view.members.map((x: any) => [x.id, x]));
+    expect(m.get(brand)).toMatchObject({ reportsTo: cmo, reportsToSource: 'user', subfunction: 'leadership', autoSubfunction: false, inference: { subfunction: 'brand' } });
+    expect(m.get(ic)).toMatchObject({ reportsTo: brand, reportsToSource: 'inferred', reportsToConfidence: 0.6, subfunction: 'brand' });
+    expect(store!.explorerCosts().org).toBeCloseTo(0.012);
+    expect((await req('GET', `${base}/api/state`, { token })).json.costs.org).toBeCloseTo(0.012);
+
+    // cancel: nothing changes; cancel on an idle account is a no-op
+    mode = 'wait-abort';
+    expect((await req('POST', `${base}/api/accounts/${id}/org/cancel`, { token, body: {} })).json.cancelled).toBe(false);
+    expect((await req('POST', url, { token, body: { ids: [ic] } })).status).toBe(200);
+    expect((await req('POST', `${base}/api/accounts/${id}/org/cancel`, { token, body: {} })).json.cancelled).toBe(true);
+    await until(() => events.some((e) => e.type === 'notice' && /cancelled/.test(e.message)));
+    expect((await req('GET', `${base}/api/state`, { token })).json.queue.orgJob).toBeNull();
+    expect((await req('GET', `${base}/api/accounts/${id}`, { token })).json.members.find((x: any) => x.id === ic)).toMatchObject({ reportsTo: brand, reportsToSource: 'inferred' });
+  });
+
+  // ---- web org research (Phase 4); the pass runner is stubbed, all people fictional ----
+  const passOk = (pass: any, raw: unknown, costUsd = 0.1) => ({ pass, status: 'ok' as const, data: normalizeOrgResearch(raw as any), model: 'stub', costUsd, durationMs: 1 });
+  const passRl = (pass: any, costUsd = 0.01) => ({ pass, status: 'rate_limited' as const, error: 'web search was rate-limited', model: 'stub', costUsd, durationMs: 1 });
+  const ev = (path: string) => `https://www.ledgerly.example${path}`;
+  const seedRaw = {
+    people: [
+      { name: 'Ava Lindqvist', title: 'Chief Marketing Officer', entity: '', country: '', subfunction: 'leadership', evidenceUrl: ev('/leadership'), quote: 'Ava Lindqvist, CMO', date: '' },
+      { name: 'Riley Moss', title: 'Head of Communications', entity: 'Ledgerly Services GmbH', country: 'DE', subfunction: 'comms-pr', evidenceUrl: ev('/leadership'), quote: 'Riley Moss leads communications', date: '' },
+      { name: 'Dev Rao', title: 'Brand Lead', entity: '', country: '', subfunction: 'brand', evidenceUrl: 'https://www.linkedin.com/in/devrao', quote: 'Brand Lead', date: '' },
+      { name: 'Noor Haddad', title: 'Content Lead', entity: '', country: '', subfunction: 'content', evidenceUrl: '', quote: 'x', date: '' },
+    ],
+    facts: [
+      { kind: 'reporting', text: 'Riley Moss reports to the CMO.', entity: '', country: '', subject: 'Riley Moss', manager: 'Ava Lindqvist', evidenceUrl: ev('/press/riley'), quote: 'Riley Moss, who reports to CMO Ava Lindqvist', confidence: 0.9 },
+      { kind: 'reporting', text: 'Ben Ortiz reports to Riley Moss.', entity: '', country: '', subject: 'Ben Ortiz', manager: 'Riley Moss', evidenceUrl: ev('/press/ben'), quote: 'Ben Ortiz reports to Riley Moss', confidence: 0.9 },
+      { kind: 'entity', text: 'Group marketing sits in the services entity.', entity: 'Ledgerly Services GmbH', country: 'DE', subject: '', manager: '', evidenceUrl: ev('/imprint'), quote: 'Ledgerly Services GmbH', confidence: 0.6 },
+    ],
+    headcounts: [{ label: 'employees', scope: 'company', count: 1200, evidenceUrl: ev('/about'), quote: 'over 1,200 employees' }],
+    searchesRun: 5,
+    rateLimited: false,
+  };
+  const empty = { people: [], facts: [], headcounts: [], searchesRun: 2, rateLimited: false };
+
+  it('web org research: token POST only, sequential passes, backoff on rate limits, evidence kept, never over a user line, idempotent', async () => {
+    const calls: Parameters<OrgResearchFn>[0][] = [];
+    let seedLimited = 1;
+    const orgResearchFn: OrgResearchFn = async (o) => {
+      calls.push(o);
+      if (o.pass === 'seed' && seedLimited-- > 0) return passRl('seed');
+      return o.pass === 'seed' ? passOk('seed', seedRaw, 0.4) : passOk(o.pass, empty, 0.05);
+    };
+    const { base, token, events } = await setup({ orgResearchFn, backoffMs: [5] });
+    const id = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Ledgerly', domain: 'ledgerly.example' } })).json.account.id;
+    const [ava, ben] = (await req('POST', `${base}/api/accounts/${id}/contacts`, { token, body: { contacts: [
+      { fullName: 'Ava Lindqvist', title: 'CMO' }, { fullName: 'Ben Ortiz', title: 'Director Brand' },
+    ] } })).json.added as string[];
+    await req('PUT', `${base}/api/accounts/${id}/members/${ben}`, { token, body: { reportsTo: ava } }); // the user's line
+
+    const url = `${base}/api/accounts/${id}/org/research`;
+    expect((await req('POST', url, { body: {} })).status).toBe(401);
+    expect((await req('GET', url, { token })).status).toBe(405);
+    expect((await req('POST', `${base}/api/accounts/nope/org/research`, { token, body: {} })).status).toBe(404);
+    expect((await req('POST', url, { token, body: { passes: ['seed', 'linkedin'] } })).status).toBe(400);
+    expect((await req('POST', url, { token, body: { passes: [] } })).status).toBe(400);
+    expect((await req('POST', url, { token, body: { passes: 'seed' } })).status).toBe(400);
+    expect(calls).toHaveLength(0);
+    const st = (await req('GET', `${base}/api/state`, { token })).json;
+    expect(st.estimates.orgResearchUsd).toEqual({ min: 0.3, max: 1.4 });
+    expect(st.estimates.orgResearchPassUsd.seed.max).toBeGreaterThan(st.estimates.orgResearchPassUsd.press.max);
+
+    const r = await req('POST', url, { token, body: { passes: ['press', 'seed'] } });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ started: 2, passes: ['seed', 'press'], queue: { orgJob: { accountId: id, kind: 'research', phase: 'seed', done: 0, total: 2 } } });
+    expect(r.json.estimate.min).toBeGreaterThan(0);
+    expect((await req('POST', `${base}/api/accounts/${id}/org/infer`, { token, body: {} })).status).toBe(409); // one org job at a time
+    await until(() => events.some((e) => e.type === 'accounts' && /Web research done/.test(e.notice ?? '')));
+    await until(() => (events.filter((e) => e.type === 'queue').at(-1) as any)?.queue.orgJob === null);
+
+    expect(calls.map((c) => c.pass)).toEqual(['seed', 'seed', 'press']); // rate-limited seed retried after the backoff
+    expect(calls.map((c) => c.model)).toEqual(['sonnet', 'sonnet', 'haiku']);
+    expect(calls[0]!.known.people.map((p) => p.name)).toEqual(expect.arrayContaining(['Ava Lindqvist', 'Ben Ortiz']));
+    expect(calls[2]!.known.people.map((p) => p.name)).toContain('Riley Moss'); // later passes see earlier findings
+    expect(events.some((e) => e.type === 'notice' && /rate-limited — pausing/.test(e.message))).toBe(true);
+    expect(events.some((e) => e.type === 'queue' && e.queue.orgJob?.pausedUntil)).toBe(true);
+    expect(store!.explorerCosts().org).toBeCloseTo(0.01 + 0.4 + 0.05);
+
+    const view = (await req('GET', `${base}/api/accounts/${id}`, { token })).json;
+    const byName = new Map(view.members.map((m: any) => [m.fullName, m]));
+    expect(view.members).toHaveLength(3); // Ava confirmed (not duplicated), Riley added, LinkedIn-only / evidence-less people dropped
+    const riley = byName.get('Riley Moss') as any;
+    expect(riley).toMatchObject({ kind: 'light', title: 'Head of Communications', entity: 'Ledgerly Services GmbH', country: 'DE', subfunction: 'comms-pr', confidence: 0.9 });
+    expect(riley.reportsTo).toBe(ava);
+    expect(riley).toMatchObject({ reportsToSource: 'web', reportsToConfidence: 0.9 });
+    expect(riley.reportsToReason).toContain(ev('/press/riley'));
+    expect(riley.sources).toEqual([expect.objectContaining({ kind: 'web', evidenceUrl: ev('/leadership'), quote: 'Riley Moss leads communications' })]);
+    expect((byName.get('Ava Lindqvist') as any).sources.some((s: any) => s.kind === 'web' && s.evidenceUrl === ev('/leadership'))).toBe(true);
+    expect(byName.get('Ben Ortiz')).toMatchObject({ reportsTo: ava, reportsToSource: 'user' }); // web never overrides the user
+    for (const m of view.members) for (const s of m.sources.filter((x: any) => x.kind === 'web')) expect(s.evidenceUrl).toMatch(/^https:\/\/www\.ledgerly\.example\//);
+    const facts = store!.accounts.orgFacts(id);
+    expect(facts).toHaveLength(3);
+    expect(facts.find((f) => f.kind === 'entity')!.text).toContain('(Ledgerly Services GmbH, DE)');
+    expect(facts.every((f) => /^https:\/\//.test(f.evidenceUrl) && f.quote)).toBe(true);
+    expect(store!.accounts.headcounts(id)).toEqual([expect.objectContaining({ source: 'web', scope: 'company', count: 1200, evidenceUrl: ev('/about'), confidence: 0.9 })]);
+    // people never enter the network
+    expect(store!.listExplorerPeople().some((p) => p.fullName === 'Riley Moss')).toBe(false);
+
+    // the same research again: nothing duplicated
+    const nContacts = store!.accounts.allContacts().length;
+    expect((await req('POST', url, { token, body: { passes: ['seed'] } })).status).toBe(200);
+    await until(() => events.filter((e) => e.type === 'accounts' && /Web research done/.test(e.notice ?? '')).length === 2);
+    expect(store!.accounts.allContacts().length).toBe(nContacts);
+    expect(store!.accounts.members(id)).toHaveLength(3);
+    expect(store!.accounts.orgFacts(id)).toHaveLength(3);
+    expect(store!.accounts.headcounts(id)).toHaveLength(1);
+    const riley2 = store!.accounts.members(id).find((m) => m.personId === riley.id)!;
+    expect(riley2.sources.filter((s) => s.kind === 'web')).toHaveLength(1);
+  });
+
+  it('web org research: name-only match for web people, edge confidence from the fact, duplicates reported', async () => {
+    const raw = {
+      ...empty,
+      people: [
+        { name: 'Ava Lindqvist', title: 'Chief Marketing Officer', entity: '', country: '', subfunction: 'leadership', evidenceUrl: 'https://news.example/ava', quote: 'CMO Ava Lindqvist', date: '' },
+        { name: 'Sam Okafor', title: 'Head of Brand', entity: '', country: '', subfunction: 'brand', evidenceUrl: ev('/team'), quote: 'Sam Okafor, Head of Brand', date: '' },
+        { name: 'Dev Rao', title: 'Digital Lead', entity: '', country: '', subfunction: 'digital-social', evidenceUrl: ev('/team'), quote: 'Dev Rao, Digital', date: '' },
+      ],
+      facts: [
+        { kind: 'reporting', text: 'Sam reports to the CMO.', entity: '', country: '', subject: 'Sam Okafor', manager: 'Ava Lindqvist', evidenceUrl: ev('/team'), quote: 'Sam Okafor works with CMO Ava Lindqvist', confidence: 0.7 },
+        { kind: 'reporting', text: 'Dev maybe reports to Sam.', entity: '', country: '', subject: 'Dev Rao', manager: 'Sam Okafor', evidenceUrl: ev('/team'), quote: 'Dev Rao and Sam Okafor', confidence: 0.4 },
+        { kind: 'reporting', text: 'Kai reports to Ava.', entity: '', country: '', subject: 'Kai Brandt', manager: 'Ava Lindqvist', evidenceUrl: ev('/team'), quote: 'Kai Brandt reports to Ava Lindqvist', confidence: 0.9 },
+      ],
+    };
+    const orgResearchFn: OrgResearchFn = async (o) => passOk(o.pass, raw, 0.1);
+    const { base, token, events } = await setup({ orgResearchFn });
+    const id = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Ledgerly', domain: 'ledgerly.example' } })).json.account.id;
+    const [ava] = (await req('POST', `${base}/api/accounts/${id}/contacts`, { token, body: { contacts: [
+      { fullName: 'Ava Lindqvist', title: 'CMO' }, // "CMO" vs "Chief Marketing Officer"
+      { fullName: 'Dev Rao', url: 'https://www.linkedin.com/in/dev-rao-1', title: 'Werkstudent Vertrieb' }, { fullName: 'Dev Rao', url: 'https://www.linkedin.com/in/dev-rao-2', title: 'Sales Intern' },
+    ] } })).json.added as string[];
+    expect(store!.accounts.members(id)).toHaveLength(3);
+    expect((await req('POST', `${base}/api/accounts/${id}/org/research`, { token, body: { passes: ['seed'] } })).status).toBe(200);
+    const done = () => events.find((e) => e.type === 'accounts' && /Web research done/.test(e.notice ?? '')) as any;
+    await until(() => Boolean(done()));
+    const ms = store!.accounts.members(id);
+    expect(ms.filter((m) => m.personId === ava)).toHaveLength(1);
+    expect(ms).toHaveLength(5); // Ava matched by name alone; Sam new; Dev ambiguous (two Devs) → new + warning
+    const view = (await req('GET', `${base}/api/accounts/${id}`, { token })).json;
+    const sam = view.members.find((m: any) => m.fullName === 'Sam Okafor');
+    expect(sam).toMatchObject({ reportsTo: ava, reportsToSource: 'web', reportsToConfidence: 0.7 });
+    expect(view.members.filter((m: any) => m.reportsToSource === 'web')).toHaveLength(1); // 0.4 edge and unknown Kai skipped
+    expect(view.members.find((m: any) => m.id === ava).sources.some((s: any) => s.kind === 'web')).toBe(true);
+    expect(done().notice).toMatch(/possible duplicate to check: Dev Rao/);
+  });
+
+  it('web org research: exhausted backoff waits for Resume; cancel keeps finished passes', async () => {
+    const calls: string[] = [];
+    let pressLimited = 2;
+    const orgResearchFn: OrgResearchFn = async (o) => {
+      calls.push(o.pass);
+      if (o.pass === 'seed') return passOk('seed', { ...empty, people: [seedRaw.people[1]] }, 0.3);
+      if (o.pass === 'press' && pressLimited-- > 0) return passRl('press');
+      if (o.pass === 'press') return passOk('press', empty, 0.05);
+      // jobs: hangs until cancelled; an aborted call carries its spend
+      await new Promise<void>((resolve) => o.signal!.addEventListener('abort', () => resolve(), { once: true }));
+      throw Object.assign(new Error('Aborted'), { name: 'AbortError', details: {} });
+    };
+    const { base, token, events } = await setup({ orgResearchFn, backoffMs: [5] });
+    const id = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Ledgerly', domain: 'ledgerly.example' } })).json.account.id;
+    const other = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Globex' } })).json.account.id;
+    const r = await req('POST', `${base}/api/accounts/${id}/org/research`, { token, body: { passes: ['seed', 'press', 'jobs'] } });
+    expect(r.status).toBe(200);
+    const lastQueue = () => (events.filter((e) => e.type === 'queue').at(-1) as any)?.queue;
+    await until(() => lastQueue()?.orgJob?.pausedManual === true);
+    expect(lastQueue().orgJob).toMatchObject({ kind: 'research', phase: 'press', done: 1, total: 3 });
+    expect(calls).toEqual(['seed', 'press', 'press']); // one timed backoff, then a manual pause — no tight loop
+    await sleep(30);
+    expect(calls).toHaveLength(3);
+    expect(events.some((e) => e.type === 'notice' && /Click Resume/.test(e.message))).toBe(true);
+    // the seed pass is already saved
+    expect(store!.accounts.members(id)).toHaveLength(1);
+    expect((await req('POST', `${base}/api/accounts/${id}/org/research`, { token, body: {} })).status).toBe(409);
+    expect((await req('POST', `${base}/api/accounts/${other}/org/resume`, { token, body: {} })).json.resumed).toBe(false);
+    expect((await req('POST', `${base}/api/accounts/${id}/org/resume`, { body: {} })).status).toBe(401);
+
+    expect((await req('POST', `${base}/api/accounts/${id}/org/resume`, { token, body: {} })).json.resumed).toBe(true);
+    await until(() => calls.includes('jobs'));
+    expect(calls).toEqual(['seed', 'press', 'press', 'press', 'jobs']);
+    expect((await req('POST', `${base}/api/accounts/${id}/org/resume`, { token, body: {} })).json.resumed).toBe(false); // not paused
+    expect((await req('POST', `${base}/api/accounts/${id}/org/cancel`, { token, body: {} })).json.cancelled).toBe(true);
+    await until(() => events.some((e) => e.type === 'notice' && /Web research cancelled — findings from finished passes are kept/.test(e.message)));
+    await until(() => lastQueue()?.orgJob === null);
+    expect(store!.accounts.members(id)).toHaveLength(1);
+    expect(store!.explorerCosts().org).toBeCloseTo(0.3 + 0.01 + 0.01 + 0.05);
+    // the job is free again
+    expect((await req('POST', `${base}/api/accounts/${id}/org/research`, { token, body: { passes: ['seed'] } })).status).toBe(200);
+  });
+
+  it('web org research: Resume during a timed pause retries now and resets the backoff', async () => {
+    const calls: string[] = [];
+    let limited = 2;
+    const orgResearchFn: OrgResearchFn = async (o) => {
+      calls.push(o.pass);
+      return limited-- > 0 ? passRl(o.pass) : passOk(o.pass, empty, 0.05);
+    };
+    // first pause is long: only Resume ends it; with a reset backoff the second rate limit waits the long step again
+    const { base, token, events } = await setup({ orgResearchFn, backoffMs: [60_000, 5] });
+    const id = (await req('POST', `${base}/api/accounts`, { token, body: { name: 'Ledgerly' } })).json.account.id;
+    expect((await req('POST', `${base}/api/accounts/${id}/org/research`, { token, body: { passes: ['press'] } })).status).toBe(200);
+    const lastQueue = () => (events.filter((e) => e.type === 'queue').at(-1) as any)?.queue;
+    await until(() => Boolean(lastQueue()?.orgJob?.pausedUntil));
+    expect((await req('POST', `${base}/api/accounts/${id}/org/resume`, { token, body: {} })).json.resumed).toBe(true);
+    await until(() => calls.length === 2);
+    await until(() => Boolean(lastQueue()?.orgJob?.pausedUntil));
+    const until1 = Date.parse(lastQueue().orgJob.pausedUntil) - Date.now();
+    expect(until1).toBeGreaterThan(30_000); // back at the first (long) step, not the 5 ms one
+    await sleep(30);
+    expect(calls).toHaveLength(2);
+    expect((await req('POST', `${base}/api/accounts/${id}/org/resume`, { token, body: {} })).json.resumed).toBe(true);
+    await until(() => lastQueue()?.orgJob === null);
+    expect(calls).toEqual(['press', 'press', 'press']);
   });
 });

@@ -363,7 +363,8 @@ export function classifyRateLimited(raw: RawDossier, d: Dossier): boolean {
   return noSearches && isEmptyDossier(d) && RATE_LIMIT_TEXT_RE.test(dossierText(d));
 }
 
-const CLI_RATE_LIMIT_RE = /rate.?limit|\b429\b|too many requests|usage limit/i;
+/** CLI error text that means "rate-limited, back off" (shared with the org-research job) */
+export const CLI_RATE_LIMIT_RE = /rate.?limit|\b429\b|too many requests|usage limit/i;
 
 /**
  * Build one goal-free dossier. Never rejects except with AbortError: failures become status 'error', and rate

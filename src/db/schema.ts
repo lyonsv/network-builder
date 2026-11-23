@@ -226,6 +226,83 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX account_members_person ON account_members(person_id);
   `,
+  // 7: marketing org map — light contacts (list rows / added by hand) with provenance, URL aliases (member URN vs
+  //    vanity URL), per-member org fields with source + confidence, headcount snapshots, list runs, anonymous list
+  //    rows and web org facts
+  `
+  ALTER TABLE contacts ADD COLUMN kind TEXT NOT NULL DEFAULT 'full';
+  ALTER TABLE contacts ADD COLUMN sources_json TEXT NOT NULL DEFAULT '[]';
+  CREATE TABLE contact_aliases (
+    alias_id   TEXT PRIMARY KEY,
+    contact_id TEXT NOT NULL,
+    url        TEXT NOT NULL,
+    added_at   TEXT NOT NULL
+  );
+  ALTER TABLE account_members ADD COLUMN subfunction TEXT NOT NULL DEFAULT '';
+  ALTER TABLE account_members ADD COLUMN team TEXT NOT NULL DEFAULT '';
+  ALTER TABLE account_members ADD COLUMN entity TEXT NOT NULL DEFAULT '';
+  ALTER TABLE account_members ADD COLUMN country TEXT NOT NULL DEFAULT '';
+  ALTER TABLE account_members ADD COLUMN responsibilities TEXT NOT NULL DEFAULT '';
+  ALTER TABLE account_members ADD COLUMN noise TEXT NOT NULL DEFAULT '';
+  ALTER TABLE account_members ADD COLUMN sources_json TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE account_members ADD COLUMN confidence REAL;
+  ALTER TABLE account_members ADD COLUMN reports_to_source TEXT NOT NULL DEFAULT '';
+  ALTER TABLE account_members ADD COLUMN reports_to_confidence REAL;
+  ALTER TABLE account_members ADD COLUMN reports_to_reason TEXT NOT NULL DEFAULT '';
+  ALTER TABLE account_members ADD COLUMN inference_json TEXT NOT NULL DEFAULT '';
+  UPDATE account_members SET reports_to_source = 'user' WHERE reports_to <> '';
+
+  CREATE TABLE account_headcounts (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    taken_at     TEXT NOT NULL,
+    source       TEXT NOT NULL,
+    scope        TEXT NOT NULL,
+    label        TEXT NOT NULL DEFAULT '',
+    count        INTEGER NOT NULL,
+    url          TEXT NOT NULL DEFAULT '',
+    evidence_url TEXT NOT NULL DEFAULT '',
+    quote        TEXT NOT NULL DEFAULT '',
+    confidence   REAL,
+    run_id       TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX account_headcounts_acc ON account_headcounts(account_id, taken_at);
+
+  CREATE TABLE account_list_runs (
+    id          TEXT PRIMARY KEY,
+    account_id  TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    page_kind   TEXT NOT NULL,
+    url         TEXT NOT NULL,
+    keywords    TEXT NOT NULL DEFAULT '',
+    started_at  TEXT NOT NULL,
+    finished_at TEXT NOT NULL DEFAULT '',
+    rows_seen   INTEGER NOT NULL DEFAULT 0,
+    named       INTEGER NOT NULL DEFAULT 0,
+    anonymous   INTEGER NOT NULL DEFAULT 0,
+    stop_reason TEXT NOT NULL DEFAULT ''
+  );
+
+  CREATE TABLE account_anon_rows (
+    run_id   TEXT NOT NULL REFERENCES account_list_runs(id) ON DELETE CASCADE,
+    idx      INTEGER NOT NULL,
+    headline TEXT NOT NULL DEFAULT '',
+    location TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (run_id, idx)
+  );
+
+  CREATE TABLE account_org_facts (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    kind         TEXT NOT NULL,
+    text         TEXT NOT NULL,
+    evidence_url TEXT NOT NULL,
+    quote        TEXT NOT NULL DEFAULT '',
+    confidence   REAL,
+    found_at     TEXT NOT NULL,
+    run_id       TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX account_org_facts_acc ON account_org_facts(account_id);
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -58,10 +58,11 @@ To use a different database, add `-e NETWORK_BUILDER_HOME=/path/to/folder`, or a
 | `network_export` | Write CSVs to the outputs folder: `crm`, `full`, or `ahoy` (Companies, Contacts and Notes files). | writes files |
 | `network_list_accounts` | Target accounts with status, people, connections and buying-committee coverage. | no |
 | `network_get_account` | **One account as one markdown document:** ABX brief, buying committee and gaps, org chart (department → seniority, reporting lines), each person's full LinkedIn profile and notes, and your warm paths (connections who work or worked there). Found by name, alias, id or LinkedIn company URL. `detail: "summary"` leaves out the profiles. | no |
+| `network_get_org_map` | **An account's marketing org:** headcounts (captured vs LinkedIn's company count and its "What they do → Marketing" count — only present when Marketing is among the top 5 functions LinkedIn shows; without it there is no coverage — plus search counts, anonymous rows, web statements, coverage), sub-function × seniority, the reporting tree with each line tagged `[confirmed]`, `[inferred 0.6]` or `[web 0.9]` plus its reason, people with no known manager, flagged people (not counted), entities and web facts with evidence URLs. `detail: "summary"` is shorter. `structuredContent` has the `OrgMap` and per-person fields. | no |
 | `network_get_contact` | One key person on an account in full: placement, role, notes, every experience entry with descriptions, education, skills; optionally the raw captured page text. | no |
 | `network_create_account` / `network_update_account` | Create an account, or change its name, domain, LinkedIn page, aliases, status or brief. `brief_mode: "append"` (the default) adds to the brief, e.g. a campaign plan. | local |
-| `network_account_add_people` | Put connections (ids or LinkedIn URLs) or captured people on an account, optionally with a role. | local |
-| `network_account_update_person` | Set role, department or level (`""` = automatic from the title), who they report to, notes. | local |
+| `network_account_add_people` | Put connections (ids or LinkedIn URLs) or captured people on an account, optionally with a role. `contacts` adds people found elsewhere as light contacts (name, title, LinkedIn URL, evidence URL; source `mcp`), deduped by URL or name + title, so a repeat adds nothing. | local |
+| `network_account_update_person` | Set role, department or level (`""` = automatic from the title), who they report to, notes, and marketing org fields: sub-function, team, legal entity, country, responsibilities, noise (`"none"` = in the org, `""` = automatic). `confirm_reports_to: true` accepts a suggested line as yours. | local |
 | `network_account_remove_person` | Take someone off an account (their captured profile is kept). | local, reversible |
 
 **Prompts:**
@@ -73,6 +74,11 @@ To use a different database, add `-e NETWORK_BUILDER_HOME=/path/to/folder`, or a
 **Resources:** `account://<id>` is the same document as `network_get_account`, so a client can attach an account as
 context.
 
+**Marketing org maps** are built in the explorer and the Chrome extension: headcount capture and list walks on
+LinkedIn, then **Classify** and **Research on the web** (see the README's "Map a marketing org"). Over MCP, Claude can
+read the map, add people it found as light contacts, set org fields and confirm or set reporting lines. All of that is
+local and free. It can't classify, research or walk LinkedIn.
+
 People captured from LinkedIn with the [Chrome extension](../extension/README.md) are reachable **only** through the
 account tools. They aren't connections, so network search, lenses and exports never include them.
 
@@ -82,8 +88,8 @@ narrow the results.
 
 ## What it deliberately doesn't do
 
-- **Nothing that costs money or touches other systems.** It won't start web research, create or re-score lenses, or send
-  anything to Ahoy. Those stay human-triggered in the explorer (`network-builder`). If a task needs them, Claude will
+- **Nothing that costs money or touches other systems.** It won't start web research, create or re-score lenses, send
+  anything to Ahoy, classify an org, research an org on the web or walk LinkedIn lists. Those stay human-triggered in the explorer (`network-builder`). If a task needs them, Claude will
   tell you which people to research there.
 - **No deletes of your data.** Removing someone from a lens or an account is reversible (captured profiles are kept),
   and lists are only created or updated.
@@ -101,4 +107,6 @@ to respect that.
 - "Save the top 20 angel-lens members as 'Q4 outreach' and export it for Ahoy."
 - "Plan an ABX campaign for Ledgerly." / "Who on the Initech account reports to the CFO, and who's our champion?"
 - "Add my connections who work at Ledgerly to that account, and append this meeting summary to its brief."
+- "Summarise Ledgerly's marketing org: who leads brand and demand gen, and which reporting lines are only guesses?"
+- "Ava Lindqvist reports to Jonas; confirm that line and set her sub-function to content."
 - "Give me an overview of my network: top companies, seniority mix, and how many people have web profiles."

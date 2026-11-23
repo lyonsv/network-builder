@@ -244,7 +244,7 @@ export interface ClaudeCliJson {
   num_turns?: number;
 }
 
-export type CostStage = 'rank' | 'research' | 'enrich' | 'dossier' | 'lens' | 'ahoy';
+export type CostStage = 'rank' | 'research' | 'enrich' | 'dossier' | 'lens' | 'ahoy' | 'org';
 
 export interface CostTracker {
   add(stage: CostStage, usd: number): void;
@@ -637,6 +637,16 @@ export interface JobQueueState {
   lensJob: { lensId: string; phase: 'score' | 'rerank'; done: number; total: number } | null;
   /** Ahoy check / send in progress */
   ahoyJob?: { kind: 'check' | 'send'; done: number; total: number } | null;
+  /** account org-map job in progress (one at a time): 'infer' = Haiku classification + reporting lines */
+  orgJob?: {
+    accountId: string;
+    kind: 'infer' | 'research';
+    phase: string;
+    done: number;
+    total: number;
+    pausedUntil?: string | null;
+    pausedManual?: boolean;
+  } | null;
   seq: number;
 }
 
@@ -648,6 +658,8 @@ export interface ExplorerCosts {
   research: number;
   /** Ahoy CRM checks and sends */
   ahoy?: number;
+  /** account org-map inference / research */
+  org?: number;
   total: number;
   incomplete: boolean;
 }
@@ -671,6 +683,11 @@ export interface ExplorerState {
     lensRerankUsdPer100: number;
     ahoyCheckUsdPerPerson?: number;
     ahoySendUsdPerProposal?: number;
+    /** org inference (Haiku classification + reporting lines) per 100 members */
+    orgInferUsdPer100?: number;
+    /** web org research, whole run (all passes); per pass in `orgResearchPassUsd` */
+    orgResearchUsd?: { min: number; max: number };
+    orgResearchPassUsd?: Record<string, { min: number; max: number }>;
   };
   dbPath: string;
   /** accounts (ABX) — summaries only; GET /api/accounts/:id for the full view */
@@ -688,7 +705,8 @@ export interface ExtensionStatus {
 
 export type ExplorerEvent =
   | { type: 'hello'; queue: JobQueueState; costs: ExplorerCosts }
-  | { type: 'queue'; queue: JobQueueState }
+  /** `costs` only when an org job ends */
+  | { type: 'queue'; queue: JobQueueState; costs?: ExplorerCosts }
   | { type: 'person'; person: ExplorerPerson; costs: ExplorerCosts; error?: string }
   | { type: 'lens'; lens: Lens; scores?: { personId: string; score: number; reason: string; basis: EvidenceBasis }[]; costs: ExplorerCosts }
   | { type: 'lenses'; lenses: Lens[] }
@@ -697,7 +715,7 @@ export type ExplorerEvent =
   | { type: 'crm'; updates: { id: string; crm: CrmMatch | null }[]; costs: ExplorerCosts }
   | { type: 'notice'; level: 'info' | 'warn' | 'error'; message: string }
   /** accounts changed (`changed` = the account touched; `notice` = e.g. a capture from the Chrome extension) */
-  | { type: 'accounts'; accounts: AccountSummary[]; changed?: string; notice?: string }
+  | { type: 'accounts'; accounts: AccountSummary[]; changed?: string; notice?: string; costs?: ExplorerCosts }
   /** the Chrome extension reached the server (`connected` = first contact, or first in 10 min) */
   | { type: 'extension'; extension: ExtensionStatus; connected: boolean }
   /** another process changed the database: clients should refetch GET /api/state */

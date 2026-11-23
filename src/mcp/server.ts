@@ -58,9 +58,10 @@ Typical workflows: find people (network_search_people, network_find_connections_
 (network_get_person) → curate a lens (network_lens_add / network_lens_remove / network_set_lens_threshold) → save a
 list (network_save_list) → export CSV for a CRM (network_export, preset "ahoy" for Ahoy imports).
 
-Not available here by design: starting web research, creating or re-scoring lenses, or sending to Ahoy — those cost
-money or touch external systems and are started by the user in the explorer UI (run \`network-builder\`). Suggest it
-when a task needs them (e.g. "these 5 have no web profile; research them in the explorer first").
+Not available here by design: starting web research, creating or re-scoring lenses, sending to Ahoy, classifying an
+account's org, web org research, or walking LinkedIn lists — those cost money or touch external systems and are started
+by the user in the explorer UI (run \`network-builder\`) or the Chrome extension. Suggest it when a task needs them
+(e.g. "these 5 have no web profile; research them in the explorer first").
 ${ACCOUNT_INSTRUCTIONS}`;
 
 export interface NetworkMcpOptions {

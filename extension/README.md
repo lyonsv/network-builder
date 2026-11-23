@@ -2,11 +2,15 @@
 
 Adds a **＋ Network Builder** button next to *Message / More* on LinkedIn profiles. One click files the person, with
 their full profile, under an **account** (a company you're targeting) in your local Network Builder. From there Claude
-can plan an ABX campaign with `network_get_account`.
+can plan an ABX campaign with `network_get_account`. On a company's **People** tab or a **people search**, a
+**⇣ Map to Network Builder** button files the list you're looking at under an account
+([Mapping a team from a list](#mapping-a-team-from-a-list)).
 
-- **Reads only the person you're viewing, and only when you click.** It then opens that person's own "Show all" lists
-  (experience, education, skills, certifications, languages, volunteering, honours) in a minimized window, reads them and
-  closes it, so it captures every role with dates and tenure, just as you'd see clicking through. No crawling of anyone else.
+- **Reads only what is on your screen, and only when you click.** For a profile, it then opens that person's own
+  "Show all" lists (experience, education, skills, certifications, languages, volunteering, honours) in a minimized
+  window, reads them and closes it, so it captures every role with dates and tenure, just as you'd see clicking
+  through. Full profiles are always one click per person; nothing opens profiles for you.
+- **Lists are walked only in the tab you're looking at**, after you press Start, at human pace and within caps (below).
 - **Sends only to your own machine** (`http://127.0.0.1:<port>`). It contacts no other server, and nothing costs money.
 - **People you capture are not added to your network.** They live under the account, never in your connections,
   lenses or exports.
@@ -42,6 +46,43 @@ visible profile is saved instead.
 
 After updating the extension's files, click ↻ on its card in `chrome://extensions` and reload your LinkedIn tabs.
 
+## Mapping a team from a list
+
+1. Run a LinkedIn **people search** for the team, e.g. *marketing* filtered to the company. (A keyword search on a
+   company's **People** tab now redirects to these search results: 10 per page with a **Next** button.)
+2. Click **⇣ Map to Network Builder** (bottom right). Check the **account** (preselected when the account's LinkedIn
+   page is this company) and the **most rows this run**.
+3. Click **Start mapping** and keep the tab in front. **Cancel** stops at once.
+
+**Headcount only.** LinkedIn's people search no longer shows a result count, so the size of the org comes from the
+company **People** tab. On that tab (without a keyword search, for the company total), make the member count and the
+**What they do** box visible — flip the insights carousel to it if needed — and click **Capture headcount only**. It
+reads "N associated members" and the What they do counts that are visible — on LinkedIn's current layout only the top 5
+functions, so Marketing may be missing (the job-function filter doesn't filter the page either). On older layouts with
+a **Show more** in that box it clicks it at most once, as a fallback. It saves the counts and reads no people. Do it once per company page (each legal entity's page adds up in the org map). For a group company,
+capture the headcount and walk the search for each entity page, picking the same account each time.
+
+What it does and doesn't do:
+
+- **Starts only when you press Start** on that page. Nothing runs by itself, on a timer, or in another tab.
+- **Runs only in the visible tab.** It pauses as soon as you switch tabs or minimize the window and carries on when
+  you come back. It never opens windows or tabs for a list.
+- **Human pace:** 2.5–4 s between loads, slower (up to 8 s more) whenever LinkedIn loads nothing new; search pages turn
+  at most once every 4–7 s, with the visible **Next** button.
+- **Caps:** 300 rows per run by default, 500 at most, and 1,000 rows a day in this browser. Network Builder also refuses
+  more than 1,000 rows for one run.
+- **Stops immediately** on a LinkedIn checkpoint, captcha, sign-in page, "unusual activity" or limit message, when the
+  list ends, or when you leave the page. Complete any check yourself and wait before mapping again.
+- **Reads only what you can see:** each result's name, headline, location and profile link, the "N associated members"
+  count and the **What they do** numbers. No hidden fields, no data attributes, no requests of its own to LinkedIn.
+- **"LinkedIn Member" rows** (people outside your network) are kept only as anonymous counts, never as contacts.
+- Everyone else is saved as a *light contact* on the account (no full profile). Open a person and click
+  **＋ Network Builder** when you want their full profile.
+- If Network Builder isn't running, the walk pauses with the error and a **Retry** button (lists are not queued).
+
+**LinkedIn's terms restrict automated browsing.** LinkedIn may limit or restrict accounts that browse a lot. Keep runs
+small, map one team at a time, and stop if you see a security check.
+
 ## When something's wrong
 
 | You see | What it means / what to do |
@@ -54,5 +95,6 @@ After updating the extension's files, click ↻ on its card in `chrome://extensi
 | "Extension was updated — reload this tab" | Reload the LinkedIn tab after updating the extension. |
 
 LinkedIn changes its page markup from time to time. The extension also sends the page's visible text, and Network
-Builder falls back to that, so profiles still come through. Parsing lives in `src/accounts/capture.ts` (with tests), so
-fixes don't require reinstalling the extension.
+Builder falls back to that, so profiles still come through. Parsing lives in `src/accounts/capture.ts` and
+`src/accounts/list-capture.ts` (with tests), so most fixes don't require reinstalling the extension. Finding list
+cards on the page lives in `list-reader.js` (known selectors first, then a structural fallback).

@@ -552,6 +552,94 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
 .exp li:last-child { border-bottom: 0; }
 .exp .d { font-size: 12px; color: var(--muted); }
 .exp .x2 { font-size: 12.5px; white-space: pre-wrap; margin-top: 3px; }
+/* marketing org map (v9 Phase 5) */
+.btn.xs { padding: 1px 7px; font-size: 11.5px; border-radius: 6px; }
+.acc-card-h .seg { font-weight: 400; }
+.cb { display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 999px; padding: 0 6px; line-height: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cb-high { background: var(--good-soft); color: var(--good); }
+.cb-medium { background: var(--info-soft); color: var(--info); }
+.cb-low { background: var(--warn-soft); color: var(--warn); }
+.tag.t-light { border-style: dashed; color: var(--muted); text-decoration: none; }
+.tag.t-vendor { background: var(--info-soft); color: var(--info); border-color: transparent; }
+.tag.t-noise { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.tag.t-sf { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.o-wrap { padding: 10px 14px 14px; }
+.o-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.o-hint { font-size: 12px; color: var(--muted); }
+.o-job { flex-basis: 100%; display: flex; gap: 8px; align-items: center; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); color: var(--text); }
+.o-job.paused { background: var(--warn-soft); color: var(--warn); }
+.hc-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.hc { display: flex; flex-direction: column; min-width: 120px; max-width: 100%; flex: 0 1 auto; padding: 7px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-2); }
+.hc b { font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.hc .l { font-size: 12px; color: var(--text); }
+.hc .s { font-size: 11px; color: var(--muted); }
+.hc.cap { border-color: var(--accent); }
+.hc.q, .hc.web { border-style: dashed; }
+.bd-wrap { overflow-x: auto; margin: 10px 0 4px; width: 0; min-width: 100%; }
+.bd { border-collapse: collapse; font-size: 12px; width: auto; min-width: 0; }
+.bd th { text-align: left; font-weight: 500; color: var(--muted); padding: 3px 8px 3px 0; white-space: nowrap; }
+.bd thead th { font-size: 10.5px; padding-right: 4px; white-space: normal; vertical-align: bottom; }
+.bd td { padding: 2px 3px 2px 0; min-width: 34px; }
+.bd-c { position: relative; display: block; width: 100%; min-width: 32px; height: 20px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel); cursor: pointer; padding: 0; overflow: hidden; color: var(--text); }
+.bd-c .bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-soft); }
+.bd-c .v { position: relative; font-size: 11.5px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.bd-c:hover, .bd-c.on { border-color: var(--accent); }
+.bd-c.on .bar { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.o-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; }
+.o-filters input, .o-filters select, .o-sel { padding: 4px 8px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); font-size: 12.5px; }
+.o-filters input { min-width: 260px; }
+.o-filt { display: contents; }
+.o-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.o-chip { border: 1px solid var(--border-strong); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 1px 9px; font-size: 12px; cursor: pointer; }
+.o-chip.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.o-sec { margin-top: 14px; }
+.o-sec h5, .o-sec > summary { margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; cursor: default; }
+.o-sec > summary { cursor: pointer; }
+.o-tree, .o-tree ul { list-style: none; margin: 0; padding: 0; }
+.o-tree { overflow-x: auto; width: 0; min-width: 100%; padding-bottom: 2px; }
+.o-wrap { min-width: 0; overflow-wrap: anywhere; }
+.o-tree ul { padding-left: 26px; }
+.o-tree li { position: relative; padding-top: 6px; }
+.o-tree ul > li::before { content: ""; position: absolute; left: -16px; top: 0; bottom: 0; border-left: 2px solid var(--border-strong); }
+.o-tree ul > li:last-child::before { bottom: auto; height: 26px; }
+.o-tree ul > li::after { content: ""; position: absolute; left: -16px; top: 26px; width: 14px; border-top: 2px solid var(--border-strong); }
+.o-tree li.e-inferred::after, .o-tree li.e-web::after { border-top-style: dashed; border-top-color: var(--warn); }
+.o-tree li.e-inferred > .o-card, .o-tree li.e-web > .o-card { border-style: dashed; }
+.o-tree li.o-dim > .o-card { opacity: .55; }
+.o-tree li.o-ctx > .o-card { background: var(--panel-2); }
+.o-card { display: inline-block; max-width: 100%; min-width: 260px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; color: var(--text); }
+.o-card.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.o-top { display: flex; gap: 6px; align-items: baseline; }
+.o-open { border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; color: var(--text); min-width: 0; }
+.o-open:hover .n { color: var(--accent); text-decoration: underline; }
+.o-open .n { font-weight: 600; font-size: 13.5px; margin-right: 6px; }
+.o-open .t { font-size: 12.5px; color: var(--muted); }
+.o-tog { border: 0; background: var(--panel-2); color: var(--muted); border-radius: 5px; font-size: 11px; padding: 0 5px; cursor: pointer; white-space: nowrap; }
+.o-tags { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.o-src { display: inline-flex; gap: 2px; font-size: 12px; }
+.o-edge, .o-prov { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; font-size: 11.5px; color: var(--muted); }
+.o-elab { font-weight: 600; }
+.o-elab.el-user { color: var(--good); }
+.o-elab.el-inferred, .o-elab.el-web { color: var(--warn); }
+.o-why { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.o-why2 { flex-basis: 100%; font-size: 12px; overflow-wrap: anywhere; }
+.o-ctl { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.o-sel { font-size: 11.5px; padding: 1px 4px; max-width: 170px; }
+.o-err { color: var(--bad); font-size: 12px; }
+.o-err:empty { display: none; }
+.o-ush { font-weight: 600; font-size: 12.5px; margin: 8px 0 2px; }
+.o-uent { margin: 2px 0 6px 10px; }
+.o-uh { font-size: 11.5px; color: var(--faint); margin-bottom: 3px; }
+.o-ulist { display: flex; flex-wrap: wrap; gap: 6px; }
+.o-flag .o-card { opacity: .85; }
+.o-facts { margin: 0; padding-left: 16px; font-size: 12.5px; }
+.o-facts li + li { margin-top: 4px; }
+.o-dt { color: var(--faint); font-size: 11.5px; }
+.o-runs ul { margin: 0; padding-left: 16px; font-size: 12.5px; }
+.o-ro { padding: 6px 0; color: var(--text); font-size: 13px; }
+.o-q { font-size: 12px; color: var(--muted); font-style: italic; }
+.o-dsec .grid2 { margin-top: 6px; }
+@media (max-width: 640px) { .o-card { min-width: 0; } .o-tree ul { padding-left: 18px; } .o-filters input { min-width: 0; flex: 1 1 100%; } }
 .acc-empty { padding: 44px 24px; text-align: center; color: var(--muted); }
 .acc-empty h3 { color: var(--text); margin: 0 0 8px; font-size: 17px; }
 .acc-empty ol { text-align: left; display: inline-block; margin: 8px 0 14px; line-height: 1.7; }
@@ -954,7 +1042,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   var byId = new Map();
   // Queue state comes ONLY from server snapshots (SSE events, POST responses, /api/state), ordered by seq.
   var qmap = new Map(), rmap = new Map();
-  var pausedUntil = null, pausedManual = false, lensJob = null, ahoyJob = null;
+  var pausedUntil = null, pausedManual = false, lensJob = null, ahoyJob = null, orgJob = null;
   var lastSeq = -1;
   var costs = state.costs;
   var connected = LIVE ? 'connecting' : 'static';
@@ -966,6 +1054,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     pausedManual = !!q.pausedManual;
     lensJob = q.lensJob || null;
     ahoyJob = q.ahoyJob || null;
+    orgJob = q.orgJob || null;
     lastSeq = typeof q.seq === 'number' ? q.seq : lastSeq;
   }
   setQueueMaps(state.queue);
@@ -1426,6 +1515,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       append(box, h('span', { class: 'chip', title: 'Ahoy CRM job (through your Ahoy connector in Claude Code)' }, h('span', { class: 'spin', 'aria-hidden': 'true' }),
         ' Ahoy ' + (ahoyJob.kind === 'send' ? 'send ' : 'check ') + (Number(ahoyJob.done) || 0).toLocaleString() + '/' + (Number(ahoyJob.total) || 0).toLocaleString()));
     }
+    if (orgJob) append(box, orgJobChip());
     if (rmap.size || qmap.size || pausedActive() || pausedManual) {
       var txt = (rmap.size ? rmap.size + ' running' : '') + (rmap.size && qmap.size ? ' · ' : '') + (qmap.size ? qmap.size + ' queued' : '');
       if (pausedManual) {
@@ -1438,7 +1528,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       } else append(box, h('span', { class: 'chip', text: txt }));
     }
     append(box, h('span', { class: 'chip', title: 'Total spend recorded in the database · profiles ' + usd(costs.enrich) + ' · web profiles ' + usd(costs.dossier) +
-      ' · lenses (incl. earlier ranking) ' + usd(costs.lens) + ' · legacy research ' + usd(costs.research) + (costs.ahoy ? ' · Ahoy ' + usd(costs.ahoy) : '') + (costs.incomplete ? ' (lower bound: some calls were cut off)' : '') },
+      ' · lenses (incl. earlier ranking) ' + usd(costs.lens) + ' · legacy research ' + usd(costs.research) + (costs.ahoy ? ' · Ahoy ' + usd(costs.ahoy) : '') + (costs.org ? ' · org map ' + usd(costs.org) : '') + (costs.incomplete ? ' (lower bound: some calls were cut off)' : '') },
       h('b', { text: (costs.incomplete ? '≥ ' : '') + usd(costs.total) }), ' spent'));
     if (LIVE) {
       var label = connected === 'live' ? 'live' : connected === 'connecting' ? 'connecting…' : 'reconnecting…';
@@ -2532,8 +2622,9 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     if (!q) return [];
     var sq = typeof q.seq === 'number' ? q.seq : -1;
     if (!authoritative && sq >= 0 && sq < lastSeq) return [];
-    var oq = qmap, or = rmap, oldJob = lensJob;
+    var oq = qmap, or = rmap, oldJob = lensJob, oldOrg = JSON.stringify(orgJob);
     setQueueMaps(q);
+    if (oldOrg !== JSON.stringify(orgJob) && typeof paintOrgActions === 'function') paintOrgActions();
     var changed = [];
     function diff(a, b) { a.forEach(function (v, id) { if (b.get(id) !== v) changed.push(id); }); }
     diff(oq, qmap); diff(qmap, oq); diff(or, rmap); diff(rmap, or);
@@ -2606,7 +2697,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       if (d.costs) costs = d.costs;
       renderLensBar(); refresh();
     });
-    on('queue', function (d) { refreshLight(applyQueue(d.queue)); });
+    on('queue', function (d) { if (d.costs) costs = d.costs; refreshLight(applyQueue(d.queue)); });
     on('person', function (d) {
       var p = d.person;
       replacePerson(p);
@@ -2653,6 +2744,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       if (ui.crmf && ui.crmf !== 'any') heavyRefresh();
     });
     on('accounts', function (d) {
+      if (d && d.costs) { costs = d.costs; renderStats(); }
       if (d && Array.isArray(d.accounts)) accountsUpdated(d.accounts, d.changed, d.notice);
     });
     on('extension', function (d) {
@@ -3656,9 +3748,17 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       });
       org.appendChild(col);
     });
+    var mkt = acc.orgView === 'marketing';
+    var orgSw = h('span', { class: 'seg', role: 'group', 'aria-label': 'Org chart view' },
+      [['all', 'All departments'], ['marketing', 'Marketing org']].map(function (o) {
+        return h('button', { type: 'button', 'aria-pressed': String(acc.orgView === o[0]), text: o[1], on: { click: function () { setOrgView(o[0]); } } });
+      }));
     var orgCard = h('div', { class: 'card acc-sec' },
-      h('div', { class: 'acc-card-h' }, 'Org chart', h('span', { class: 'sub', text: 'department → seniority · placed from job titles; click a person to correct it, set their role or who they report to' })),
-      ms.length ? org : h('div', { class: 'acc-empty', style: 'padding:24px' },
+      h('div', { class: 'acc-card-h' }, mkt ? 'Marketing org' : 'Org chart', orgSw,
+        h('span', { class: 'sub', text: mkt
+          ? 'reporting tree · dashed lines are suggestions (AI or web) until you confirm them · click a person for sources and details'
+          : 'department → seniority · placed from job titles; click a person to correct it, set their role or who they report to' })),
+      mkt ? renderMarketingOrg(v) : ms.length ? org : h('div', { class: 'acc-empty', style: 'padding:24px' },
         h('div', { text: 'Nobody on this account yet. Add people from LinkedIn with the Chrome extension, or add your connections who work there (below).' }),
         h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn sm', type: 'button', text: '🧩 Set up the Chrome extension', on: { click: openExtDialog } }))));
 
@@ -3681,12 +3781,560 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     box.appendChild(head);
     box.appendChild(h('div', { class: 'acc-row' }, brief, h('div', null, comm, h('div', { style: 'height:16px' }), warmCard)));
     box.appendChild(orgCard);
+    if (mkt) { paintOrgActions(); paintOrg(); }
+  }
+
+  // ---- marketing org map (v9 Phase 5). Renders straight from view.org (built by src/accounts/org.ts on the server):
+  // the page never rebuilds the tree, it only hides what the filters exclude. Vocab mirrors src/accounts/types.ts.
+  var SUBFUNCTIONS = ['leadership', 'brand', 'product-marketing', 'demand-gen', 'content', 'comms-pr', 'events', 'partner-marketing',
+    'marketing-ops', 'digital-social', 'field-marketing', 'other'];
+  var SUBFUNCTION_LABELS = { leadership: 'Leadership', brand: 'Brand', 'product-marketing': 'Product marketing', 'demand-gen': 'Demand gen & growth',
+    content: 'Content', 'comms-pr': 'Comms & PR', events: 'Events', 'partner-marketing': 'Partner marketing', 'marketing-ops': 'Marketing ops & tech',
+    'digital-social': 'Digital, web & social', 'field-marketing': 'Field & regional', other: 'Other' };
+  var SENIORITIES = ['c-level', 'svp', 'vp', 'senior-director', 'director', 'head', 'senior-manager', 'manager', 'lead', 'senior-ic', 'ic',
+    'junior', 'intern', 'unknown'];
+  var SENIORITY_LABELS = { 'c-level': 'C-level', svp: 'SVP', vp: 'VP', 'senior-director': 'Sr director', director: 'Director', head: 'Head of',
+    'senior-manager': 'Sr manager', manager: 'Manager', lead: 'Lead', 'senior-ic': 'Sr IC', ic: 'IC', junior: 'Junior', intern: 'Intern', unknown: 'Unknown' };
+  var NOISE_LABELS = { 'hr-marketing': 'HR / employer marketing', 'sales-hybrid': 'Sales & marketing hybrid', 'not-marketing': 'Not marketing',
+    stale: 'Left / out of date', 'other-employer': 'Works for another company' };
+  var SOURCE_LABELS = { 'extension-list': ['☰', 'LinkedIn list'], 'extension-profile': ['👤', 'LinkedIn profile'], web: ['🌐', 'Web research'],
+    connection: ['🤝', 'Your connection'], manual: ['✎', 'Added by hand'], mcp: ['⚙', 'Added through Claude (MCP)'] };
+  var PASS_LABELS = { seed: 'Company site', press: 'Press & news', jobs: 'Jobs & careers', events: 'Events & talks', headcount: 'Headcount' };
+  acc.orgView = 'all';
+  try { acc.orgView = localStorage.getItem('nb.orgView') === 'marketing' ? 'marketing' : 'all'; } catch (e) { /* storage blocked */ }
+  acc.of = { sub: [], sen: '', ent: '', src: '', conf: '', flagged: false, q: '' };
+  acc.collapsed = new Set();
+
+  function setOrgView(vw) {
+    acc.orgView = vw === 'marketing' ? 'marketing' : 'all';
+    try { localStorage.setItem('nb.orgView', acc.orgView); } catch (e) { /* ignore */ }
+    renderAccMain();
+  }
+  /** O(1) member lookup; the index is rebuilt only when acc.view is replaced */
+  var memberIdx = { view: null, map: null };
+  function memberById(id) {
+    var v = acc.view;
+    if (!v) return null;
+    if (memberIdx.view !== v) { memberIdx.view = v; memberIdx.map = new Map(v.members.map(function (m) { return [m.id, m]; })); }
+    return memberIdx.map.get(id) || null;
+  }
+  function pct(n) { return Math.round(n * 100) + '%'; }
+  function confKind(c) { return c >= 0.75 ? 'high' : c >= 0.45 ? 'medium' : 'low'; }
+  function confBadge(c, what) {
+    if (c === null || c === undefined || !isFinite(c)) return null;
+    var k = confKind(c);
+    return h('span', { class: 'cb cb-' + k, text: k + ' ' + (Math.round(c * 100) / 100),
+      title: (what || 'Confidence') + ': ' + pct(c) + ' (' + k + '). Stated in a source ≈ 0.9 · same team + clear seniority gap ≈ 0.6 · title only ≈ 0.3' });
+  }
+  function srcKinds(m) {
+    var k = {};
+    (m.sources || []).forEach(function (s) { if (s && s.kind) k[s.kind] = true; });
+    if (m.isConnection) k.connection = true;
+    if (m.kind === 'full') k['extension-profile'] = true;
+    return Object.keys(k);
+  }
+  function srcIcons(m) {
+    return h('span', { class: 'o-src' }, srcKinds(m).map(function (k) {
+      var l = SOURCE_LABELS[k] || ['•', k];
+      return h('span', { title: l[1], 'aria-label': l[1], text: l[0] });
+    }));
+  }
+  function lightTag(m) {
+    var t = 'Known from a list row or a web page only — open their LinkedIn profile and click ＋ Network Builder to capture the full profile';
+    return m.url ? h('a', { class: 'tag t-light', href: m.url, target: '_blank', rel: 'noopener noreferrer', title: t, text: 'light ↗' })
+      : h('span', { class: 'tag t-light', title: t, text: 'light' });
+  }
+
+  // filters (they only hide; nothing here acts on hidden people)
+  function orgFiltersOn() { var f = acc.of; return !!(f.sub.length || f.sen || f.ent || f.src || f.conf || f.q.trim()); }
+  function orgPasses(m) {
+    var f = acc.of;
+    if (f.sub.length && f.sub.indexOf(m.subfunction) < 0) return false;
+    if (f.sen && m.seniority !== f.sen) return false;
+    if (f.ent) {
+      if (f.ent === '__none') { if (m.entity || m.country) return false; }
+      else if ((m.entity || '') + '|' + (m.country || '') !== f.ent) return false;
+    }
+    if (f.src && srcKinds(m).indexOf(f.src) < 0) return false;
+    if (f.conf) {
+      var min = f.conf === 'high' ? 0.75 : 0.45;
+      var unassessed = m.confidence === null || m.confidence === undefined;
+      // "High only" means assessed as high: people nobody has scored yet are hidden (counted in the filter row)
+      if (unassessed ? f.conf === 'high' : m.confidence < min) return false;
+      var sug = m.reportsTo && (m.reportsToSource === 'inferred' || m.reportsToSource === 'web');
+      if (sug && m.reportsToConfidence !== null && m.reportsToConfidence !== undefined && m.reportsToConfidence < min) return false;
+    }
+    var q = f.q.trim().toLowerCase();
+    if (q) {
+      var hay = [m.fullName, m.title, m.headline, m.team, m.entity, m.country, m.location, m.responsibilities].join(' ').toLowerCase();
+      if (q.split(/\s+/).some(function (t) { return hay.indexOf(t) < 0; })) return false;
+    }
+    return true;
+  }
+
+  /** PUT a member change from the org view; errors (e.g. a reporting loop) go inline into errEl. Resolves true on success. */
+  function orgPut(pid, patch, errEl, okMsg) {
+    if (errEl) errEl.textContent = '';
+    return api('/api/accounts/' + enc(acc.cur) + '/members/' + enc(pid), patch, 'PUT').then(function (res) {
+      applyAccountRes(res);
+      if (okMsg) toast(okMsg, 'good');
+      return true;
+    }).catch(function (e) {
+      if (errEl && errEl.isConnected) errEl.textContent = e.message; else toast('Not saved: ' + e.message, 'bad');
+      return false;
+    });
+  }
+  /** <option>s for a manager picker: everyone on the account but `selfId`, by name (sorted list cached per view) */
+  var mgrSorted = { view: null, list: [] };
+  function managerOptions(selfId) {
+    var v = acc.view;
+    if (mgrSorted.view !== v) {
+      mgrSorted.view = v;
+      mgrSorted.list = v.members.slice().sort(function (a, b) { return a.fullName.localeCompare(b.fullName); });
+    }
+    var out = [];
+    mgrSorted.list.forEach(function (o) { if (o.id !== selfId) out.push(h('option', { value: o.id, text: o.fullName + (o.title ? ' — ' + o.title : '') })); });
+    return out;
+  }
+  /** ✓ Confirm (a suggestion) · Change… / Set manager… · ↺ reset to automatic */
+  function lineCtl(m, err, placeholder) {
+    if (!LIVE) return null;
+    var out = [];
+    if (m.reportsTo && m.reportsToSource !== 'user') {
+      out.push(h('button', { class: 'btn xs', type: 'button', text: '✓ Confirm', title: 'Make this line yours: it stops being a suggestion and nothing automatic will change it',
+        on: { click: function () { orgPut(m.id, { confirmReportsTo: true }, err, 'Reporting line confirmed'); } } }));
+    }
+    // the member list is filled only when the picker is used (hundreds of cards × hundreds of people otherwise)
+    var sel = h('select', { class: 'o-sel', 'aria-label': 'Who ' + m.fullName + ' reports to', title: 'Set who ' + m.fullName + ' reports to (saved as yours)' },
+      h('option', { value: '__', text: placeholder || 'Change…' }));
+    var filled = false;
+    function fill() {
+      if (filled) return;
+      filled = true;
+      append(sel, [m.reportsTo ? h('option', { value: '', text: '— no manager (set by you)' }) : null].concat(managerOptions(m.id)));
+    }
+    sel.addEventListener('mousedown', fill);
+    sel.addEventListener('focus', fill);
+    sel.addEventListener('keydown', fill);
+    sel.addEventListener('change', function () {
+      if (sel.value === '__') return;
+      orgPut(m.id, { reportsTo: sel.value }, err, 'Saved').then(function (ok) { if (!ok) sel.value = '__'; });
+    });
+    out.push(sel);
+    if (m.reportsTo || m.reportsToSource === 'user') {
+      out.push(h('button', { class: 'btn xs ghost', type: 'button', text: '↺', 'aria-label': 'Reset to automatic',
+        title: 'Reset to automatic: removes this line and your ownership of it — a later “Classify & suggest” may suggest a manager again',
+        on: { click: function () { orgPut(m.id, { reportsToSource: 'auto' }, err, 'Reset to automatic'); } } }));
+    }
+    return h('span', { class: 'o-ctl' }, out);
+  }
+  function edgeLabel(src) { return src === 'user' ? '✓ confirmed' : src === 'web' ? 'web' : 'suggested'; }
+  function edgeLine(m, edge) {
+    var err = h('span', { class: 'o-err', role: 'status' });
+    var why = edge.source === 'user' ? '' : edge.reason || '';
+    return h('div', { class: 'o-edge' },
+      h('span', { class: 'o-elab el-' + edge.source, text: edgeLabel(edge.source),
+        title: edge.source === 'user' ? 'You set or confirmed this line' : edge.source === 'web' ? 'Found by web research (a page says so) — confirm it to make it yours' : 'Suggested by the classifier from titles and teams — confirm or change it' }),
+      edge.source === 'user' ? null : confBadge(edge.confidence, 'Reporting line confidence'),
+      why ? h('span', { class: 'o-why', title: why, text: why }) : null,
+      lineCtl(m, err), err);
+  }
+  var descCache = new WeakMap(); // node → people below it (nodes are new objects per view)
+  function descCount(n) {
+    var c = descCache.get(n);
+    if (c === undefined) { c = n.children.reduce(function (s, k) { return s + 1 + descCount(k); }, 0); descCache.set(n, c); }
+    return c;
+  }
+  function orgCardEl(m, n, extra) {
+    var tags = [h('span', { class: 'tag t-sf', text: SUBFUNCTION_LABELS[m.subfunction] || m.subfunction, title: 'Sub-function' + (m.autoSubfunction ? ' (automatic)' : ' (set by you)') })];
+    if (m.seniority && m.seniority !== 'unknown') tags.push(h('span', { class: 'tag', text: SENIORITY_LABELS[m.seniority] || m.seniority, title: 'Seniority' }));
+    var ec = [m.entity, m.country].filter(Boolean).join(' · ');
+    if (ec) tags.push(h('span', { class: 'tag', text: ec, title: 'Legal entity · country' }));
+    if (m.vendorFunded) tags.push(h('span', { class: 'tag t-vendor', text: 'vendor-funded', title: 'Works for this company in a role funded by / dedicated to a vendor — part of the org and every count' }));
+    if (m.noise) tags.push(h('span', { class: 'tag t-noise', text: NOISE_LABELS[m.noise] || m.noise, title: 'Flagged — not counted' }));
+    if (m.role) tags.push(roleChip(m.role));
+    if (m.isConnection) tags.push(h('span', { class: 'tag t-founder', text: 'connection', title: 'In your LinkedIn connections' }));
+    if (m.kind === 'light') tags.push(lightTag(m));
+    if (n && n.context) tags.push(h('span', { class: 'tag', text: 'outside marketing', title: 'Shown for context only: not part of the marketing org or its counts' }));
+    tags.push(confBadge(m.confidence, 'In this org / role now'));
+    tags.push(srcIcons(m));
+    var tog = null;
+    if (n && n.children.length) {
+      var closed = acc.collapsed.has(n.id) && !orgFiltersOn();
+      tog = h('button', { class: 'o-tog', type: 'button', 'aria-expanded': String(!closed), text: (closed ? '▸ ' : '▾ ') + descCount(n),
+        title: (closed ? 'Expand' : 'Collapse') + ' (' + descCount(n) + ' below)', on: { click: function () {
+          if (acc.collapsed.has(n.id)) acc.collapsed.delete(n.id); else acc.collapsed.add(n.id);
+          paintOrg();
+        } } });
+    }
+    return h('div', { class: 'o-card' + (acc.open === m.id ? ' cur' : ''), 'data-pid': m.id },
+      h('div', { class: 'o-top' }, tog,
+        h('button', { class: 'o-open', type: 'button', title: 'Open ' + m.fullName, on: { click: function () { openPerson(m.id); } } },
+          h('span', { class: 'n', text: m.fullName }), h('span', { class: 't', text: m.title || m.headline || '—' }))),
+      h('div', { class: 'o-tags' }, tags), extra || null);
+  }
+  function orgNodeEl(n, ctx) {
+    var m = memberById(n.id);
+    if (!m) return null;
+    var kids = [];
+    n.children.forEach(function (c) { var e = orgNodeEl(c, ctx); if (e) kids.push(e); });
+    var self = !n.context && orgPasses(m);
+    if (!self && !kids.length) return null;
+    if (self) ctx.shown++;
+    var closed = acc.collapsed.has(n.id) && !orgFiltersOn();
+    return h('li', { class: 'o-node' + (n.edge ? ' e-' + n.edge.source : '') + (n.context ? ' o-ctx' : '') + (self ? '' : ' o-dim') },
+      orgCardEl(m, n, n.edge ? edgeLine(m, n.edge) : null),
+      kids.length && !closed ? h('ul', null, kids) : null);
+  }
+  function unplacedCard(m) {
+    var err = h('span', { class: 'o-err', role: 'status' });
+    return orgCardEl(m, null, h('div', { class: 'o-edge' }, h('span', { class: 'o-elab', text: 'no known manager' }), lineCtl(m, err, 'Set manager…'),
+      LIVE ? h('button', { class: 'btn xs ghost', type: 'button', text: '✕ Not marketing', title: 'Flag as not marketing (e.g. a list hit from a past job): moves them to Flagged, out of every count',
+        on: { click: function () { orgPut(m.id, { noise: 'not-marketing' }, err, m.fullName + ' flagged as not marketing'); } } }) : null, err));
+  }
+
+  // headcount strip: captured vs what LinkedIn reports (latest snapshot per scope + label; never summed across runs)
+  function hcTile(num, label, sub, title, cls) {
+    return h('div', { class: 'hc' + (cls ? ' ' + cls : ''), title: title || '' }, h('b', { text: num }), h('span', { class: 'l', text: label }), sub ? h('span', { class: 's' }, sub) : null);
+  }
+  function snapSub(sn, what) {
+    return [fmtDate(sn.takenAt), sn.url || sn.evidenceUrl ? [' · ', h('a', { href: sn.evidenceUrl || sn.url, target: '_blank', rel: 'noopener noreferrer', text: what || 'source ↗' })] : null];
+  }
+  function snapTitle(sn, what) {
+    return what + ' · ' + (sn.source === 'web' ? 'web research' : 'LinkedIn') + ' · ' + fmtDate(sn.takenAt) + (sn.quote ? ' · “' + sn.quote + '”' : '') + (sn.url ? ' · ' + sn.url : '');
+  }
+  /** a LinkedIn total: the latest read of each company page, summed (`pages`) */
+  function aggSub(t) {
+    var p = t.pages[0];
+    return [fmtDate(t.takenAt), t.pages.length > 1 ? ' · ' + t.pages.length + ' pages' : p && p.url ? [' · ', h('a', { href: p.url, target: '_blank', rel: 'noopener noreferrer', text: 'source ↗' })] : null];
+  }
+  function aggTitle(t, what) {
+    return what + ' · latest read of each page, summed: ' + t.pages.map(function (p) {
+      return p.count.toLocaleString() + ' on ' + (p.url.replace(/^https?:\/\/(www\.)?linkedin\.com\//, '').replace(/\/people\/?.*$/, '') || 'LinkedIn') + ' (' + fmtDate(p.takenAt) + ')';
+    }).join('; ');
+  }
+  function headcountStrip(org) {
+    var hc = org.headcount, c = hc.captured, li = hc.linkedin, out = [];
+    if (li.company) out.push(hcTile(li.company.count.toLocaleString(), 'on LinkedIn (company)', aggSub(li.company), aggTitle(li.company, 'Company People tab header (all employees on LinkedIn)')));
+    if (li.marketing) out.push(hcTile(li.marketing.count.toLocaleString(), 'LinkedIn · “' + li.marketing.label + '”', aggSub(li.marketing), aggTitle(li.marketing, 'People tab “What they do” — counts people by function, not this org’s reporting line'), 'li'));
+    li.queries.slice(0, 3).forEach(function (q) {
+      out.push(hcTile(q.count.toLocaleString(), (q.source === 'linkedin-search' ? 'search ' : 'list ') + '“' + (q.label || 'all') + '”', snapSub(q),
+        snapTitle(q, 'Result count of a search / filtered list — query-scoped: it counts matches for these keywords and filters, not the org'), 'q'));
+    });
+    out.push(hcTile(c.total.toLocaleString(), 'captured in the org', c.full + ' full · ' + c.light + ' light' + (c.connections ? ' · ' + c.connections + ' connections' : '') + (c.vendorFunded ? ' · ' + c.vendorFunded + ' vendor-funded' : ''),
+      'Named people placed in the marketing org (flagged people excluded). Full = captured profile; light = list row / web page only.', 'cap'));
+    if (hc.anonymous) out.push(hcTile(hc.anonymous.toLocaleString(), 'anonymous seen', 'out-of-network rows', '“LinkedIn Member” rows: counted from the latest walk of each list (re-running a list never adds up), never named or stored as people'));
+    if (org.flagged.length) out.push(hcTile(String(org.flagged.length), 'flagged', 'not counted', 'People from marketing lists / titles flagged as noise (HR marketing, sales hybrid, not marketing, left, other employer) — listed at the bottom'));
+    hc.web.slice(0, 3).forEach(function (w) {
+      out.push(hcTile(w.count.toLocaleString(), 'web · ' + (w.label || w.scope), snapSub(w, 'evidence ↗'), snapTitle(w, 'Stated on a web page (' + w.scope + ')'), 'web'));
+    });
+    if (hc.coverage !== undefined) {
+      out.push(hcTile(hc.coverageOver ? '100%+' : pct(hc.coverage), 'coverage', hc.coverageOver ? 'more than LinkedIn reports' : hc.coverageBasis === 'function' ? 'of LinkedIn “Marketing”' : 'of a marketing search',
+        'Captured org members ÷ ' + (hc.coverageBasis === 'function' ? 'LinkedIn’s “What they do → Marketing” count (summed over company pages)' : 'the latest marketing search result count (query-scoped: a rough base)') +
+        (hc.coverageOver ? '. More people are captured than that count: it is probably from one entity page only — capture the headcount on each company page.' : ''), 'cov'));
+    }
+    return h('div', { class: 'hc-strip' }, out);
+  }
+
+  // sub-function × seniority (counts the org members; click a cell to filter)
+  function breakdownEl(org) {
+    var cross = {}, rowT = {}, colT = {}, max = 0;
+    org.members.forEach(function (id) {
+      var m = memberById(id);
+      if (!m) return;
+      var k = m.subfunction + '|' + m.seniority;
+      cross[k] = (cross[k] || 0) + 1; rowT[m.subfunction] = (rowT[m.subfunction] || 0) + 1; colT[m.seniority] = (colT[m.seniority] || 0) + 1;
+      if (cross[k] > max) max = cross[k];
+    });
+    var rows = SUBFUNCTIONS.filter(function (s) { return rowT[s]; }), cols = SENIORITIES.filter(function (s) { return colT[s]; });
+    if (!rows.length) return null;
+    var rmax = Math.max.apply(null, rows.map(function (s) { return rowT[s]; }));
+    var f = acc.of;
+    function cell(sf, sn, n, big) {
+      var on = (sf ? f.sub.length === 1 && f.sub[0] === sf : !f.sub.length) && (sn ? f.sen === sn : !f.sen) && (sf || sn);
+      return h('td', null, n ? h('button', { class: 'bd-c' + (on ? ' on' : ''), type: 'button', title: 'Show ' + n + ': ' + [sf ? SUBFUNCTION_LABELS[sf] : '', sn ? SENIORITY_LABELS[sn] : ''].filter(Boolean).join(' · '),
+        on: { click: function () {
+          if (on) { f.sub = []; f.sen = ''; } else { f.sub = sf ? [sf] : []; f.sen = sn || ''; }
+          paintOrg();
+        } } }, h('span', { class: 'bar', style: 'width:' + Math.round(n / big * 100) + '%' }), h('span', { class: 'v', text: String(n) })) : '');
+    }
+    return h('div', { class: 'bd-wrap' }, h('table', { class: 'bd' },
+      h('thead', null, h('tr', null, h('th', { text: 'Sub-function × seniority', style: 'min-width:120px' }), cols.map(function (s) { return h('th', { text: SENIORITY_LABELS[s] }); }), h('th', { text: 'Total' }))),
+      h('tbody', null, rows.map(function (sf) {
+        return h('tr', null, h('th', { text: SUBFUNCTION_LABELS[sf] }), cols.map(function (sn) { return cell(sf, sn, cross[sf + '|' + sn] || 0, max); }), cell(sf, '', rowT[sf], rmax));
+      }))));
+  }
+
+  function orgFilterCtl(org) {
+    var f = acc.of;
+    var subs = SUBFUNCTIONS.filter(function (s) { return org.headcount.captured.bySubfunction[s]; });
+    var chips = h('span', { class: 'o-chips' }, subs.map(function (s) {
+      var on = f.sub.indexOf(s) >= 0;
+      return h('button', { type: 'button', class: 'o-chip' + (on ? ' on' : ''), 'aria-pressed': String(on), text: SUBFUNCTION_LABELS[s] + ' ' + org.headcount.captured.bySubfunction[s],
+        on: { click: function () { f.sub = on ? f.sub.filter(function (x) { return x !== s; }) : f.sub.concat([s]); paintOrg(); } } });
+    }));
+    function sel(label, key, opts) {
+      var s = h('select', { 'aria-label': label, on: { change: function () { f[key] = s.value; paintOrg(); } } },
+        opts.map(function (o) { return h('option', { value: o[0], text: o[1], selected: o[0] === f[key] }); }));
+      return s;
+    }
+    var sens = SENIORITIES.filter(function (s) { return org.headcount.captured.bySeniority[s]; });
+    var ents = org.entities.map(function (e) { return [e.entity + '|' + e.country, [e.entity || 'Entity unknown', e.country].filter(Boolean).join(' · ') + ' (' + e.n + ')']; });
+    return [chips,
+      sel('Seniority', 'sen', [['', 'Any seniority']].concat(sens.map(function (s) { return [s, SENIORITY_LABELS[s]]; }))),
+      ents.length ? sel('Entity / country', 'ent', [['', 'Any entity']].concat(ents, [['__none', 'No entity known']])) : null,
+      sel('Source', 'src', [['', 'Any source'], ['extension-list', 'LinkedIn list'], ['extension-profile', 'LinkedIn profile'], ['web', 'Web research'], ['connection', 'Your connection'], ['manual', 'Added by hand'], ['mcp', 'Claude (MCP)']]),
+      sel('Minimum confidence', 'conf', [['', 'Any confidence'], ['medium', 'Medium or better (not assessed shown)'], ['high', 'High only (assessed)']]),
+      f.conf ? h('span', { class: 'o-hint', text: (function () {
+        var n = org.members.filter(function (id) { var m = memberById(id); return m && (m.confidence === null || m.confidence === undefined); }).length;
+        return n ? 'not assessed: ' + n + (f.conf === 'high' ? ' (hidden)' : ' (shown)') : '';
+      })() }) : null,
+      orgFiltersOn() ? h('button', { class: 'btn xs ghost', type: 'button', text: 'Clear filters', on: { click: function () {
+        acc.of = { sub: [], sen: '', ent: '', src: '', conf: '', flagged: f.flagged, q: '' };
+        var qi = $('orgQ'); if (qi) qi.value = '';
+        paintOrg();
+      } } }) : null];
+  }
+
+  function factsEl(org) {
+    if (!org.facts.length) return null;
+    return h('div', { class: 'o-sec' }, h('h5', { text: 'Structure facts from the web (' + org.facts.length + ')' }),
+      h('ul', { class: 'o-facts' }, org.facts.map(function (x) {
+        return h('li', null, h('span', { class: 'tag', text: x.kind }), ' ', h('span', { text: x.text }), ' ', confBadge(x.confidence, 'Fact confidence'), ' ',
+          h('a', { href: x.evidenceUrl, target: '_blank', rel: 'noopener noreferrer', title: (x.quote ? '“' + x.quote + '” — ' : '') + x.evidenceUrl, text: (hostOf(x.evidenceUrl) || 'evidence') + ' ↗' }),
+          h('span', { class: 'o-dt', text: ' · ' + fmtDate(x.foundAt) }));
+      })));
+  }
+  function runsEl(org) {
+    if (!org.runs.length) return null;
+    var STOP = { end: 'finished', cap: 'hit the cap', cancelled: 'cancelled', checkpoint: 'stopped: security check', 'rate-limit': 'stopped: LinkedIn limit', login: 'stopped: signed out', stalled: 'stalled', error: 'error', 'counts-only': 'headcount only' };
+    return h('details', { class: 'o-sec o-runs' }, h('summary', { text: 'LinkedIn list walks (' + org.runs.length + (org.runs.length === 10 ? ', latest' : '') + ')' }),
+      h('ul', null, org.runs.map(function (r) {
+        return h('li', null, h('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer', text: (r.pageKind === 'search' ? 'Search' : 'People tab') + (r.keywords ? ' “' + r.keywords + '”' : '') }),
+          ' · ' + fmtDate(r.startedAt) + ' · ' + r.named + ' named · ' + r.anonymous + ' anonymous · ' + (r.finishedAt ? (STOP[r.stopReason] || r.stopReason || 'finished') : 'running or interrupted'));
+      })));
+  }
+
+  // paid jobs: estimate + confirm first; progress, Cancel and Resume come from queue.orgJob (SSE)
+  function orgJobText(j) {
+    if (!j) return '';
+    if (j.kind === 'infer') return (j.phase === 'reporting' ? 'Suggesting reporting lines' : 'Classifying ' + (Number(j.done) || 0) + '/' + (Number(j.total) || 0));
+    return 'Web research: ' + (PASS_LABELS[j.phase] || j.phase) + ' (' + ((Number(j.done) || 0) + 1) + '/' + (Number(j.total) || 0) + ')';
+  }
+  function orgResume(id) {
+    api('/api/accounts/' + enc(id) + '/org/resume', {}).then(function (res) {
+      if (res && res.queue) applyQueue(res.queue);
+      toast(res && res.resumed ? 'Resumed web research' : 'Nothing to resume', res && res.resumed ? 'good' : null);
+    }).catch(function (e) { toast('Resume failed: ' + e.message, 'bad'); });
+  }
+  function orgCancel(id) {
+    api('/api/accounts/' + enc(id) + '/org/cancel', {}).then(function (res) { if (res && res.queue) applyQueue(res.queue); })
+      .catch(function (e) { toast('Cancel failed: ' + e.message, 'bad'); });
+  }
+  function orgJobChip() {
+    var j = orgJob, a = Array.isArray(accounts) ? accById(j.accountId) : null;
+    var paused = j.pausedManual ? ' · paused (rate limit)' : j.pausedUntil ? ' · paused until ' + fmtTime(j.pausedUntil) : '';
+    return h('span', { class: 'chip' + (paused ? ' paused' : ''), title: 'Org map job on ' + (a ? a.name : 'an account') + ' (paid, started by you)' },
+      paused ? null : h('span', { class: 'spin', 'aria-hidden': 'true' }), ' Org · ' + orgJobText(j) + paused,
+      LIVE && j.pausedManual ? h('button', { type: 'button', class: 'btn sm', text: 'Resume', on: { click: function () { orgResume(j.accountId); } } }) : null);
+  }
+  function startOrgInfer() {
+    var v = acc.view, n = v.members.length;
+    if (!n) return;
+    var est = Math.max(0.005, n / 100 * ((EST && EST.orgInferUsdPer100) || 0.06));
+    confirmDlg('Classify ' + n + ' ' + (n === 1 ? 'person' : 'people') + ' on ' + v.account.name + '?',
+      'Claude Haiku reads titles, headlines and captured profiles to set sub-function, seniority, entity and noise, then suggests reporting lines with a confidence (shown dashed until you confirm them). ≈ ' + usd(est) +
+      ' on your Claude subscription. Anything you set by hand is never overwritten; earlier suggestions are replaced.', 'Classify (≈ ' + usd(est) + ')').then(function (ok) {
+      if (!ok) return;
+      var id = v.account.id;
+      api('/api/accounts/' + enc(id) + '/org/infer', {}).then(function (res) {
+        if (res && res.queue) applyQueue(res.queue);
+        toast('Classifying ' + res.started + ' people (≈ ' + usd(res.estimateUsd) + ') — you’ll get a notice when it’s done', 'good');
+      }).catch(function (e) { toast(/409|already/.test(e.message) ? 'An org job is already running — wait for it or cancel it.' : 'Couldn’t start: ' + e.message, 'bad'); });
+    });
+  }
+  function startOrgResearch() {
+    var v = acc.view, rs = (EST && EST.orgResearchUsd) || { min: 0.3, max: 1.4 };
+    confirmDlg('Research ' + v.account.name + '’s marketing org on the web?',
+      'Five passes, one after another (company site, press, jobs, events, headcount) with web search: leaders, teams, legal entities, headcount hints and “reports to” statements. Every person and fact needs an evidence link and quote, or it is dropped; LinkedIn is never searched. ≈ ' +
+      usd(rs.min) + '–' + usd(rs.max) + ' on your Claude subscription. If web search is rate-limited it waits, then asks you to Resume.', 'Research (≈ ' + usd(rs.min) + '–' + usd(rs.max) + ')').then(function (ok) {
+      if (!ok) return;
+      var id = v.account.id;
+      api('/api/accounts/' + enc(id) + '/org/research', {}).then(function (res) {
+        if (res && res.queue) applyQueue(res.queue);
+        toast('Web research started (' + res.started + ' passes) — findings appear after each pass', 'good');
+      }).catch(function (e) { toast(/409|already/.test(e.message) ? 'An org job is already running — wait for it or cancel it.' : 'Couldn’t start: ' + e.message, 'bad'); });
+    });
+  }
+  function paintOrgActions() {
+    var box = $('orgActions');
+    if (!box || !acc.view) return;
+    box.textContent = '';
+    var v = acc.view, a = v.account, n = v.members.length, j = orgJob, mine = !!(j && j.accountId === a.id);
+    var est = n ? Math.max(0.005, n / 100 * ((EST && EST.orgInferUsdPer100) || 0.06)) : 0;
+    var rs = (EST && EST.orgResearchUsd) || { min: 0.3, max: 1.4 };
+    var liUrl = a.linkedinUrl ? a.linkedinUrl.replace(/\/+$/, '') + '/people/' : '';
+    append(box, [
+      h('button', { class: 'btn sm', type: 'button', disabled: !LIVE || !!j || !n, text: '✦ Classify & suggest reporting lines (≈ ' + usd(est) + ')',
+        title: 'Paid (Claude Haiku on your subscription): sub-function, seniority, entity, noise and suggested managers for all ' + n + ' people — asks before it starts', on: { click: startOrgInfer } }),
+      h('button', { class: 'btn sm', type: 'button', disabled: !LIVE || !!j, text: '🌐 Research on the web (≈ ' + usd(rs.min) + '–' + usd(rs.max) + ')',
+        title: 'Paid (web search on your subscription): leaders, teams, entities, headcount and reporting facts with evidence — asks before it starts', on: { click: startOrgResearch } }),
+      liUrl ? h('a', { class: 'btn sm ghost', href: liUrl, target: '_blank', rel: 'noopener noreferrer', text: 'Load from LinkedIn ↗',
+        title: 'Opens the company’s People tab (unfiltered). There: ⇣ Map to Network Builder → Capture headcount only. Then search LinkedIn for “marketing” at the company and walk the results with Start mapping (this page never starts it).' })
+        : h('span', { class: 'o-hint', text: 'Add the LinkedIn company page above to load people from its People tab.' }),
+      liUrl ? h('span', { class: 'o-hint', text: 'On the People tab: Capture headcount only. Then search “marketing” and walk the results.' }) : null
+    ]);
+    if (j) {
+      var paused = j.pausedManual ? 'paused — web search kept hitting the rate limit' : j.pausedUntil ? 'paused until ' + fmtTime(j.pausedUntil) + ' (rate limit)' : '';
+      var other = !mine ? accById(j.accountId) : null;
+      append(box, h('div', { class: 'o-job' + (paused ? ' paused' : '') },
+        paused ? null : h('span', { class: 'spin', 'aria-hidden': 'true' }),
+        h('span', { text: mine ? orgJobText(j) + (paused ? ' · ' + paused : '') : 'An org job is running on ' + (other ? other.name : 'another account') + ' — one at a time' }),
+        mine && (j.pausedManual || j.pausedUntil) ? h('button', { class: 'btn xs', type: 'button', text: 'Resume now', on: { click: function () { orgResume(a.id); } } }) : null,
+        mine ? h('button', { class: 'btn xs ghost', type: 'button', text: 'Cancel', title: j.kind === 'research' ? 'Stop: findings from finished passes are kept' : 'Stop: nothing is changed', on: { click: function () { orgCancel(a.id); } } }) : null));
+    }
+    if (!orgJob) {
+      // the spend line
+      append(box, h('span', { class: 'o-hint', text: costs && costs.org ? 'Org map spend so far: ' + usd(costs.org) : '' }));
+    }
+  }
+
+  function renderMarketingOrg(v) {
+    var org = v.org;
+    var box = h('div', { class: 'o-wrap' });
+    var actions = h('div', { class: 'o-actions', id: 'orgActions' });
+    box.appendChild(actions);
+    if (!org) { box.appendChild(h('div', { class: 'dd-note', text: 'The org map needs a newer server — restart network-builder.' })); return box; }
+    box.appendChild(headcountStrip(org));
+    var q = h('input', { type: 'search', id: 'orgQ', placeholder: 'Search name, title, team, entity…', 'aria-label': 'Search the marketing org', value: acc.of.q });
+    q.addEventListener('input', debounce(function () { acc.of.q = q.value; paintOrg(true); }, 150));
+    box.appendChild(h('div', { id: 'orgBd' }));
+    box.appendChild(h('div', { class: 'o-filters' }, q, h('span', { id: 'orgFilt', class: 'o-filt' })));
+    box.appendChild(h('div', { id: 'orgBody' }));
+    box.appendChild(h('div', { id: 'orgFoot' }, factsEl(org), runsEl(org)));
+    return box; // renderAccMain paints it (paintOrgActions + paintOrg) once it is in the DOM
+  }
+  /** (re)paint breakdown, filter controls and tree from view.org; `typing` keeps the filter row (search box focus) */
+  function paintOrg(typing) {
+    var v = acc.view, org = v && v.org, body = $('orgBody');
+    if (!org || !body) return;
+    var bd = $('orgBd'); bd.textContent = ''; append(bd, breakdownEl(org));
+    if (!typing) { var fl = $('orgFilt'); fl.textContent = ''; append(fl, orgFilterCtl(org)); }
+    body.textContent = '';
+    if (!org.members.length && !org.flagged.length) {
+      body.appendChild(h('div', { class: 'acc-empty', style: 'padding:24px' },
+        h('div', { text: 'No marketing people on this account yet.' }),
+        h('div', { class: 'dd-note', text: 'Load them from the company’s LinkedIn People tab (button above → the extension’s ⇣ Map to Network Builder), or run the web research. People whose titles say marketing, and everyone from a marketing-keyword list, land here.' })));
+      return;
+    }
+    var ctx = { shown: 0 };
+    var trees = org.roots.map(function (r) { return orgNodeEl(r, ctx); }).filter(Boolean);
+    var lines = 0; (function walk(ns) { ns.forEach(function (n) { if (n.edge) lines++; walk(n.children); }); })(org.roots);
+    if (trees.length) {
+      body.appendChild(h('div', { class: 'o-sec' }, h('h5', { text: 'Reporting lines (' + lines + ')' }), h('ul', { class: 'o-tree' }, trees)));
+    }
+    // unplaced, by sub-function → entity
+    var groups = [], cur = null;
+    org.unplaced.forEach(function (g) {
+      var ms = g.ids.map(memberById).filter(function (m) { return m && orgPasses(m); });
+      if (!ms.length) return;
+      ctx.shown += ms.length;
+      if (!cur || cur.sf !== g.subfunction) { cur = { sf: g.subfunction, n: 0, el: h('div', { class: 'o-ugrp' }) }; groups.push(cur); }
+      cur.n += ms.length;
+      cur.el.appendChild(h('div', { class: 'o-uent' }, h('div', { class: 'o-uh', text: g.entity || 'Entity unknown' }), h('div', { class: 'o-ulist' }, ms.map(unplacedCard))));
+    });
+    if (groups.length) {
+      body.appendChild(h('div', { class: 'o-sec' }, h('h5', { text: 'No known manager (' + groups.reduce(function (s, g) { return s + g.n; }, 0) + ')', title: 'Set a manager here, or let “Classify & suggest” propose one' }),
+        groups.map(function (g) { return h('div', null, h('div', { class: 'o-ush', text: (SUBFUNCTION_LABELS[g.sf] || g.sf) + ' · ' + g.n }), g.el); })));
+    }
+    if (!ctx.shown && orgFiltersOn()) body.appendChild(h('div', { class: 'dd-note', text: 'Nobody in the org matches these filters.' }));
+    // flagged: collapsed at the bottom; never counted
+    if (org.flagged.length) {
+      var fms = org.flagged.map(function (x) { return memberById(x.id); }).filter(function (m) { return m && orgPasses(m); });
+      var det = h('details', { class: 'o-sec o-flag', open: acc.of.flagged },
+        h('summary', { text: 'Flagged — not counted (' + org.flagged.length + (fms.length !== org.flagged.length ? ', ' + fms.length + ' shown' : '') + ')' }),
+        h('div', { class: 'dd-note', text: 'From marketing titles or lists, but flagged as noise by the classifier or by you. Click “In the org” if that’s wrong.' }),
+        h('div', { class: 'o-ulist' }, fms.map(function (m) {
+          var err = h('span', { class: 'o-err', role: 'status' });
+          return orgCardEl(m, null, h('div', { class: 'o-edge' },
+            m.inference && m.inference.reason && m.autoNoise ? h('span', { class: 'o-why', title: m.inference.reason, text: 'AI: ' + m.inference.reason }) : h('span', { class: 'o-elab', text: m.autoNoise ? 'automatic' : 'set by you' }),
+            LIVE ? h('button', { class: 'btn xs', type: 'button', text: 'In the org', title: 'Not noise: count ' + m.fullName + ' in the marketing org', on: { click: function () { orgPut(m.id, { noise: 'none' }, err, m.fullName + ' is back in the org'); } } }) : null,
+            LIVE && !m.autoNoise ? h('button', { class: 'btn xs ghost', type: 'button', text: '↺ Automatic', title: 'Let the classifier / title rules decide again', on: { click: function () { orgPut(m.id, { noise: '' }, err, 'Reset to automatic'); } } }) : null, err));
+        })));
+      det.addEventListener('toggle', function () { acc.of.flagged = det.open; });
+      body.appendChild(det);
+    }
+  }
+
+  // drawer: reports-to provenance + org fields + sources
+  function reportsToLine(m, v) {
+    var pm = m.inference && m.inference.possibleManager;
+    if (!m.reportsTo && m.reportsToSource !== 'user') {
+      var pmM = pm && memberById(pm.id);
+      if (!pmM) return null;
+      var perr = h('span', { class: 'o-err', role: 'status' });
+      return h('div', { class: 'o-prov' },
+        h('span', { class: 'o-elab', text: 'possible manager:' }), h('span', { text: pmM.fullName }), confBadge(pm.confidence, 'Guess confidence (too low to draw a line)'),
+        pm.reason ? h('div', { class: 'o-why2', text: pm.reason }) : null,
+        LIVE ? h('div', { class: 'o-ctl' }, h('button', { class: 'btn xs', type: 'button', text: 'Set ' + pmM.fullName + ' as manager',
+          on: { click: function () { orgPut(m.id, { reportsTo: pmM.id }, perr, 'Saved'); } } })) : null, perr);
+    }
+    var mgr = memberById(m.reportsTo);
+    var err = h('span', { class: 'o-err', role: 'status' });
+    var src = m.reportsToSource || 'user';
+    return h('div', { class: 'o-prov' },
+      h('span', { class: 'o-elab el-' + src, text: !m.reportsTo ? 'no manager (set by you)' : src === 'user' ? '✓ set by you' : src === 'web' ? 'from web research' : 'suggested by AI' }),
+      m.reportsTo && src !== 'user' ? confBadge(m.reportsToConfidence, 'Reporting line confidence') : null,
+      mgr ? h('span', { class: 'o-dt', text: ' → ' + mgr.fullName }) : null,
+      m.reportsToReason ? h('div', { class: 'o-why2', text: m.reportsToReason }) : null,
+      LIVE ? h('div', { class: 'o-ctl' },
+        m.reportsTo && src !== 'user' ? h('button', { class: 'btn xs', type: 'button', text: '✓ Confirm', on: { click: function () { orgPut(m.id, { confirmReportsTo: true }, err, 'Reporting line confirmed'); } } }) : null,
+        h('button', { class: 'btn xs ghost', type: 'button', text: '↺ Reset to automatic', title: 'Removes the line and your ownership of it', on: { click: function () { orgPut(m.id, { reportsToSource: 'auto' }, err, 'Reset to automatic'); } } })) : null,
+      err);
+  }
+  function orgDrawerSec(m) {
+    function sel(label, key, opts, value, cls) {
+      var s = h('select', { on: { change: function () { var p = {}; p[key] = s.value; updMember(m.id, p); } } },
+        opts.map(function (o) { return h('option', { value: o[0], text: o[1], selected: o[0] === value }); }));
+      return h('label', { class: cls || '' }, label, s);
+    }
+    function inp(label, key, value, ph, max, cls) {
+      var i = h('input', { type: 'text', value: value || '', placeholder: ph || '', maxlength: String(max) });
+      i.addEventListener('change', function () { var p = {}; p[key] = key === 'country' ? i.value.trim().toUpperCase() : i.value; updMember(m.id, p); });
+      return h('label', { class: cls || '' }, label, i);
+    }
+    var autoSf = m.autoSubfunction ? 'Auto: ' + (SUBFUNCTION_LABELS[m.subfunction] || m.subfunction) : 'Automatic';
+    var noiseVal = m.autoNoise ? '' : m.noise ? m.noise : m.vendorFunded ? 'vendor-funded' : 'none';
+    var autoN = m.autoNoise ? 'Auto: ' + (m.noise ? NOISE_LABELS[m.noise] || m.noise : m.vendorFunded ? 'in the org (vendor-funded)' : 'in the org') : 'Automatic';
+    var resp = h('textarea', { placeholder: 'What they own (from their profile, a job ad, a talk…)', maxlength: '1000' });
+    resp.value = m.responsibilities || '';
+    resp.addEventListener('change', function () { updMember(m.id, { responsibilities: resp.value }); });
+    var srcs = (m.sources || []).slice().reverse();
+    var inf = m.inference;
+    return h('div', { class: 'sec o-dsec' }, h('h4', { text: 'Marketing org' }),
+      h('div', { class: 'grid2' },
+        sel('Sub-function', 'subfunction', [['', autoSf]].concat(SUBFUNCTIONS.map(function (s) { return [s, SUBFUNCTION_LABELS[s]]; })), m.autoSubfunction ? '' : m.subfunction),
+        h('label', null, 'Seniority', h('span', { class: 'o-ro', title: 'From the AI classification, else the title', text: SENIORITY_LABELS[m.seniority] || m.seniority })),
+        sel('In the org?', 'noise', [['', autoN], ['none', 'Yes — not noise'], ['vendor-funded', 'Yes — vendor-funded (tagged)']].concat(Object.keys(NOISE_LABELS).map(function (k) { return [k, 'No — ' + NOISE_LABELS[k]]; })), noiseVal, 'full'),
+        inp('Team', 'team', m.team, 'e.g. Brand studio', 120),
+        inp('Country (ISO, 2 letters)', 'country', m.country, 'DE', 2),
+        inp('Legal entity', 'entity', m.entity, 'e.g. Ledgerly Services GmbH', 200, 'full'),
+        h('label', { class: 'full' }, 'Responsibilities', resp)),
+      h('div', { class: 'dd-note', style: 'padding:6px 0 0' }, 'In this org / role: ', confBadge(m.confidence, 'In this org / role now') || 'not assessed',
+        inf && inf.reason ? ' · AI: ' + inf.reason + (inf.at ? ' (' + fmtDate(inf.at) + ')' : '') : ''),
+      srcs.length ? h('div', { class: 'sec' }, h('h4', { text: 'Sources (' + srcs.length + ')' }), h('ul', { class: 'sources o-srcs' }, srcs.map(function (s) {
+        var l = SOURCE_LABELS[s.kind] || ['•', s.kind];
+        var link = s.evidenceUrl || s.url;
+        return h('li', null, l[0] + ' ' + l[1] + ' · ' + fmtDate(s.at),
+          link ? [' · ', h('a', { href: link, target: '_blank', rel: 'noopener noreferrer', text: (hostOf(link) || 'link') + ' ↗', title: link })] : null,
+          s.quote ? h('div', { class: 'o-q', text: '“' + s.quote + '”' }) : null);
+      }))) : null);
   }
 
   // ---- person drawer
   function closeDrawer() { acc.open = ''; $('accDrawer').textContent = ''; markOpenCard(); }
   function markOpenCard() {
-    Array.prototype.forEach.call(document.querySelectorAll('.pcard'), function (c) { c.classList.toggle('cur', c.getAttribute('data-pid') === acc.open); });
+    Array.prototype.forEach.call(document.querySelectorAll('.pcard, .o-card'), function (c) { c.classList.toggle('cur', c.getAttribute('data-pid') === acc.open); });
   }
   function openPerson(id) { acc.open = id; renderDrawer(); markOpenCard(); }
   function renderDrawer() {
@@ -3741,6 +4389,8 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
         sel('Level', 'tier', [['', autoT]].concat(TIERS.map(function (t) { return [t, TIER_LABELS[t]]; })), m.autoTier ? '' : m.tier),
         sel('Reports to', 'reportsTo', [['', '— unknown —']].concat(others.map(function (o) { return [o.id, o.fullName + (o.title ? ' (' + o.title + ')' : '')]; })), m.reportsTo, 'full'),
         h('label', { class: 'full' }, 'Your notes', notes)),
+      reportsToLine(m, v),
+      orgDrawerSec(m),
       m.webSummary ? sec('Web profile', h('p', { text: m.webSummary })) : null,
       p && p.headline && p.headline !== m.title ? sec('Headline', h('p', { text: p.headline })) : null,
       p && p.about ? sec('About', h('p', { text: p.about })) : null,

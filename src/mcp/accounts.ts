@@ -1,23 +1,28 @@
 import { ResourceTemplate, type McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { accountMarkdown, profileSections } from '../accounts/brief';
+import { accountMarkdown, edgeTag, orgMapMarkdown, profileSections } from '../accounts/brief';
+import { buildOrgMap, orgMapSources } from '../accounts/org';
 import { canonicalProfileUrl } from '../accounts/capture';
 import {
   ACCOUNT_STATUSES,
   COMMITTEE_ROLES,
   DEPARTMENTS,
   DEPARTMENT_LABELS,
+  NOISE_FLAGS,
   ROLE_LABELS,
+  SUBFUNCTIONS,
+  SUBFUNCTION_LABELS,
   TIERS,
   TIER_LABELS,
   type Account,
   type AccountMember,
   type AccountView,
+  type LightContactInput,
 } from '../accounts/types';
 import { accountSummaries, buildAccountView } from '../accounts/view';
 import { AccountError } from '../db/accounts';
 import type { Store } from '../db/store';
-import { CHARACTER_LIMIT } from './data';
+import { CHARACTER_LIMIT, cap } from './data';
 
 type ToolResult = { content: { type: 'text'; text: string }[]; structuredContent?: Record<string, unknown>; isError?: boolean };
 
@@ -39,12 +44,33 @@ Chrome extension — their full profile (about, experience, education). Captured
 they are only reachable through the account tools, never through network search or lenses.
 Workflow for "plan a campaign for <company>": network_get_account (one call returns the brief, committee, org chart,
 full profiles and warm paths) → network_get_contact for anyone needing more depth → save the plan back into the brief
-with network_update_account (brief_mode "append"). Warm paths are the user's connections who work / worked there.`;
+with network_update_account (brief_mode "append"). Warm paths are the user's connections who work / worked there.
+
+Marketing org map: network_get_org_map returns an account's marketing org — headcounts (captured here vs what LinkedIn
+reports), sub-function × seniority, the reporting tree (each line tagged [confirmed] by the user, [inferred 0.6] by AI
+or [web 0.9] from web research, with a reason), people with no known manager, flagged people (HR marketing, sales
+hybrids, other employers… — not counted) and web facts with evidence URLs. Inferred lines are guesses: say so. You may
+set org fields (sub-function, team, entity, country, responsibilities, noise) and confirm or set reporting lines with
+network_account_update_person, and add people you found (name, title, LinkedIn URL, evidence URL) with
+network_account_add_people \`contacts\` — all local and free. Classifying people, web org research and LinkedIn list
+walks cost money or touch LinkedIn: the user starts them in the explorer (Accounts → Marketing org) and the Chrome
+extension. Suggest that when the map is thin.`;
 
 function view(s: Store, a: Account): AccountView {
   const people = new Map(s.listExplorerPeople().map((p) => [p.id, p]));
-  return buildAccountView(s.accounts, a, people);
+  const v = buildAccountView(s.accounts, a, people);
+  return { ...v, org: buildOrgMap(v, orgMapSources(s.accounts, a.id)) };
 }
+
+const lightContact = z.object({
+  full_name: z.string().min(1).max(200).describe('Their name as shown.'),
+  url: z.string().max(2000).optional().describe('LinkedIn profile URL (linkedin.com/in/…), if known — it dedupes best.'),
+  title: z.string().max(300).optional().describe('Current job title.'),
+  headline: z.string().max(500).optional(),
+  company: z.string().max(200).optional().describe('Current employer (the account or one of its entities).'),
+  location: z.string().max(200).optional(),
+  evidence_url: z.string().max(2000).optional().describe('Where you found them (http/https page), kept as the source.'),
+});
 
 export function registerAccountTools(server: McpServer, ctx: AccountToolCtx): void {
   const { db, ok, wrap } = ctx;
@@ -113,7 +139,8 @@ export function registerAccountTools(server: McpServer, ctx: AccountToolCtx): vo
       description:
         'Everything about one target account in one markdown document, ready to plan an ABX campaign: the ABX brief, the buying committee ' +
         '(roles + gaps), the org chart grouped by department → seniority with reporting lines, each person\'s full LinkedIn profile ' +
-        '(about, experience, education) and notes, and the user\'s warm paths in (connections who work / worked there). ' +
+        '(about, experience, education) and notes, the user\'s warm paths in (connections who work / worked there), and — when mapped — a short ' +
+        '"Marketing org" section (counts, top two reporting levels; the full map is network_get_org_map). ' +
         'Accepts the account name (or an alias), its id, or its LinkedIn company URL.',
       inputSchema: {
         account: z.string().min(1).max(300).describe('Account name, alias, id, or linkedin.com/company/… URL.'),
@@ -129,6 +156,70 @@ export function registerAccountTools(server: McpServer, ctx: AccountToolCtx): vo
         gaps: v.gaps,
         members: v.members.map((m) => ({ ...m, profile: undefined, has_profile: Boolean(m.profile) })),
         warm_paths: v.warmPaths,
+        marketing_org: v.org
+          ? { in_org: v.org.headcount.captured.total, flagged: v.org.flagged.length, linkedin_marketing: v.org.headcount.linkedin.marketing?.count ?? null, coverage: v.org.headcount.coverage ?? null }
+          : null,
+      });
+    }),
+  );
+
+  server.registerTool(
+    'network_get_org_map',
+    {
+      title: 'Get an account\'s marketing org map',
+      description:
+        'The marketing org of one account: headcounts (people captured here vs LinkedIn\'s company count and its "What they do → Marketing" count — ' +
+        'LinkedIn shows only the top 5 functions, so the marketing count and coverage are missing when Marketing is not among them; ' +
+        'search counts, anonymous rows, web statements, coverage), sub-function × seniority, the reporting tree with each line\'s provenance ' +
+        '([confirmed] by the user, [inferred 0.6] by AI, [web 0.9] from research) and reason, people with no known manager (by sub-function → ' +
+        'entity), flagged people (not counted), legal entities, and web structure facts with evidence URLs. Read-only; nothing is classified or ' +
+        'researched by this call (the user starts that in the explorer).',
+      inputSchema: {
+        account: z.string().min(1).max(300).describe('Account name, alias, id, or linkedin.com/company/… URL.'),
+        function: z.enum(['marketing']).default('marketing').describe('The function to map (only "marketing" for now).'),
+        detail: z
+          .enum(['summary', 'full'])
+          .default('full')
+          .describe('"full" (default) adds line reasons, ids, quotes, responsibilities, list walks and per-person data (≤ 200 people); "summary" is shorter (tree to 3 levels, ≤ 10 per unplaced group, no per-person data) — use it for big orgs.'),
+      },
+      annotations: { title: 'Get a marketing org map', ...READ },
+    },
+    wrap(async (a) => {
+      const acc = accountOrThrow(a.account);
+      const v = view(db(), acc);
+      const org = v.org!;
+      let text = orgMapMarkdown(v, org, a.detail);
+      if (a.detail === 'full' && text.length > CHARACTER_LIMIT - 200) text = `${orgMapMarkdown(v, org, 'summary')}\n\n_Shortened to fit: shown as detail "summary" (line reasons, ids and quotes omitted) — see structuredContent.people, or network_get_contact per person._`;
+      // explicit about what a cut loses (ok() would cap again with a generic hint)
+      text = cap(text, 'the org map is longer than one response: the rest of the tree / groups is missing. Use network_get_contact for specific people, or the explorer\'s Marketing org view.');
+      if (a.detail === 'summary') {
+        const { runs: _runs, ...slim } = org;
+        return ok(text, { account: { id: acc.id, name: acc.name }, function: a.function, detail: 'summary', org: slim as unknown as Record<string, unknown> });
+      }
+      const ids = new Set([...org.members, ...org.flagged.map((f) => f.id)]);
+      const walk = (n: (typeof org.roots)[number]) => {
+        ids.add(n.id);
+        n.children.forEach(walk);
+      };
+      org.roots.forEach(walk);
+      const PEOPLE_MAX = 200;
+      const inMap = v.members.filter((m) => ids.has(m.id));
+      // org members first (as ordered in the map: most senior first), then context / flagged people
+      const order = new Map([...org.members, ...org.flagged.map((f) => f.id)].map((id, i) => [id, i]));
+      inMap.sort((x, y) => (order.get(x.id) ?? 1e9) - (order.get(y.id) ?? 1e9));
+      const people = inMap
+        .slice(0, PEOPLE_MAX)
+        .map((m) => ({
+          id: m.id, full_name: m.fullName, title: m.title, url: m.url, kind: m.kind, is_connection: m.isConnection,
+          in_org: org.members.includes(m.id), subfunction: m.subfunction, auto_subfunction: m.autoSubfunction, seniority: m.seniority,
+          team: m.team, entity: m.entity, country: m.country, responsibilities: m.responsibilities, noise: m.noise, vendor_funded: m.vendorFunded,
+          confidence: m.confidence, reports_to: m.reportsTo, reports_to_source: m.reportsToSource, reports_to_confidence: m.reportsToConfidence,
+          reports_to_reason: m.reportsToReason, line: m.reportsTo ? edgeTag({ source: m.reportsToSource, confidence: m.reportsToConfidence, reason: '' }) : '',
+          sources: m.sources,
+        }));
+      return ok(text, {
+        account: { id: acc.id, name: acc.name }, function: a.function, detail: 'full', org: org as unknown as Record<string, unknown>,
+        people, people_total: inMap.length, people_truncated: inMap.length > PEOPLE_MAX,
       });
     }),
   );
@@ -234,10 +325,13 @@ export function registerAccountTools(server: McpServer, ctx: AccountToolCtx): vo
       title: 'Add people to an account',
       description:
         'Put people on an account: your connections (ids from network_search_people / network_find_connections_at, or their LinkedIn URLs) or people ' +
-        'already captured from LinkedIn. People who are not connections and were never captured must be captured with the Chrome extension first.',
+        'already captured from LinkedIn (`people`), and/or people you found elsewhere as light contacts (`contacts`: name, title, LinkedIn URL, ' +
+        'evidence URL). Light contacts are deduped (same LinkedIn URL, or same name + compatible title on this account), so adding them twice ' +
+        'adds nothing. They stay under the account and never enter the user\'s network. Local and free.',
       inputSchema: {
         account: z.string().min(1).describe('Account name, alias or id.'),
-        people: z.array(z.string().min(1)).min(1).max(200).describe('Person ids or LinkedIn profile URLs.'),
+        people: z.array(z.string().min(1)).max(200).optional().describe('Person ids or LinkedIn profile URLs (connections or already captured).'),
+        contacts: z.array(lightContact).max(200).optional().describe('People not yet known, as light contacts (source "mcp").'),
         role: z.enum(COMMITTEE_ROLES).optional().describe('Buying-committee role to give everyone added (optional).'),
       },
       annotations: { title: 'Add people to an account', ...WRITE },
@@ -245,12 +339,38 @@ export function registerAccountTools(server: McpServer, ctx: AccountToolCtx): vo
     wrap(async (a) => {
       const s = db();
       const acc = accountOrThrow(a.account);
-      const ids = a.people.map((ref) => (canonicalProfileUrl(ref) ? guard(() => s.accounts.idForProfileUrl(ref)).id : ref.trim()));
-      const r = guard(() => s.accounts.addMembers(acc.id, ids, a.role ? { role: a.role } : {}));
-      const text =
-        `${acc.name}: added ${r.added.length}${r.already.length ? `, ${r.already.length} already on it${a.role ? ' (role updated)' : ''}` : ''}.` +
-        (r.unknown.length ? ` Not found (not a connection and never captured): ${r.unknown.slice(0, 10).join(', ')} — capture them from LinkedIn with the Chrome extension.` : '');
-      return ok(text, { account_id: acc.id, ...r });
+      if (!a.people?.length && !a.contacts?.length) throw ctx.userError('Nothing to add: pass `people` (ids / LinkedIn URLs) and/or `contacts` (light contacts).');
+      const parts: string[] = [];
+      let r: { added: string[]; already: string[]; unknown: string[] } = { added: [], already: [], unknown: [] };
+      if (a.people?.length) {
+        const ids = a.people.map((ref) => (canonicalProfileUrl(ref) ? guard(() => s.accounts.idForProfileUrl(ref)).id : ref.trim()));
+        r = guard(() => s.accounts.addMembers(acc.id, ids, a.role ? { role: a.role } : {}));
+        parts.push(
+          `added ${r.added.length}${r.already.length ? `, ${r.already.length} already on it${a.role ? ' (role updated)' : ''}` : ''}.` +
+            (r.unknown.length ? ` Not found (not a connection and never captured): ${r.unknown.slice(0, 10).join(', ')} — capture them from LinkedIn with the Chrome extension, or pass them as \`contacts\`.` : ''),
+        );
+      }
+      let light: ReturnType<Store['accounts']['upsertLightContacts']> | undefined;
+      if (a.contacts?.length) {
+        const at = new Date().toISOString();
+        const inputs: LightContactInput[] = a.contacts.map((c, i) => {
+          const ev = c.evidence_url?.trim();
+          if (ev && !/^https?:\/\/[^\s]+$/i.test(ev)) throw ctx.userError(`contacts[${i}].evidence_url must be an http(s) URL.`);
+          return {
+            fullName: c.full_name, url: c.url, title: c.title, headline: c.headline, company: c.company, location: c.location,
+            source: { kind: 'mcp', at, ...(ev ? { evidenceUrl: ev } : {}) },
+          };
+        });
+        light = guard(() => s.accounts.upsertLightContacts(acc.id, inputs));
+        if (a.role) for (const pid of light.added) guard(() => s.accounts.updateMember(acc.id, pid, { role: a.role }));
+        const known = light.updated.length + light.merged.length;
+        parts.push(
+          `${light.added.length} new light contact${light.added.length === 1 ? '' : 's'}${known ? `, ${known} already on it` : ''}` +
+            `${light.skipped.length ? `, ${light.skipped.length} skipped (${light.skipped.slice(0, 5).map((x) => `${x.input.fullName || '?'}: ${x.reason}`).join('; ')})` : ''}.` +
+            (light.warnings.length ? ` ${light.warnings.slice(0, 5).join(' ')}` : ''),
+        );
+      }
+      return ok(`${acc.name}: ${parts.join(' ')}`, { account_id: acc.id, ...r, ...(light ? { light } : {}) });
     }),
   );
 
@@ -260,7 +380,9 @@ export function registerAccountTools(server: McpServer, ctx: AccountToolCtx): vo
       title: 'Update a key person',
       description:
         'Set a person\'s buying-committee role, org-chart placement (department / tier — "" returns to automatic from the title), who they report to ' +
-        '(another person on the same account; "" clears it), or your notes (replaces them).',
+        '(another person on the same account; "" clears it), or your notes (replaces them). Marketing org fields: sub-function, team, legal entity, ' +
+        'country, responsibilities, noise ("none" = definitely in the org, "" = automatic, a flag = not counted). confirm_reports_to accepts a ' +
+        'suggested (inferred / web) reporting line as the user\'s. Set or confirm lines only when the user asked or a source states it. Local and free.',
       inputSchema: {
         account: z.string().min(1).describe('Account name, alias or id.'),
         person: z.string().min(1).describe('Person id, LinkedIn URL or name (on this account).'),
@@ -268,7 +390,14 @@ export function registerAccountTools(server: McpServer, ctx: AccountToolCtx): vo
         department: z.enum([...DEPARTMENTS, '']).optional().describe(`One of ${DEPARTMENTS.join(', ')}, or "" for automatic.`),
         tier: z.enum([...TIERS, '']).optional().describe(`One of ${TIERS.join(', ')}, or "" for automatic.`),
         reports_to: z.string().optional().describe('Id or name of their manager on this account, or "" to clear.'),
+        confirm_reports_to: z.boolean().optional().describe('true = accept the current suggested reporting line (it becomes set by the user).'),
         notes: z.string().max(10_000).optional(),
+        subfunction: z.enum([...SUBFUNCTIONS, '']).optional().describe(`Marketing sub-function: ${SUBFUNCTIONS.join(', ')}, or "" for automatic.`),
+        team: z.string().max(200).optional(),
+        entity: z.string().max(200).optional().describe('Legal entity, e.g. "Ledgerly Services GmbH".'),
+        country: z.string().regex(/^([A-Za-z]{2})?$/, 'country must be a 2-letter ISO code or ""').optional().describe('ISO-3166 alpha-2, e.g. "DE", or "".'),
+        responsibilities: z.string().max(2000).optional(),
+        noise: z.enum([...NOISE_FLAGS, 'none', '']).optional().describe(`"none" = in the org; "" = automatic; or a flag: ${NOISE_FLAGS.join(', ')} (vendor-funded is a tag: still in the org).`),
       },
       annotations: { title: 'Update a key person', ...WRITE },
     },
@@ -278,11 +407,25 @@ export function registerAccountTools(server: McpServer, ctx: AccountToolCtx): vo
       const v = view(s, acc);
       const m = memberOrThrow(v, a.person);
       const reportsTo = a.reports_to === undefined ? undefined : a.reports_to.trim() ? memberOrThrow(v, a.reports_to).id : '';
-      guard(() => s.accounts.updateMember(acc.id, m.id, { role: a.role, department: a.department, tier: a.tier, reportsTo, notes: a.notes }));
+      // confirm needs a line to confirm: check first, so a failing call saves nothing
+      if (a.confirm_reports_to === true && reportsTo === undefined && !m.reportsTo) throw ctx.userError(`${m.fullName} has no reporting line to confirm. Set one with reports_to.`);
+      guard(() => {
+        s.accounts.updateMember(acc.id, m.id, {
+          role: a.role, department: a.department, tier: a.tier, reportsTo, notes: a.notes, subfunction: a.subfunction, team: a.team,
+          entity: a.entity, country: a.country, responsibilities: a.responsibilities, noise: a.noise,
+        });
+        // a line set in the same call is already the user's
+        if (a.confirm_reports_to === true && reportsTo === undefined) s.accounts.confirmReportsTo(acc.id, m.id);
+      });
       const after = view(s, acc).members.find((x) => x.id === m.id)!;
+      const line = after.reportsTo
+        ? ` · reports to ${v.members.find((x) => x.id === after.reportsTo)?.fullName ?? after.reportsTo} ${edgeTag({ source: after.reportsToSource, confidence: after.reportsToConfidence, reason: '' })}`
+        : '';
+      const org = [SUBFUNCTION_LABELS[after.subfunction] + (after.autoSubfunction ? ' (auto)' : ''), after.team && `team ${after.team}`, after.entity, after.country, after.noise && `flagged: ${after.noise}`, after.vendorFunded && 'vendor-funded']
+        .filter(Boolean)
+        .join(' · ');
       return ok(
-        `${after.fullName} on ${acc.name}: ${after.role ? ROLE_LABELS[after.role] : 'no role'} · ${DEPARTMENT_LABELS[after.department]} · ${TIER_LABELS[after.tier]}` +
-          `${after.reportsTo ? ` · reports to ${v.members.find((x) => x.id === after.reportsTo)?.fullName ?? after.reportsTo}` : ''}.`,
+        `${after.fullName} on ${acc.name}: ${after.role ? ROLE_LABELS[after.role] : 'no role'} · ${DEPARTMENT_LABELS[after.department]} · ${TIER_LABELS[after.tier]}${line}. Marketing org: ${org}.`,
         { member: { ...after, profile: undefined } },
       );
     }),

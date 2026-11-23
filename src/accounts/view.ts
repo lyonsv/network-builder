@@ -1,6 +1,6 @@
 import type { AccountsRepo } from '../db/accounts';
 import type { ExplorerPerson } from '../types';
-import { classify } from './classify';
+import { classify, isOtherEmployer, noiseFromTitle, seniorityFromTitle, subfunctionFromTitle, vendorFundedFromTitle } from './classify';
 import { mentionsCompany, normalizeCompany } from './capture';
 import {
   COMMITTEE_ROLES,
@@ -12,6 +12,10 @@ import {
   type AccountSummary,
   type AccountView,
   type CommitteeRole,
+  type MemberInference,
+  type NoiseFlag,
+  type OrgNoise,
+  type Subfunction,
   type WarmPath,
 } from './types';
 
@@ -30,7 +34,9 @@ export function accountSummaries(repo: AccountsRepo, connectionIds: Set<string>)
     arr.push(m);
     byAccount.set(m.accountId, arr);
   }
-  const captured = new Set(repo.allContacts().map((c) => c.id));
+  const contacts = repo.allContacts();
+  const captured = new Set(contacts.filter((c) => c.kind === 'full').map((c) => c.id));
+  const light = new Set(contacts.filter((c) => c.kind === 'light').map((c) => c.id));
   return repo.list().map((a) => {
     const ms = byAccount.get(a.id) ?? [];
     const roles: Partial<Record<CommitteeRole, number>> = {};
@@ -43,6 +49,7 @@ export function accountSummaries(repo: AccountsRepo, connectionIds: Set<string>)
       memberIds: ms.map((m) => m.personId),
       memberCount: ms.length,
       captured: ms.filter((m) => captured.has(m.personId)).length,
+      light: ms.filter((m) => light.has(m.personId)).length,
       connections: ms.filter((m) => connectionIds.has(m.personId)).length,
       roles,
       updatedAt: a.updatedAt,
@@ -54,6 +61,68 @@ const deptRank = (d: string) => DEPARTMENTS.indexOf(d as (typeof DEPARTMENTS)[nu
 const tierRank = (t: string) => TIERS.indexOf(t as (typeof TIERS)[number]);
 export function sortMembers(ms: AccountMember[]): AccountMember[] {
   return [...ms].sort((a, b) => deptRank(a.department) - deptRank(b.department) || tierRank(a.tier) - tierRank(b.tier) || a.fullName.localeCompare(b.fullName));
+}
+
+/** LinkedIn company pages whose People tab was walked into this account (they count as the account / its entities) */
+export function accountCompanyPages(repo: AccountsRepo, accountId: string): string[] {
+  return [...new Set(repo.listRuns(accountId).filter((r) => r.pageKind === 'people-tab' && r.url).map((r) => r.url))];
+}
+
+export interface OrgPlacementInput {
+  account: Pick<Account, 'name' | 'aliases' | 'domain' | 'linkedinUrl'>;
+  /** entities the user set on this account's members (count as the account) */
+  entities: string[];
+  /** LinkedIn company pages already captured onto this account (list walks; count as the account) */
+  companyPages?: string[];
+  title: string;
+  /** display company (may be guessed from a headline): used only for the vendor-funded title rule */
+  company: string;
+  /**
+   * employer from a captured full profile's current experience ('' = not known). The only company the
+   * `other-employer` rule looks at: never a company guessed from a headline, never an extension-list row.
+   */
+  employer?: string;
+  /** /company/ URL of that current role, when the capture has one */
+  companyUrl?: string;
+  /** stored user overrides ('' = automatic) */
+  noiseOverride: NoiseFlag | 'none' | '';
+  subfunctionOverride: Subfunction | '';
+  inference?: MemberInference;
+}
+
+/**
+ * Resolved noise, vendor-funded tag and sub-function of one member (Phase 2b).
+ * - Noise: user override ('none' → clean) → inference (even '' = clean) → rules (`isOtherEmployer` first, then
+ *   `noiseFromTitle`). `vendor-funded` is never noise: a stored override or older inference holding it reads as the
+ *   tag — unless the person's company is clearly another employer, then it reads as `other-employer` (the user's
+ *   2026-11-23 rule: only people working for the account or its entities are in the org). A HAND-SET 'vendor-funded'
+ *   always means noise '' + the tag (user intent wins). `other-employer` needs `employer` (a captured current role).
+ * - Tag: override 'vendor-funded' → inference (`vendorFunded`, or legacy noise 'vendor-funded') → `vendorFundedFromTitle`;
+ *   always false when the person ends up with any excluding noise flag (e.g. `other-employer`).
+ * - Sub-function: user override → 'partner-marketing' when tagged → inference → `subfunctionFromTitle`.
+ */
+export function resolveOrgPlacement(x: OrgPlacementInput): { noise: OrgNoise | ''; vendorFunded: boolean; subfunction: Subfunction } {
+  const inf = x.inference;
+  const hasInf = Boolean(inf && inf.noise !== undefined);
+  const other = () => Boolean(x.employer) && isOtherEmployer(x.employer!, x.account, x.entities, x.companyUrl, x.companyPages);
+  let noise: OrgNoise | '';
+  let tagged: boolean;
+  if (x.noiseOverride === 'vendor-funded') {
+    // the user's call wins over the heuristic: in the org, tagged
+    noise = '';
+    tagged = true;
+  } else {
+    if (x.noiseOverride === 'none') noise = '';
+    else if (x.noiseOverride) noise = x.noiseOverride;
+    else if (hasInf) noise = inf!.noise === 'vendor-funded' ? (other() ? 'other-employer' : '') : (inf!.noise as OrgNoise | '');
+    else noise = other() ? 'other-employer' : noiseFromTitle(x.title);
+    // a person on the account with no company known works there (they are on its list): compare the vendor to the account
+    tagged = hasInf ? Boolean(inf!.vendorFunded) || inf!.noise === 'vendor-funded' : vendorFundedFromTitle(x.title, x.company || x.account.name);
+  }
+  // the tag only marks people in the org: any excluding flag (incl. a user's hand-set one) clears it
+  const vendorFunded = tagged && !noise;
+  const subfunction = x.subfunctionOverride || (vendorFunded ? 'partner-marketing' : inf?.subfunction || subfunctionFromTitle(x.title));
+  return { noise, vendorFunded, subfunction };
 }
 
 export function buildAccountView(repo: AccountsRepo, account: Account, people: Map<string, ExplorerPerson>): AccountView {
@@ -68,17 +137,34 @@ export function buildAccountView(repo: AccountsRepo, account: Account, people: M
     others.set(m.personId, arr);
   }
 
+  const entities = [...new Set(rows.map((r) => r.entity).filter(Boolean))];
+  const companyPages = accountCompanyPages(repo, account.id);
   const members: AccountMember[] = rows.map((r) => {
     const c = contacts.get(r.personId);
     const p = people.get(r.personId);
     const d = dos(p);
     const title = c?.title || p?.profile?.role || p?.title || '';
     const auto = classify(title || c?.headline || '', p?.profile);
+    const inf = r.inference;
+    const company = c?.company || (p ? companyOfPerson(p) : '');
+    const cur = c?.kind === 'full' ? c.profile?.experience?.find((e) => e.current) : undefined;
+    const org = resolveOrgPlacement({
+      account,
+      entities,
+      companyPages,
+      title: title || c?.headline || '',
+      company,
+      employer: cur?.company ?? '',
+      companyUrl: cur?.companyUrl ?? '',
+      noiseOverride: r.noise,
+      subfunctionOverride: r.subfunction,
+      ...(inf ? { inference: inf } : {}),
+    });
     return {
       id: r.personId,
       fullName: c?.fullName || p?.fullName || '(unknown)',
       title,
-      company: c?.company || (p ? companyOfPerson(p) : ''),
+      company,
       url: c?.url || p?.url || '',
       location: c?.location || d?.location || p?.profile?.region || '',
       headline: c?.headline || p?.title || '',
@@ -96,6 +182,23 @@ export function buildAccountView(repo: AccountsRepo, account: Account, people: M
       ...(c ? { profile: c.profile } : {}),
       webSummary: d?.oneLiner ?? '',
       otherAccounts: others.get(r.personId) ?? [],
+      kind: c ? c.kind : 'connection',
+      subfunction: org.subfunction,
+      autoSubfunction: !r.subfunction,
+      seniority: inf?.seniority || seniorityFromTitle(title || c?.headline || ''),
+      noise: org.noise,
+      vendorFunded: org.vendorFunded,
+      autoNoise: !r.noise,
+      team: r.team || inf?.team || '',
+      entity: r.entity || inf?.entity || '',
+      country: r.country || inf?.country || '',
+      responsibilities: r.responsibilities || inf?.responsibilities || '',
+      sources: r.sources,
+      confidence: r.confidence,
+      reportsToSource: r.reportsToSource,
+      reportsToConfidence: r.reportsToConfidence,
+      reportsToReason: r.reportsToReason,
+      ...(r.inference ? { inference: r.inference } : {}),
     };
   });
 

@@ -412,12 +412,12 @@ export class Store {
       updatedAt: str(r.updated_at),
     }));
     const spendRows = this.db.prepare('SELECT stage, SUM(usd) AS usd FROM cost_ledger GROUP BY stage').all() as Row[];
-    const spend = { enrich: 0, rank: 0, research: 0, dossier: 0, lens: 0, ahoy: 0, total: 0 };
+    const spend = { enrich: 0, rank: 0, research: 0, dossier: 0, lens: 0, ahoy: 0, org: 0, total: 0 };
     for (const r of spendRows) {
       const stage = str(r.stage) as CostStage;
       if (stage in spend) spend[stage] = Number(r.usd ?? 0);
     }
-    spend.total = spend.enrich + spend.rank + spend.research + spend.dossier + spend.lens + spend.ahoy;
+    spend.total = spend.enrich + spend.rank + spend.research + spend.dossier + spend.lens + spend.ahoy + spend.org;
     return {
       path: this.path,
       people: n('SELECT COUNT(*) AS n FROM people'),
@@ -780,7 +780,7 @@ export class Store {
 
   /** cumulative spend from the ledger, grouped for the explorer ('rank' is legacy lens scoring) */
   explorerCosts(): ExplorerCosts {
-    const spend = { enrich: 0, dossier: 0, lens: 0, research: 0, ahoy: 0 };
+    const spend = { enrich: 0, dossier: 0, lens: 0, research: 0, ahoy: 0, org: 0 };
     for (const r of this.db.prepare('SELECT stage, SUM(usd) AS usd FROM cost_ledger GROUP BY stage').all() as Row[]) {
       const usd = Number(r.usd ?? 0);
       const stage = str(r.stage);
@@ -789,8 +789,9 @@ export class Store {
       else if (stage === 'lens' || stage === 'rank') spend.lens += usd;
       else if (stage === 'research') spend.research += usd;
       else if (stage === 'ahoy') spend.ahoy += usd;
+      else if (stage === 'org') spend.org += usd;
     }
-    return { ...spend, total: spend.enrich + spend.dossier + spend.lens + spend.research + spend.ahoy, incomplete: false };
+    return { ...spend, total: spend.enrich + spend.dossier + spend.lens + spend.research + spend.ahoy + spend.org, incomplete: false };
   }
 }
 

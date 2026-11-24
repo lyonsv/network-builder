@@ -1,0 +1,97 @@
+<!doctype html>
+<!-- README hero. Render: scripts/render-hero.sh (headless Chrome, 1280×680 @2x → docs/hero.png). Fictional data only. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 680px; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, sans-serif;
+    background:
+      radial-gradient(900px 500px at 12% 0%, #ede7ff 0%, transparent 60%),
+      radial-gradient(800px 500px at 100% 100%, #dcf6f1 0%, transparent 60%),
+      #f7f7fb;
+    color: #1d1b2e;
+    position: relative;
+  }
+  .steps { position: absolute; top: 34px; left: 0; right: 0; display: flex; justify-content: center; gap: 56px; }
+  .step { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; color: #3a3656; }
+  .num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 700;
+         background: linear-gradient(135deg, #7f5af0, #2cb1bc); box-shadow: 0 2px 6px rgba(20,16,40,.18); }
+  .arrow { color: #6f6a8e; font-size: 20px; align-self: center; margin: 0 -30px; }
+
+  /* the app window, centre */
+  .app { position: absolute; left: 250px; top: 96px; width: 780px; height: 520px; border-radius: 14px; overflow: hidden; background: #fff;
+         box-shadow: 0 30px 60px -20px rgba(40,30,90,.35), 0 0 0 1px rgba(30,20,80,.08); }
+  .bar { height: 34px; background: #f1f0f6; display: flex; align-items: center; gap: 7px; padding: 0 13px; border-bottom: 1px solid #e4e2ee; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .bar .t { margin-left: 12px; font-size: 12px; color: #5d5880; font-weight: 500; }
+  .app img { display: block; width: 1100px; margin: -2px 0 0 -6px; transform-origin: 0 0; transform: scale(.715); }
+
+  /* Claude Code terminal, bottom left */
+  .term { position: absolute; left: 36px; top: 300px; width: 400px; border-radius: 12px; background: #17151f; color: #e9e6f5;
+          font: 13px/1.5 "SF Mono", Menlo, ui-monospace, monospace; box-shadow: 0 28px 50px -18px rgba(15,10,40,.55); overflow: hidden; }
+  .term .bar { background: #24212f; border-color: #2f2b3d; }
+  .term .bar .t { color: #9a95b8; }
+  .term .body { padding: 14px 16px 16px; }
+  .you { color: #fff; }
+  .you b { color: #c9b8ff; font-weight: 600; }
+  .dim { color: #a9a4c4; }
+  .ok { color: #7fe0b0; }
+  .term p { margin-top: 7px; }
+
+  /* Ahoy proposal, right */
+  .card { position: absolute; right: 34px; top: 230px; width: 330px; border-radius: 14px; background: #fff; padding: 16px 16px 14px;
+          box-shadow: 0 28px 50px -18px rgba(20,60,70,.4), 0 0 0 1px rgba(20,60,70,.08); }
+  .card .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #1d7a72; font-weight: 700; }
+  .card h3 { font-size: 15px; margin: 4px 0 2px; }
+  .card .sub { font-size: 12px; color: #55507a; margin-bottom: 10px; }
+  .deal { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; background: #f6f5fb; margin-top: 6px; font-size: 13px; }
+  .deal span { color: #55507a; font-size: 12px; }
+  .stage { display: inline-block; font-size: 11px; font-weight: 600; color: #5b3fd6; background: #eee9ff; border-radius: 999px; padding: 2px 8px; margin-left: 6px; }
+  .btns { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { flex: 1; text-align: center; font-size: 13px; font-weight: 600; padding: 8px; border-radius: 8px; }
+  .approve { background: #1f8a5e; color: #fff; }
+  .review { background: #f1f0f6; color: #3a3656; }
+</style>
+</head>
+<body>
+  <div class="steps">
+    <div class="step"><div class="num">1</div>Ask Claude</div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="num">2</div>Trim the scored list</div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="num">3</div>Approve the pipeline in Ahoy</div>
+  </div>
+
+  <div class="app">
+    <div class="bar"><div class="dot" style="background:#ff5f57"></div><div class="dot" style="background:#febc2e"></div><div class="dot" style="background:#28c840"></div><div class="t">Network Builder</div></div>
+    <img src="../screens/01-lens.png" alt="">
+  </div>
+
+  <div class="term">
+    <div class="bar"><div class="dot" style="background:#ff5f57"></div><div class="dot" style="background:#febc2e"></div><div class="dot" style="background:#28c840"></div><div class="t">Claude Code</div></div>
+    <div class="body">
+      <div class="you"><b>&gt;</b> Find the senior marketing leaders in my network based in Ireland and build an Ahoy pipeline</div>
+      <p class="dim">Scoring 245 connections costs ≈ $0.10. OK?</p>
+      <div class="you"><b>&gt;</b> yes</div>
+      <p><span class="ok">✓</span> 15 people at 9 companies, Dublin · Cork · Galway</p>
+      <p><span class="ok">✓</span> Checked Ahoy: 9 new companies, 1 known contact</p>
+      <p><span class="ok">✓</span> 2 proposals ready for you to approve</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="k">Ahoy · proposal</div>
+    <h3>Ireland marketing outreach</h3>
+    <div class="sub">9 companies · 15 contacts · 9 deals<span class="stage">Sales → Prospect</span></div>
+    <div class="deal">Emerald Fintech <span>3 people</span></div>
+    <div class="deal">Liffey Labs <span>2 people</span></div>
+    <div class="deal">Corrib Insurance <span>1 person</span></div>
+    <div class="deal">Spire Software <span>1 person</span></div>
+    <div class="deal" style="color:#55507a">+ 5 more companies <span></span></div>
+    <div class="btns"><div class="btn review">Review</div><div class="btn approve">Approve</div></div>
+  </div>
+</body>
+</html>

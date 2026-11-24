@@ -11,45 +11,72 @@ a reason. You trim the list, and Claude turns it into companies, contacts and de
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runs locally](https://img.shields.io/badge/data-stays%20on%20your%20Mac-0ea5e9)](#-your-data)
 
-</div>
-
-## Install on a Mac
-
-Open **Terminal** (press **⌘ Space**, type *Terminal*, press **Enter**), paste this line and press **Enter**:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/lyonsv/network-builder/main/install.sh | bash
-```
-
-**About 10 minutes.** It walks you through each step, and it's safe to run again if anything goes wrong.<br>
-**You need** a Mac, Google Chrome and a Claude Pro or Max plan. No API key and nothing else to buy: AI work counts against
-your Claude plan (importing 2,000 connections uses about $0.40 worth).<br>
-**Your data stays on your Mac**, in `~/.network-builder`. [What it changes](#what-the-installer-changes) ·
-[Uninstall](#uninstall) · [Read the script](install.sh)
-
-<sub>Already use Claude Code? Paste this into it instead, and Claude does the setup with you:
-`Set up network-builder for me by following https://raw.githubusercontent.com/lyonsv/network-builder/main/SETUP.md`</sub>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/explorer-dark.png">
-  <img alt="Network Builder: a lens of marketing leaders in Ireland, scored 0–100 with a reason for each person" src="docs/explorer-light.png" width="100%">
-</picture>
+<img alt="Network Builder: ask Claude for marketing leaders in Ireland, trim the scored list, approve the pipeline in Ahoy" src="docs/hero.png" width="100%">
 
 <sub>Shown with made-up example data.</sub>
 
-### What happens during setup
+</div>
 
-1. **Claude Code** is installed if you don't have it, and you log in.
-2. **Network Builder** goes into Applications and your Dock, and Claude Code is connected to it.
-3. **Chrome** opens its Extensions page with the folder path already copied. You switch on *Developer mode*, click
-   *Load unpacked*, press ⌘⇧G and paste. <sub>(The connections exporter isn't in the Chrome Web Store, which is why
-   Chrome calls it "unpacked". It only reads your Connections page when you click Start, and sends nothing anywhere.)</sub>
-4. **LinkedIn** opens your Connections page. Click 🧩 → *LinkedIn Connections Exporter* → *Start export* and keep the
-   tab in front (about a minute per 500 connections). Setup spots the file in Downloads and imports it.
-   <sub>No Chrome, or a work laptop that blocks extensions? Choose LinkedIn's own export instead; it arrives by email.</sub>
-5. **Ahoy** is checked. If it isn't connected to Claude yet, setup opens the page where you connect it (two clicks).
+## Get started (Mac, about 15 minutes)
 
-It ends with a checklist of what's done. Check again any time with `network-builder setup --status`.
+**You need:** a Mac, Google Chrome, a Claude Pro or Max plan, and your Ahoy login. No API key, nothing to buy.
+AI work counts against your Claude plan (importing 2,000 connections uses about $0.40 worth). Your data stays on your
+Mac, in `~/.network-builder`.
+
+### Step 1: Install
+
+1. Open **Terminal**: press **⌘ Space**, type `Terminal`, press **Enter**.
+2. Copy this line, paste it into Terminal, and press **Enter**:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/lyonsv/network-builder/main/install.sh | bash
+   ```
+
+3. Wait about a minute while it installs. You'll see green ✓ lines, and the Network Builder app appears in your Dock.
+4. If it asks **"Install Claude Code now?"**, press **Enter** (Yes).
+5. If a browser opens to log in to Claude, log in, then come back to Terminal.
+
+### Step 2: Get your connections
+
+Terminal asks **"How do you want to get your connections?"**. Press **Enter** (Chrome extension).
+
+**a. Add the exporter to Chrome.** Chrome opens its Extensions page by itself.
+
+1. Turn on the **Developer mode** switch (top right of the page).
+2. Click **Load unpacked** (top left).
+3. In the window that opens, press **⌘ Shift G**, then **⌘ V** (the folder is already copied), then **Enter**.
+4. Click **Select**. Terminal shows ✓ **LinkedIn Connections Exporter is in Chrome** on its own.
+
+**b. Export.** LinkedIn's Connections page opens next.
+
+1. Log in to LinkedIn if it asks.
+2. Click the **🧩 puzzle piece** in Chrome's toolbar, then **LinkedIn Connections Exporter**, then **Start export**.
+3. Leave that tab in front while it scrolls (about a minute per 500 connections). A CSV downloads at the end, and
+   Terminal spots it.
+4. At **"Import them now?"** press **Enter**. It imports in a minute or two.
+
+<sub>Why "Developer mode"? The exporter isn't in the Chrome Web Store yet, and this is how Chrome adds an extension from
+a folder. It reads your Connections page only when you click Start, and sends nothing anywhere.
+No Chrome, or a work laptop that blocks this? Choose **LinkedIn's own export** at the question instead; LinkedIn emails
+you a file (10 minutes to a day), and running the install line again then imports it.
+Paused around 1,900? Click "Pause 60s & retry". A LinkedIn security check? Stop and try tomorrow.</sub>
+
+### Step 3: Connect Ahoy
+
+Skip this if Terminal says ✓ **Ahoy is connected**. Otherwise a Claude page opens at **Settings → Connectors**:
+
+1. Find **Ahoy** and click **Connect**.
+2. Sign in to Ahoy and allow access.
+3. Back in Terminal, at **"Connected?"** choose **Check again**.
+
+### Step 4: Finish
+
+1. Terminal shows a checklist. Everything that matters has a ✓.
+2. At **"Open the Network Builder app now?"** press **Enter**. The app opens; it's also in your Dock now.
+3. At **"Start Claude Code now with a tour of your network?"** press **Enter**.
+
+Something not ticked? Run the install line again any time; it skips what's done. `network-builder setup --status` shows
+what's missing.
 
 <details id="what-the-installer-changes"><summary><b>What the installer changes on your Mac</b></summary>
 
@@ -59,7 +86,7 @@ It ends with a checklist of what's done. Check again any time with `network-buil
 - `~/.claude/skills/network-builder` and a Claude Code connection called `network-builder` (all projects)
 - Claude Code itself, if you didn't have it
 
-No `sudo`, nothing in system folders.
+No `sudo`, nothing in system folders. [Read the script](install.sh).
 </details>
 
 <details id="uninstall"><summary><b>Uninstall</b></summary>
@@ -72,20 +99,26 @@ network-builder uninstall --delete-data   # removes everything
 Then remove the extensions in `chrome://extensions`.
 </details>
 
-## 🚀 Your first 15 minutes
+<sub>Already use Claude Code? Instead of steps 1–4 you can paste this into it, and Claude walks you through the same
+steps: `Set up network-builder for me by following https://raw.githubusercontent.com/lyonsv/network-builder/main/SETUP.md`</sub>
 
-In Terminal, run **`network-builder claude`** to open Claude Code on your network (or just `claude`; if it was already
-open, restart it so it picks up network-builder). Then ask:
+## 🚀 Build your first Ahoy pipeline
 
-> *Find the senior marketing leaders in my network based in Ireland and build an Ahoy pipeline of the target companies
-> and people to reach out to.*
+1. Open Claude Code on your network: in Terminal, type `network-builder claude` and press **Enter**.
+   <sub>(First time, Claude Code asks whether you trust the folder: choose **Yes**.)</sub>
+2. Paste this and press **Enter**:
 
-What Claude does, checking with you at each ★:
+   ```text
+   Find the senior marketing leaders in my network based in Ireland and build an Ahoy pipeline of the target companies and people to reach out to.
+   ```
 
-1. ★ Tells you the cost and asks before scoring your network for that goal (≈ $1–2 for 2,000 connections).
-2. ★ Shows a shortlist grouped by company, each person with a score and a reason. You say who to cut.
-3. ★ Asks which Ahoy pipeline to use, checks what's already in Ahoy, then sends the new companies, contacts, a deal per
-   company and a "why them" note on each person as **proposals**. Nothing changes in Ahoy until you approve them there.
+3. Claude says what scoring your network will cost (≈ $1–2 for 2,000 connections). Type `yes`.
+4. Claude shows a shortlist grouped by company. Type who to cut (e.g. `drop the agencies and Pat at Northwind`), or `looks good`.
+5. Claude asks which Ahoy pipeline to use. Type its name (e.g. `Sales, first stage`).
+6. Claude shows the plan (companies, contacts, one deal per company, a note on each person). Type `yes, send it`.
+7. Open each proposal link Claude gives you and click **Approve** in Ahoy. Nothing changes in Ahoy until you do.
+
+When Claude Code asks permission to use a tool, choose **Yes** (or "Yes, and don't ask again" for network-builder).
 
 > [!NOTE]
 > LinkedIn exports don't include where people are. "In Ireland" comes from what their headline says, and Claude marks it
@@ -102,6 +135,7 @@ Other things to ask:
 
 Claude does the free work (searching, curating, preparing proposals). Anything that costs money or changes Ahoy, it asks
 first. Full list of what Claude can do: [docs/MCP.md](docs/MCP.md).
+
 
 ## 🧭 Using the app
 

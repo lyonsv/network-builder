@@ -8,10 +8,7 @@
   html, body { width: 1280px; height: 680px; overflow: hidden; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, sans-serif;
-    background:
-      radial-gradient(900px 500px at 12% 0%, #ede7ff 0%, transparent 60%),
-      radial-gradient(800px 500px at 100% 100%, #dcf6f1 0%, transparent 60%),
-      #f7f7fb;
+    background: linear-gradient(160deg, #f3f1fa 0%, #f6f7f9 55%, #f1f6f5 100%);
     color: #1d1b2e;
     position: relative;
   }
@@ -31,7 +28,7 @@
 
   /* Claude Code terminal, bottom left */
   .term { position: absolute; left: 36px; top: 300px; width: 400px; border-radius: 12px; background: #17151f; color: #e9e6f5;
-          font: 13px/1.5 "SF Mono", Menlo, ui-monospace, monospace; box-shadow: 0 28px 50px -18px rgba(15,10,40,.55); overflow: hidden; }
+          font: 13px/1.5 "SF Mono", Menlo, ui-monospace, monospace; box-shadow: 0 24px 44px -18px rgba(0,0,0,.35); overflow: hidden; }
   .term .bar { background: #24212f; border-color: #2f2b3d; }
   .term .bar .t { color: #9a95b8; }
   .term .body { padding: 14px 16px 16px; }
@@ -49,7 +46,7 @@
   .card .sub { font-size: 12px; color: #55507a; margin-bottom: 10px; }
   .deal { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; background: #f6f5fb; margin-top: 6px; font-size: 13px; }
   .deal span { color: #55507a; font-size: 12px; }
-  .stage { display: inline-block; font-size: 11px; font-weight: 600; color: #5b3fd6; background: #eee9ff; border-radius: 999px; padding: 2px 8px; margin-left: 6px; }
+  .stage { display: inline-block; font-size: 11px; font-weight: 600; color: #5b3fd6; background: #eee9ff; border-radius: 999px; padding: 3px 10px; margin-left: 8px; }
   .btns { display: flex; gap: 8px; margin-top: 12px; }
   .btn { flex: 1; text-align: center; font-size: 13px; font-weight: 600; padding: 8px; border-radius: 8px; }
   .approve { background: #1f8a5e; color: #fff; }

@@ -77,7 +77,7 @@ afterEach(async () => {
   dir = '';
 });
 
-async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; ahoyCheckFn?: AhoyCheckFn; ahoyProposalFn?: AhoyProposalFn; orgInferFn?: OrgInferFn; orgResearchFn?: OrgResearchFn; backoffMs?: number[]; concurrency?: { light: number; deep: number }; heartbeatMs?: number } = {}) {
+async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; ahoyCheckFn?: AhoyCheckFn; ahoyProposalFn?: AhoyProposalFn; orgInferFn?: OrgInferFn; orgResearchFn?: OrgResearchFn; backoffMs?: number[]; concurrency?: { light: number; deep: number }; heartbeatMs?: number; rerankTop?: number } = {}) {
   dir = mkdtempSync(path.join(os.tmpdir(), 'nb-explorer-'));
   store = Store.open(path.join(dir, 'network.db'));
   store.upsertPeople(
@@ -101,6 +101,7 @@ async function setup(o: { dossierFn?: DossierFn; scoreFn?: ScoreFn; ahoyCheckFn?
     backoffMs: o.backoffMs,
     concurrency: o.concurrency,
     heartbeatMs: o.heartbeatMs,
+    rerankTop: o.rerankTop,
     onEvent: (e) => events.push(e),
   });
   return { events, base: `http://127.0.0.1:${server.port}`, token: server.token };
@@ -345,6 +346,26 @@ describe('lenses', () => {
     expect((await req('POST', `${base}/api/lenses`, { token, body: { goal: '' } })).status).toBe(400);
     expect((await req('DELETE', `${base}/api/lenses/${lensId}`, { token })).json.lenses).toEqual([]);
     expect((await req('DELETE', `${base}/api/lenses/${lensId}`, { token })).status).toBe(404);
+  });
+
+  it('state tells the page the rerank band and model a new lens will really get (so its estimate matches)', async () => {
+    const { base, token } = await setup({ scoreFn: stubScore, rerankTop: 20 });
+    const st = (await req('GET', `${base}/api/state`, { token })).json;
+    expect(st.estimates).toMatchObject({ lensRerankTop: 20, lensRerankModel: 'sonnet', lensModel: 'haiku' });
+    expect(st.estimates.lensUsdPer1000).toBeGreaterThan(0);
+    expect(st.outDir).toMatch(/outputs$/);
+    const r = await req('POST', `${base}/api/lenses`, { token, body: { goal: 'heads of marketing in Ireland' } });
+    expect(r.json.lens).toMatchObject({ rerankTop: 20, rerankModel: 'sonnet' });
+  });
+
+  it('default rerank band is 150', async () => {
+    const { base, token } = await setup({ scoreFn: stubScore });
+    expect((await req('GET', `${base}/api/state`, { token })).json.estimates).toMatchObject({ lensRerankTop: 150, lensRerankModel: 'sonnet' });
+  });
+
+  it('rerank band 0 means no re-check model', async () => {
+    const { base, token } = await setup({ scoreFn: stubScore, rerankTop: 0 });
+    expect((await req('GET', `${base}/api/state`, { token })).json.estimates).toMatchObject({ lensRerankTop: 0, lensRerankModel: '' });
   });
 
   it('saves membership: threshold + manual pins in/out, cleared pins, validation, cascade on delete', async () => {

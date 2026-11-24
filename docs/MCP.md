@@ -55,6 +55,7 @@ To use a different database, add `-e NETWORK_BUILDER_HOME=/path/to/folder`, or a
 | `network_lens_add` / `network_lens_remove` | Add people to a lens by hand, or remove (dismiss) them. Each undoes the other. | local, reversible |
 | `network_set_lens_threshold` | Change a lens's score cut-off. | local, reversible |
 | `network_save_list` | Create, replace or append to a named list. | local |
+| `network_ahoy_plan` | **Turn a list, a lens or chosen people into ready-to-send Ahoy proposals:** companies, contacts, one deal per company in a pipeline stage, and a "why them" note per person, grouped by company in batches of ≤ 50 operations, every operation with sources. Pass the Ahoy ids you found (contacts, companies, open deals) so nothing is duplicated. The first call returns a summary; `batch: 1, 2, …` returns each batch as `create_proposal` arguments. Guessed locations are never written to Ahoy. Claude then sends each batch with Ahoy's `create_proposal` after you agree. | no (writes nothing) |
 | `network_export` | Write CSVs to the outputs folder: `crm`, `full`, or `ahoy` (Companies, Contacts and Notes files). | writes files |
 | `network_list_accounts` | Target accounts with status, people, connections and buying-committee coverage. | no |
 | `network_get_account` | **One account as one markdown document:** ABX brief, buying committee and gaps, org chart (department → seniority, reporting lines), each person's full LinkedIn profile and notes, and your warm paths (connections who work or worked there). Found by name, alias, id or LinkedIn company URL. `detail: "summary"` leaves out the profiles. | no |
@@ -89,8 +90,10 @@ narrow the results.
 ## What it deliberately doesn't do
 
 - **Nothing that costs money or touches other systems.** It won't start web research, create or re-score lenses, send
-  anything to Ahoy, classify an org, research an org on the web or walk LinkedIn lists. Those stay human-triggered in the explorer (`network-builder`). If a task needs them, Claude will
-  tell you which people to research there.
+  anything to Ahoy, classify an org, research an org on the web or walk LinkedIn lists. Web research stays in the app.
+  A lens can be created from Claude Code when you ask for one and agree to the cost: Claude runs the CLI
+  (`network-builder -p "<goal>" --no-serve`). Ahoy writes go through Ahoy's own `create_proposal`, which you approve in
+  Ahoy; `network_ahoy_plan` only prepares those proposals, locally.
 - **No deletes of your data.** Removing someone from a lens or an account is reversible (captured profiles are kept),
   and lists are only created or updated.
 - **No network access.** Everything is read from and written to your local SQLite database and outputs folder.

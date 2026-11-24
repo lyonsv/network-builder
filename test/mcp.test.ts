@@ -77,11 +77,42 @@ afterEach(async () => {
 });
 
 describe('network-builder MCP server', () => {
+  it('plans an Ahoy pipeline: one company, deal and stage, sources everywhere, removed people skipped', async () => {
+    const r = await call('network_ahoy_plan', {
+      campaign: 'Test outreach',
+      user_request: 'build a pipeline from my network',
+      person_ids: ['eve', 'dan', 'cat'],
+      people: [{ person_id: 'dan', contact_id: 'c-dan' }],
+      lens: 'angel',
+      stage_id: 'stage-1',
+    });
+    const sm = r.data.summary;
+    expect(r.data.skipped.map((x: any) => x.person_id)).toEqual(['cat']); // removed from the lens by hand
+    expect(sm).toMatchObject({ companies: 1, newCompanies: 1, people: 2, newContacts: 1, deals: 1, notes: 2 });
+    expect(r.data.batches).toHaveLength(1);
+    const b1 = await call('network_ahoy_plan', { campaign: 'Test outreach', user_request: 'build a pipeline from my network', person_ids: ['eve', 'dan', 'cat'], people: [{ person_id: 'dan', contact_id: 'c-dan' }], lens: 'angel', stage_id: 'stage-1', batch: 1 });
+    const payload = JSON.parse(b1.text.slice(b1.text.indexOf('{')));
+    expect(payload.title).toBe('network-builder: Test outreach');
+    const ops = payload.operations as any[];
+    expect(ops.length).toBeLessThanOrEqual(50);
+    expect(ops.every((o) => o.sources.length >= 1 && o.sources.length <= 7)).toBe(true);
+    expect(ops.filter((o) => o.object_type === 'ahoy_company').map((o) => o.properties.ahoy_name)).toEqual(['Globex']);
+    expect(ops.filter((o) => o.association_type === 'ahoy_deal_to_deal_pipeline_stage').map((o) => o.target_entity_id)).toEqual(['stage-1']);
+    expect(ops.some((o) => o.association_type === 'ahoy_deal_to_contact' && o.target_entity_id === 'c-dan')).toBe(true);
+    expect(ops.filter((o) => o.object_type === 'ahoy_contact')).toHaveLength(1); // dan exists already
+    const refs = new Set(ops.filter((o) => o.temp_id).map((o) => o.temp_id));
+    for (const o of ops.filter((x) => x.operation === 'associate')) {
+      expect(refs.has(o.source_entity_id) || /^c-|^stage-/.test(o.source_entity_id)).toBe(true);
+      expect(refs.has(o.target_entity_id) || /^c-|^stage-/.test(o.target_entity_id)).toBe(true);
+    }
+    expect((await call('network_ahoy_plan', { campaign: 'x', user_request: 'y', person_ids: ['eve'] })).isError).toBe(true); // no stage
+  });
+
   it('lists the tools with annotations and the prompts', async () => {
     const tools = (await client.listTools()).tools;
     const names = tools.map((t) => t.name).sort();
     expect(names).toEqual([
-      'network_account_add_people', 'network_account_remove_person', 'network_account_update_person', 'network_create_account',
+      'network_account_add_people', 'network_account_remove_person', 'network_account_update_person', 'network_ahoy_plan', 'network_create_account',
       'network_export', 'network_find_connections_at', 'network_get_account', 'network_get_contact', 'network_get_list', 'network_get_org_map', 'network_get_person', 'network_lens_add', 'network_lens_members',
       'network_lens_remove', 'network_list_accounts', 'network_list_lenses', 'network_list_lists', 'network_save_list', 'network_search_people', 'network_set_lens_threshold', 'network_stats', 'network_update_account',
     ]);
@@ -89,7 +120,9 @@ describe('network-builder MCP server', () => {
     expect(search.annotations?.readOnlyHint).toBe(true);
     expect(tools.find((t) => t.name === 'network_lens_add')!.annotations?.readOnlyHint).toBe(false);
     // nothing that spends money is exposed
-    expect(names.some((n) => /dossier|profile_build|research|score|ahoy|infer|classify|walk/.test(n))).toBe(false);
+    expect(names.filter((n) => n !== 'network_ahoy_plan').some((n) => /dossier|profile_build|research|score|ahoy|infer|classify|walk/.test(n))).toBe(false);
+    // the Ahoy planner only builds proposal batches locally: read-only, no network
+    expect(tools.find((t) => t.name === 'network_ahoy_plan')!.annotations).toMatchObject({ readOnlyHint: true, openWorldHint: false });
     expect(tools.find((t) => t.name === 'network_get_org_map')!.annotations?.readOnlyHint).toBe(true);
     const prompts = (await client.listPrompts()).prompts.map((p) => p.name).sort();
     expect(prompts).toEqual(['abx_campaign', 'lens_shortlist', 'warm_intro']);

@@ -155,6 +155,46 @@ dbOptions(lens.command('rm').description('delete a lens and its scores').argumen
 );
 
 program
+  .command('setup')
+  .description('set everything up on a Mac (Claude Code, desktop app, Chrome, your connections, Ahoy); safe to run again')
+  .option('--agent', 'non-interactive, for Claude Code: do the automatic steps, then list what the person still has to do')
+  .option('--status', 'show what is set up and what is missing (exit code 1 if something required is missing)')
+  .option('--json', 'with --status: machine-readable output')
+  .option('--watch-downloads <minutes>', 'with --agent: wait for a connections export in Downloads, then import it', positiveInt)
+  .action(async (opts: { agent?: boolean; status?: boolean; json?: boolean; watchDownloads?: number }) => {
+    const { runSetup } = await import('./setup/wizard');
+    process.exitCode = await runSetup(opts);
+  });
+
+program
+  .command('uninstall')
+  .description('remove the app, the command, the Claude Code connection and skill (keeps your network data)')
+  .option('--delete-data', 'also delete your network data (~/.network-builder)')
+  .option('-y, --yes', "don't ask")
+  .action(async (opts: { deleteData?: boolean; yes?: boolean }) => {
+    const { runUninstall } = await import('./setup/wizard');
+    process.exitCode = await runUninstall(opts);
+  });
+
+program
+  .command('claude')
+  .description('open Claude Code in your network workspace, ready to use your network (optionally with a first prompt)')
+  .argument('[prompt...]', 'what to ask, e.g. "who could intro me to Northwind?"')
+  .action(async (words: string[]) => {
+    const { claudeWorkspace } = await import('./setup/wizard');
+    const { findClaude } = await import('./setup/checks');
+    const bin = await findClaude();
+    if (!bin) {
+      console.error('Claude Code is not installed. Run `network-builder setup`.');
+      process.exitCode = 1;
+      return;
+    }
+    const { spawn } = await import('node:child_process');
+    const child = spawn(bin, words.length ? [words.join(' ')] : [], { stdio: 'inherit', cwd: claudeWorkspace() });
+    process.exitCode = await new Promise<number>((r) => child.on('exit', (c) => r(c ?? 0)));
+  });
+
+program
   .command('mcp')
   .description('run an MCP server (stdio) so Claude Code and other MCP clients can search and curate your network')
   .option('--db <path>', `SQLite database (default ${tildify(DEFAULT_DB_PATH)})`)

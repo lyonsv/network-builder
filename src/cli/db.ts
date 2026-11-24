@@ -12,7 +12,7 @@ import { ahoyPaths, explorerExportFilename, toAhoyFiles, toExplorerCsv } from '.
 import type { ExportPreset } from '../io/export';
 import { ensureDir, writeFileAtomic } from '../io/fs-utils';
 import { DEFAULT_CACHE_DIR, DEFAULT_DB_PATH, DEFAULT_OUT_DIR, expandHome, type ExplorerPerson, type Lens } from '../types';
-import { formatUsd } from './ui';
+import { formatUsd, progress } from './ui';
 
 const tildify = (f: string): string => {
   const home = os.homedir();
@@ -342,7 +342,7 @@ export async function runLensRescore(idOrGoal: string, flags: LensRescoreFlags):
     const onSigint = () => controller.abort();
     process.once('SIGINT', onSigint);
     const costs = withLedger(createCostTracker(), store);
-    const s = p.spinner();
+    const s = progress(() => p.spinner());
     s.start(`Re-scoring ${what}`);
     try {
       await (flags.scoreFn ?? scoreLens)({

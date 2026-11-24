@@ -1,17 +1,41 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
-- **One-step setup for someone new** (0.5.0). `install.sh` sets up everything on a Mac and is safe to re-run: a private
-  Node.js, Claude Code and its login, the `network-builder` command, the MCP server (all projects), a Claude Code
-  **skill**, the desktop app (Applications + Dock), and both Chrome extensions. It opens Chrome's Extensions page with
-  the folder on the clipboard and notices when the extension is loaded, opens LinkedIn's Connections page, watches
-  Downloads for the exported CSV and imports it, then checks Ahoy is connected. `--agent` runs it from Claude Code
-  (see `SETUP.md`); `--status` reports what's missing.
-- **Claude Code skill** (`skills/network-builder`): how to search the network, build a lens, and turn it into an Ahoy
-  pipeline (companies, contacts, a deal per company in the chosen pipeline, a note per person), as proposals.
-- `scripts/release-assets.sh` builds the release files the installer downloads (`network-builder.tgz`,
-  `Network-Builder-mac-arm64.zip`).
+**A one-paste setup a newcomer can follow, and an Ahoy pipeline that Claude builds for a few dollars.** Shaped by new-user
+walkthroughs of the whole path: README → installer → app → Claude Code.
+
+- **`network-builder setup`**: a guided setup wizard (Claude Code and its login, the Claude Code connection and skill,
+  the desktop app, Chrome, your connections, Ahoy) that ends with a checklist of what's done and what's left. Safe to
+  run again. `--status [--json]` checks everything (exit code 1 when something's missing); `--agent` is the same for
+  Claude Code, with `--watch-downloads <min>` to wait for the export and import it.
+  - Connections: the Chrome exporter, **LinkedIn's own export** (its emailed zip works too), or a file you drag in
+    (`~`, quotes and `\ (1)` escapes handled). It spots the file in Downloads.
+  - The desktop app is downloaded only when its version changes, swapped in safely, and only that copy is quit.
+  - Apple silicon is detected even under Rosetta.
+- **`install.sh` is now a small bootstrap**: a private Node.js and the CLI from the pinned latest release (skipped when
+  current), the `network-builder` command, then the wizard. No more build-from-`main` fallback.
+- **`network_ahoy_plan`** (MCP, free, local): turns a list, a lens or chosen people into ready `create_proposal` batches:
+  companies, contacts, one deal per company in a pipeline stage and a "why them" note per person, grouped by company,
+  ≤ 50 operations, with sources on every operation. Claude passes them on unchanged. The Ireland → Ahoy flow now costs
+  ≈ $2.40 and ~2 minutes instead of an estimated $8–12. Guessed (headline) locations are never written to Ahoy.
+- MCP: `location_source` (`confirmed` from a web profile, `headline` otherwise) on people; the instructions now say a
+  lens can be created with the CLI when the user agrees to the cost (they used to say it couldn't).
+- The skill: filter-or-lens rule with the price, three location labels (confirmed / stated / likely), bulk Ahoy dedupe,
+  the planner, real spend reported after paid runs; fixed a wrong view name and a nonexistent command.
+- **`network-builder claude`** opens Claude Code in a network workspace (not your home folder, so no "trust your home
+  folder" warning). **`network-builder uninstall [--delete-data]`** removes everything setup added.
+- When output isn't a terminal (Claude Code, logs), progress is one line every few seconds instead of a spinner flood,
+  and there's no banner. Model work checks the Claude Code login first instead of failing silently ("Profiled 0/N").
+- **Send to Ahoy** (in the app) now includes a LinkedIn source on each operation, as Ahoy requires.
+- README rewritten for newcomers: one labelled install line, what it changes, uninstall, "Your first 15 minutes", a
+  task-by-task **Using the app**, costs, data. Accounts and the marketing org map moved to `docs/`.
+
+## 0.5.0
+
+- **One-step setup for someone new.** `install.sh` and the `network-builder` Claude Code skill; `SETUP.md` runbook.
+
+### Also in 0.5.0
 
 - **Chrome extension 0.3.3:** when LinkedIn's **Next** loads the next results page as a full page load, the walk now
   continues on that page (same run, cap and counts) instead of stopping after page 1. The page number is read only once

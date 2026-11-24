@@ -688,8 +688,16 @@ export interface ExplorerState {
     /** web org research, whole run (all passes); per pass in `orgResearchPassUsd` */
     orgResearchUsd?: { min: number; max: number };
     orgResearchPassUsd?: Record<string, { min: number; max: number }>;
+    /** rerank band a NEW lens gets on this server (`--rerank-top`, default 150); existing lenses carry their own */
+    lensRerankTop?: number;
+    /** model that re-checks the top band of a new lens ('' = no rerank) */
+    lensRerankModel?: string;
+    /** first-pass lens model */
+    lensModel?: string;
   };
   dbPath: string;
+  /** folder for exports and snapshots ("Save to outputs") — shown in the page's help panel */
+  outDir?: string;
   /** accounts (ABX) — summaries only; GET /api/accounts/:id for the full view */
   accounts?: AccountSummary[];
   /** Chrome extension pairing */

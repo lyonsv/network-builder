@@ -157,6 +157,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
   const backoff = opts.backoffMs ?? [60_000, 120_000, 300_000, 600_000];
   const lightModel = opts.lightModel ?? 'haiku';
   const lensModel = opts.lensModel ?? 'haiku';
+  const defaultRerankTop = opts.rerankTop ?? 150;
   const maxRlAttempts = Math.max(1, opts.maxRateLimitedAttempts ?? 3);
 
   // ---- people (in memory; refreshed per person / after lens jobs) ----
@@ -270,8 +271,13 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
       orgInferUsdPer100: ORG_INFER_USD_PER_100,
       orgResearchUsd: ORG_RESEARCH_USD_ESTIMATE,
       orgResearchPassUsd: Object.fromEntries(ORG_RESEARCH_PASS_IDS.map((p) => [p, ORG_RESEARCH_PASSES[p].usd])),
+      // what createLens() will actually use, so the page's estimate matches the real run
+      lensRerankTop: defaultRerankTop,
+      lensRerankModel: defaultRerankTop > 0 ? opts.researchModel : '',
+      lensModel,
     },
     dbPath: opts.dbPath,
+    outDir: opts.outDir,
     accounts: accountList(),
     extension: extensionStatus(),
   });
@@ -549,7 +555,7 @@ export async function startExplorerServer(opts: ExplorerServerOptions): Promise<
     if (goal.length > 300) throw new HttpError(400, '`goal` is too long (max 300 chars)');
     const rerankTop =
       body.rerankTop === undefined
-        ? opts.rerankTop ?? 150
+        ? defaultRerankTop
         : Number.isInteger(body.rerankTop) && (body.rerankTop as number) >= 0 && (body.rerankTop as number) <= 1000
           ? (body.rerankTop as number)
           : (() => {

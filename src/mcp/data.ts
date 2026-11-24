@@ -62,13 +62,15 @@ export function resolveLens(lenses: Lens[], ref: string): { lens?: Lens; error?:
   if (partial.length > 1) {
     return { error: `"${ref}" matches ${partial.length} lenses: ${partial.map((l) => `"${l.goal}" (${l.id})`).join(', ')}. Pass the lens id.` };
   }
-  return { error: `No lens "${ref}". Use network_list_lenses to see lenses (lenses are created in the explorer UI).` };
+  return { error: `No lens "${ref}". Use network_list_lenses to see lenses (create one in the app, or with: network-builder -p "<goal>" --no-serve).` };
 }
 
 // ---------------------------------------------------------------- search
 const dos = (p: ExplorerPerson) => (p.dossier?.status === 'ok' && p.dossier.dossier ? p.dossier.dossier : null);
 export const companyOf = (p: ExplorerPerson): string => p.profile?.company || p.company || dos(p)?.currentCompany || '';
 export const locationOf = (p: ExplorerPerson): string => dos(p)?.location || p.profile?.region || '';
+/** confirmed = from a web profile; headline = parsed from their LinkedIn headline (unconfirmed) */
+export const locationSourceOf = (p: ExplorerPerson): 'confirmed' | 'headline' | '' => (dos(p)?.location ? 'confirmed' : p.profile?.region ? 'headline' : '');
 export const depthOf = (p: ExplorerPerson): 'none' | 'light' | 'deep' => (dos(p) ? (p.dossier!.depth === 'deep' ? 'deep' : 'light') : 'none');
 export function pastCompanies(p: ExplorerPerson): string {
   const d = dos(p);
@@ -171,6 +173,7 @@ export function personSummary(p: ExplorerPerson, lens?: Lens): Record<string, un
     seniority: p.profile?.seniority ?? '',
     function: p.profile?.function ?? '',
     location: locationOf(p),
+    location_source: locationSourceOf(p),
     linkedin: p.url,
     web_profile: depthOf(p),
   };
@@ -188,7 +191,7 @@ export function personLine(p: ExplorerPerson, lens?: Lens): string {
   const co = companyOf(p);
   bits.push(`— ${p.title || '(no title)'}${co && !(p.title || '').toLowerCase().includes(co.toLowerCase()) ? ` @ ${co}` : ''}`);
   const loc = locationOf(p);
-  if (loc) bits.push(`· ${loc}`);
+  if (loc) bits.push(`· ${loc}${locationSourceOf(p) === 'headline' ? ' (from headline)' : ''}`);
   if (lens) {
     const s = p.scores?.[lens.id];
     const pin = pinOf(lens, p.id);

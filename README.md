@@ -1,459 +1,249 @@
 <div align="center">
 
-# network-builder
+# Network Builder
 
-### Your LinkedIn network, turned into lists you can act on.
+### Turn your LinkedIn network into a target list, and that list into your Ahoy pipeline.
 
-Find the **angel investors**, **buyers**, **hires** and **journalists** already in your network.<br>
-Describe who you're looking for and AI scores every connection. Then refine the list yourself and export it.
+Describe who you're after (*"senior marketing leaders at companies in Ireland"*). AI scores every connection 0–100 with
+a reason. You trim the list, and Claude turns it into companies, contacts and deals in Ahoy for you to approve.
 
 [![Release](https://img.shields.io/github/v/release/lyonsv/network-builder?color=6366f1)](https://github.com/lyonsv/network-builder/releases)
-[![CI](https://github.com/lyonsv/network-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/lyonsv/network-builder/actions/workflows/ci.yml)
-[![Node](https://img.shields.io/badge/node-%E2%89%A5%2022.13-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Runs locally](https://img.shields.io/badge/data-stays%20on%20your%20machine-0ea5e9)](#-privacy)
+[![Runs locally](https://img.shields.io/badge/data-stays%20on%20your%20Mac-0ea5e9)](#-your-data)
+
+</div>
+
+## Install on a Mac
+
+Open **Terminal** (press **⌘ Space**, type *Terminal*, press **Enter**), paste this line and press **Enter**:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lyonsv/network-builder/main/install.sh | bash
 ```
 
+**About 10 minutes.** It walks you through each step, and it's safe to run again if anything goes wrong.<br>
+**You need** a Mac, Google Chrome and a Claude Pro or Max plan. No API key and nothing else to buy: AI work counts against
+your Claude plan (importing 2,000 connections uses about $0.40 worth).<br>
+**Your data stays on your Mac**, in `~/.network-builder`. [What it changes](#what-the-installer-changes) ·
+[Uninstall](#uninstall) · [Read the script](install.sh)
+
+<sub>Already use Claude Code? Paste this into it instead, and Claude does the setup with you:
+`Set up network-builder for me by following https://raw.githubusercontent.com/lyonsv/network-builder/main/SETUP.md`</sub>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/explorer-dark.png">
-  <img alt="The network-builder explorer: an angel-investor lens over a set of example connections, scored 0–100 with In lens / Candidates / Removed tabs" src="docs/explorer-light.png" width="100%">
+  <img alt="Network Builder: a lens of marketing leaders in Ireland, scored 0–100 with a reason for each person" src="docs/explorer-light.png" width="100%">
 </picture>
 
 <sub>Shown with made-up example data.</sub>
 
-</div>
+### What happens during setup
 
----
+1. **Claude Code** is installed if you don't have it, and you log in.
+2. **Network Builder** goes into Applications and your Dock, and Claude Code is connected to it.
+3. **Chrome** opens its Extensions page with the folder path already copied. You switch on *Developer mode*, click
+   *Load unpacked*, press ⌘⇧G and paste. <sub>(The connections exporter isn't in the Chrome Web Store, which is why
+   Chrome calls it "unpacked". It only reads your Connections page when you click Start, and sends nothing anywhere.)</sub>
+4. **LinkedIn** opens your Connections page. Click 🧩 → *LinkedIn Connections Exporter* → *Start export* and keep the
+   tab in front (about a minute per 500 connections). Setup spots the file in Downloads and imports it.
+   <sub>No Chrome, or a work laptop that blocks extensions? Choose LinkedIn's own export instead; it arrives by email.</sub>
+5. **Ahoy** is checked. If it isn't connected to Claude yet, setup opens the page where you connect it (two clicks).
 
-You probably have a few hundred, or a few thousand, LinkedIn connections. Somewhere in there are the people who could
-fund your startup, buy your product or introduce you to your next hire. Finding them means scrolling and guessing.
+It ends with a checklist of what's done. Check again any time with `network-builder setup --status`.
 
-**network-builder does the reading for you.** Import your connections and describe a goal, such as *"potential angel
-investors"* or *"heads of finance at 50–500 person SaaS companies"*. Every person gets a 0–100 fit score with a
-one-line reason. Scores are based on evidence, not keywords: a recruiter with "Angel Investor" in their headline won't
-outrank a partner at a fund. Then you curate the list in a fast local web app and export it to your CRM.
+<details id="what-the-installer-changes"><summary><b>What the installer changes on your Mac</b></summary>
 
-## ✨ Features
+- `~/.network-builder/`: your data, a private copy of Node.js (your own is never touched), the Chrome extension folders
+- `~/.local/bin/network-builder`: the command, plus a PATH line in `~/.zshrc`
+- `/Applications/Network Builder.app` (or `~/Applications`) and a Dock icon, on Apple silicon Macs
+- `~/.claude/skills/network-builder` and a Claude Code connection called `network-builder` (all projects)
+- Claude Code itself, if you didn't have it
 
-- 🎯 **Lenses: score everyone for any goal.** You write the goal in plain English, and each lens is saved. Build as
-  many as you like (investors, customers, hires, press) over the same network.
-- 🧠 **Evidence over keywords.** A cheap first pass covers everyone, then a stronger model re-checks the top
-  candidates. Exits, fund roles, board seats and named investments count; buzzwords don't.
-- 🔎 **Web profiles when you want them.** For the people you pick, it looks them up on the web: career history,
-  investments, boards and **what they've been talking about lately** (podcasts, talks, articles). Nothing is
-  researched unless you ask.
-- ✂️ **Curate fast.** In lens / Candidates / Removed tabs, a score cut-off slider, one-click add and remove, keyboard
-  shortcuts (`j` `k` `x` `r` `a`), bulk actions on whatever you've filtered, and undo everywhere.
-- 🖥️ **A Mac app for your Dock.** The explorer in a native window, with its own server. [Details →](#️-desktop-app-macos)
-- 🤖 **Use it from Claude Code (MCP).** Ask about your network ("who could intro me to Stripe?"), curate lenses and
-  lists, and export, from any Claude Code session. [Setup →](docs/MCP.md)
-- 🏢 **Accounts for ABX.** Pick the companies you're targeting and collect their key people, grouped by org chart
-  (department → seniority), each with a buying-committee role, reporting line and notes. Add your ABX brief, then let
-  Claude plan the campaign from one MCP call. [Details →](#-accounts-abx-and-the-chrome-extension)
-- 🧩 **Chrome extension.** A **＋ Network Builder** button on LinkedIn profiles files a decision maker, with their full
-  profile, under an account in one click. It works even when they aren't a connection, and saves profiles until the app
-  is running. On a company's People tab or a people search, **⇣ Map to Network Builder** files the whole list (names,
-  headlines, headcount) under an account, at human pace and within caps.
-- 🔗 **Ahoy CRM, live.** See who's already in your CRM, pick the right record when several match, and send new people
-  plus research notes to Ahoy as proposals you approve.
-- 📤 **Export to your CRM.** HubSpot/Salesforce-friendly CSVs, an **Ahoy** import bundle (companies, contacts and
-  notes), or every field. Save named lists to revisit later.
-- 🔐 **Local-first.** One SQLite file on your machine. The web app runs on `127.0.0.1` with a per-session token.
-- 🔑 **No API key.** All AI runs through your existing [Claude Code](https://claude.com/claude-code) login.
+No `sudo`, nothing in system folders.
+</details>
 
-## 🚀 Quick start (Mac, about 10 minutes)
-
-Paste **one** of these. Both set up everything, and are safe to run again if anything goes wrong.
-
-**In Terminal** (⌘ Space, type *Terminal*, Enter):
+<details id="uninstall"><summary><b>Uninstall</b></summary>
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lyonsv/network-builder/main/install.sh | bash
+network-builder uninstall                 # keeps your network data
+network-builder uninstall --delete-data   # removes everything
 ```
 
-**Or as a prompt in Claude Code**, if you already use it:
+Then remove the extensions in `chrome://extensions`.
+</details>
 
-```text
-Set up network-builder for me by following https://raw.githubusercontent.com/lyonsv/network-builder/main/SETUP.md
-```
+## 🚀 Your first 15 minutes
 
-It walks you through each step and does everything it can by itself:
+In Terminal, run **`network-builder claude`** to open Claude Code on your network (or just `claude`; if it was already
+open, restart it so it picks up network-builder). Then ask:
 
-1. **Claude Code**: installs it if needed and has you log in. All the AI runs on your own Claude plan, with no API key.
-2. **network-builder**: the command, the **desktop app** in your Dock, and a connection to Claude Code (MCP server +
-   skill), so Claude can work with your network.
-3. **Chrome**: opens the Extensions page and copies the folder path for you; you click **Load unpacked** and paste. It
-   notices when the extension is loaded.
-4. **Your connections**: opens LinkedIn; you click **Start export**. It spots the file in Downloads and imports it
-   (≈ $0.20 per 1,000 connections on your Claude plan).
-5. **Ahoy**: checks your Ahoy CRM is connected to Claude Code, and helps you connect it if not.
+> *Find the senior marketing leaders in my network based in Ireland and build an Ahoy pipeline of the target companies
+> and people to reach out to.*
 
-Then open Claude Code (`claude`) and ask:
+What Claude does, checking with you at each ★:
 
-> *Find the marketing leaders in my network based in Ireland and build an Ahoy pipeline of the target companies and
-> people to reach out to.*
+1. ★ Tells you the cost and asks before scoring your network for that goal (≈ $1–2 for 2,000 connections).
+2. ★ Shows a shortlist grouped by company, each person with a score and a reason. You say who to cut.
+3. ★ Asks which Ahoy pipeline to use, checks what's already in Ahoy, then sends the new companies, contacts, a deal per
+   company and a "why them" note on each person as **proposals**. Nothing changes in Ahoy until you approve them there.
 
-Claude scores your network for that goal, shows you a shortlist grouped by company to trim, then proposes the companies,
-contacts, one deal per company in your pipeline, and a "why them" note on each person. Nothing changes in Ahoy until you
-approve the proposal there.
+> [!NOTE]
+> LinkedIn exports don't include where people are. "In Ireland" comes from what their headline says, and Claude marks it
+> *stated* or *likely*. To confirm it, research those people in the app (a light profile, ≈ $0.02 each).
 
-Check what's installed any time: `bash <(curl -fsSL https://raw.githubusercontent.com/lyonsv/network-builder/main/install.sh) --status`
+Other things to ask:
 
-<details>
-<summary><b>Manual install</b> (Linux, or if you prefer npm)</summary>
+| | |
+|---|---|
+| **Find people** | *Who in my network could introduce me to someone at Northwind?* · *Which of my connections are angel investors?* |
+| **Build lists** | *Save the top 20 as "Q1 outreach".* · *Remove the recruiters from my marketing lens.* |
+| **Ahoy** | *Put my list "Q1 outreach" into Ahoy as deals in the Sales pipeline.* |
+| **Accounts** | *Plan a campaign for Ledgerly: who decides, and what's my warm path in?* |
 
-**1. Install Claude Code and log in** (one time):
+Claude does the free work (searching, curating, preparing proposals). Anything that costs money or changes Ahoy, it asks
+first. Full list of what Claude can do: [docs/MCP.md](docs/MCP.md).
 
-```bash
-npm install -g @anthropic-ai/claude-code
-claude          # log in with your Claude account, then exit
-```
+## 🧭 Using the app
 
-**2. Export your LinkedIn connections** to a CSV. [Here's how](#-getting-your-connections), which takes a few minutes.
+Open **Network Builder** from your Dock. (Intel Mac? Run `network-builder` in Terminal; it opens the same app in your
+browser.) Closing the window keeps it running; ⌘Q quits. A **Getting started** checklist walks you through the first
+steps, and **?** (top right) opens help: a glossary, keyboard shortcuts, and prompts to copy into Claude Code.
 
-**3. Run it:**
+### 1. Score your network for a goal
 
-```bash
-npx github:lyonsv/network-builder
-```
+Click **＋** next to the lens picker (or **＋ New lens…** in it), type who you're looking for, for example
+`Senior marketing decision makers (CMO, VP/Head/Director of Marketing, Brand, Growth) at companies in Ireland`, and
+click **Create lens**. You see the cost and time first. A minute or two later everyone has a 0–100 score and a
+one-line reason (**Why**). Typing a question into search offers the same thing.
+Each goal is saved as a **lens**, and you can make as many as you like.
 
-The first run walks you through setup:
+Be specific: *"Heads of marketing at B2B software companies in Ireland"* beats *"marketing people"*.
 
-```text
-┌  network-builder
-│
-◇  Welcome to network-builder
-│    1. Import your connections (a CSV)
-│    2. Pick a goal ("lens"): everyone gets a 0–100 fit score with a reason
-│    3. Review in your browser: add/remove people, look up the ones you care about, export
-│
-◆  Claude Code 2.x · logged in
-◇  Import your LinkedIn connections › I have a CSV › linkedin-connections-2026-11-04.csv
-◇  What list do you want to build first? › Potential angel investors
-◇  Ready to go
-│    Import 1,842 people and read their headlines                       ≈ $0.37
-│    Score everyone for "potential angel investors"                     ≈ $1.30
-◆  Start? Yes
-│
-└  Opening the explorer → http://127.0.0.1:47321/?t=…
-```
+<img alt="A lens: everyone in it scored, with the reason in the Why column" src="docs/screens/01-lens.png" width="100%">
 
-> **Needs Node.js 22.13+** (`node --version`). The first `npx` run takes a minute while it downloads and builds. If you
-> prefer a permanent install, run `npm install -g github:lyonsv/network-builder`
-> and then `network-builder`. Add the Claude Code skill by copying `skills/network-builder` to `~/.claude/skills/`.
+### 2. Trim the list
+
+- **In lens** is everyone at or above the **Lens cut-off**; **Candidates** are below it. The chip next to the cut-off
+  (e.g. *15 at 60–69*) shows the near misses worth a look.
+- **✕** takes someone out for good (even after re-scoring); **＋** adds someone by hand. Keyboard: `j`/`k` move, `x`
+  selects, `r` removes, `a` adds.
+- Filter (search, seniority, function, location), then add or remove everyone you're looking at in one go.
+
+<img alt="Candidates just below the cut-off, with add and remove buttons" src="docs/screens/02-curate.png" width="100%">
+
+### 3. Research the people who matter (optional, costs a little)
+
+Select people, then **Research ▾ → Light profile** (≈ $0.02 each: who they are, roles, location) or **Deep profile** (≈ $0.17:
+full career, plus what they've been talking about lately). It runs in the background. Their scores then update with
+**↻ Update stale**.
+
+### 4. Get it into Ahoy
+
+- **Easiest:** save the people as a list (**Save as list**), then ask Claude: *"Put my list '…' into Ahoy as a
+  pipeline"*. You get companies, contacts, a deal per company and notes, as proposals.
+- **From the app:** select people → **Ahoy ▾** → **1 Check in Ahoy** (shows who's already there, ≈ $0.005 per person)
+  → **2 Send as a proposal…** (new companies, contacts and a note on each; no deals).
+- **As files:** **Export** → *Ahoy CRM import* gives Companies, Contacts and Notes CSVs. *CRM* gives HubSpot- and
+  Salesforce-friendly columns.
+
+<img alt="Seven people selected, with the Ahoy menu open: 1 Check in Ahoy, 2 Send as a proposal" src="docs/screens/04-export-ahoy.png" width="100%">
+
+### 5. Accounts: plan specific companies (optional)
+
+Switch to **Accounts** to gather the key people at a company you're targeting: an org chart, who decides, who could
+champion you, your warm paths in, and a brief. Then ask Claude *"Plan a campaign for Ledgerly"*. The optional
+**Network Builder for LinkedIn** Chrome button adds people straight from their LinkedIn profile, connection or not.
+[More about Accounts →](docs/accounts.md) · [Map a company's marketing team →](docs/marketing-org-map.md)
+
+<img alt="Getting started checklist, and the help panel with prompts to copy into Claude Code" src="docs/screens/05-help.png" width="100%">
+
+### 6. Add new connections later
+
+Run the exporter on LinkedIn again, then **File → Import Connections CSV…** in the app (or
+`network-builder import ~/Downloads/<file>.csv`). New people are added and job titles refreshed.
+
+<details><summary><b>Words you'll see</b></summary>
+
+- **Lens**: a saved goal, with everyone scored 0–100 against it.
+- **Cut-off**: the score at which people count as *in* the lens. **In lens / Candidates / Removed**: above it / below
+  it / people you took out.
+- **Headline only**: scored from their LinkedIn headline alone, before any web research.
+- **Light / deep profile**: web research on one person (quick and cheap / thorough).
+- **Stale**: their info changed since they were scored; **↻ Update stale** re-scores just them.
+- **Proposal**: a batch of changes waiting for your approval in Ahoy.
+- **Account**: a company you're targeting, with its key people (account-based marketing, ABX).
+</details>
+
+## 💸 What things cost
+
+Everything runs through Claude Code on your Claude plan, so there's no separate bill; it counts towards your plan's usage
+limits. Dollar figures are what the same work would cost on the API, so you can compare.
+
+| | Cost |
+|---|---|
+| Import (Claude reads each headline: role, seniority, industry) | ≈ $0.20 per 1,000 connections |
+| A lens (score everyone, then double-check the top 150) | ≈ $0.30 per 1,000 + ≈ $0.75 |
+| Light / deep web profile | ≈ $0.02 / ≈ $0.17 per person |
+| Ahoy check | ≈ $0.005 per person |
+| Asking Claude, curating, lists, exports, preparing Ahoy proposals | free |
+
+## 🔐 Your data
+
+- **It stays on your Mac**, in `~/.network-builder/` (`network.db`, plus exports in `outputs/`).
+- **What leaves it:** only the AI calls Claude Code makes for you. Headlines go to Claude for scoring; names, titles and
+  companies go into web searches for profiles **you** start; the people you send to Ahoy go to your own Ahoy.
+- The app listens on `127.0.0.1` only, with a per-session token, so other websites can't trigger anything.
+- Your connections are personal data. Use exports responsibly and in line with LinkedIn's terms and your local privacy
+  law. If you contact someone you found through research, tell them where you got their details (GDPR Art. 14).
+
+<details><summary><b>Troubleshooting</b></summary>
+
+- **Start here:** `network-builder setup --status` shows what's working and what to do about the rest. Running setup
+  again (`network-builder setup`, or the install line) fixes most things.
+- **Claude can't see my network** (no `network_*` tools): restart Claude Code (`/exit`, then `network-builder claude`).
+- **"Not logged in"**: run `claude auth login`.
+- **The app won't open, or macOS says it's damaged**: `xattr -dr com.apple.quarantine "/Applications/Network Builder.app"`.
+- **The exporter finds no connections**: LinkedIn has to be in English. Reload the Connections page and start again.
+- **LinkedIn shows a security check**: stop and try again tomorrow.
+- **Profiles show "paused (rate limit)"**: web search is rate-limited on your plan. It backs off by itself; if it keeps
+  happening, it waits for you to click **Resume**.
+- **"Identity not confirmed" on a light profile**: two searches weren't enough (common for less public people). Use a
+  deep profile for the people who matter.
 
 </details>
 
-## 📥 Getting your connections
+<details><summary><b>Other ways to install</b> (Linux, npm, by hand)</summary>
 
-| Source | How | You get |
-|---|---|---|
-| **Chrome extension** · fastest | Install [**chrome-linkedin-connections-exporter**](https://github.com/lyonsv/chrome-linkedin-connections-exporter): clone it, open `chrome://extensions`, turn on Developer mode, then **Load unpacked**. Open your LinkedIn connections page, click the extension, then **Start export**. Keep the tab in the foreground. | Name, headline, connection date, profile URL |
-| **LinkedIn's own export** | **Settings → Data privacy → Get a copy of your data → Connections**. The file arrives by email, usually within an hour. | First and last name, company, position, connected on, URL |
-| **Any CSV** | Lead lists from other tools work too. Name and title columns are detected automatically. | Whatever columns it has |
+- **Linux, or you already have Node.js 22.13+:** `npx github:lyonsv/network-builder` imports a CSV and opens the app in
+  your browser. Connect Claude Code with `claude mcp add -s user network-builder -- npx -y github:lyonsv/network-builder mcp`
+  and copy `skills/network-builder` to `~/.claude/skills/`.
+- **The desktop app by hand:** download `Network-Builder-mac-arm64.zip` from the
+  [latest release](https://github.com/lyonsv/network-builder/releases/latest), unzip it into Applications. It isn't
+  signed, so the first time, right-click it and choose **Open**.
+- **Connections without the extension:** LinkedIn → **Settings → Data privacy → Get a copy of your data →
+  Connections**. Any CSV with name and title columns works too: `network-builder import <file>`.
+- **The connections exporter by hand:** [chrome-linkedin-connections-exporter](https://github.com/lyonsv/chrome-linkedin-connections-exporter).
 
-Import more files any time. Repeat imports merge, adding new people and refreshing titles:
+</details>
 
-```bash
-network-builder import ~/Downloads/Connections.csv
-```
-
-## 🧭 How it works
-
-```mermaid
-flowchart LR
-    A[Connections CSV] --> B[Headline profiles<br/><sub>role · seniority · industry<br/>everyone, cheap</sub>]
-    B --> C{Lens<br/><sub>your goal</sub>}
-    C --> D[Score everyone 0–100<br/><sub>fast first pass</sub>]
-    D --> E[Re-check top candidates<br/><sub>stronger model</sub>]
-    E --> F[Explorer<br/><sub>curate · filter · undo</sub>]
-    F -->|you pick people| G[Web profiles<br/><sub>career · investments · recent talks</sub>]
-    G -->|new evidence| D
-    F --> H[CSV export<br/><sub>CRM-ready</sub>]
-```
-
-| | What it is | Approx. cost* |
-|---|---|---|
-| **Headline profiles** | Each headline is parsed into company, role, seniority, function, industry and tags. Everyone gets one, and results are cached. | $0.20 per 1,000 people |
-| **Lenses** | A goal scored across your whole network, with a reason for every score. | $0.30 per 1,000 + $0.50 per 100 re-checked |
-| **Light web profile** | 2 web searches: who they are, roles, investments, boards. | ≈ $0.02 per person |
-| **Deep web profile** | Up to 8 searches: full career, investments, boards, plus **recent activity and themes**. | ≈ $0.17 per person |
-
-<sub>*All AI runs through `claude -p` on your Claude subscription, so usage counts against your plan's limits and there's
-no separate bill. Dollar figures are API-equivalent estimates so you can compare actions before you run them.</sub>
-
-When someone gets a new web profile, their scores are marked **stale**. **↻ Update stale** re-scores just those people.
-
-### 💡 Lens ideas
-
-| Goal | Write it like this |
-|---|---|
-| Fundraising | `potential angel investors` |
-| Sales | `potential customers: heads of finance at 50–500 person SaaS companies` |
-| Hiring | `senior backend engineers and engineering managers who could join or refer` |
-| Press | `buyers of newsroom software: editors-in-chief, heads of digital at publishers` |
-| Advisors | `founders who have sold a company` |
-
-Be specific. *"Buyers of newsroom software"* finds decision makers; *"media people"* finds everyone who has ever
-written a blog post.
-
-## 🖥️ Using the explorer
-
-The explorer is a local web page served by the CLI. Keep the terminal open while you use it, and press **Ctrl-C** when
-you're done.
-
-- **Search everything.** Search names, titles, companies, past employers, investments, and what people are "talking
-  about". Filter by seniority, function, tags, location, connection date or profile status. A results bar shows the
-  count and your active filters, each with a × to clear it.
-- **Curate a lens.**
-  - Use the **In lens**, **Candidates**, **Removed** and **Everyone** tabs, and set the cut-off with **Include score ≥**.
-  - On each row, **✕** removes, **＋** adds and **↺** restores (keyboard: `r` / `a`).
-  - Filter to a group, then **Remove these N** or **Add these N**.
-  - People you remove stay out, even after a re-score.
-- **Add people to any lens.** Select them, then use **＋ Add N to lens** / **✕ Remove N from lens** for the lens you're viewing, or **Lenses ▾** for any other. Both ask before touching selected people your filters are hiding.
-- **Research.** Select people, then click **Build light profiles** or **Deep profile**. The queue runs in the background,
-  respects web-search rate limits, and resumes on its own.
-- **Export.** **⬇ Export lens**, or select people and click **Export CSV**. There are three formats:
-  - **CRM**: HubSpot/Salesforce-friendly columns.
-  - **Full**: every field.
-  - **Ahoy CRM import**: separate Companies, Contacts and Notes CSVs using [Ahoy](https://ahoy.ai)'s field names, with
-    names split and cleaned and each contact linked to its company by exact name.
-
-  **Save as list** keeps a named list for later.
-- **Reword a lens.** **✎ Edit** re-scores it with your new description and keeps your manual adds and removes.
-
-## 🖥️ Desktop app (macOS)
-
-Prefer an app in your Dock to a terminal? **Network Builder.app** runs the same explorer in a native window and
-starts and stops its own local server. It uses the same data folder and finds your Claude Code login automatically.
-
-- **Download:** grab the `.dmg` (Apple silicon) from the [latest release](https://github.com/lyonsv/network-builder/releases/latest).
-  The app is unsigned, so the first time you open it, right-click it and choose **Open** (or use **System Settings →
-  Privacy & Security → Open Anyway**).
-- **Or build it yourself:**
-  ```bash
-  cd desktop && pnpm install && pnpm build
-  node scripts/install.mjs --open     # copies it to /Applications, pins it to the Dock and opens it
-  ```
-
-On first launch with no data, it asks for your connections CSV and imports it. Use **File → Import Connections CSV…**
-to add more later. Links (LinkedIn, sources, Ahoy proposals) open in your browser. **File → Open in Browser** gives you
-the explorer in a tab too. Closing the window keeps it running; quit with ⌘Q.
-
-## 🤖 Use your network from Claude Code (MCP)
-
-network-builder includes an [MCP](https://modelcontextprotocol.io) server, so Claude Code (or any MCP client) can
-search and work with your network directly:
-
-```bash
-npm install -g github:lyonsv/network-builder
-claude mcp add -s user network-builder -- network-builder mcp
-```
-
-Then ask Claude Code things like:
-- *"Who in my network could introduce me to someone at Stripe?"*
-- *"List my angel-investor lens members in London that have deep profiles."*
-- *"Save the top 20 as 'Q4 outreach' and export it for Ahoy."*
-- *"Plan an ABX campaign for Ledgerly. Who's the champion, and what's my warm path in?"*
-
-It has 22 tools:
-- search, people, past and current companies, lenses, lists and stats;
-- adding and removing people from lenses, the score cut-off, saving lists and exporting;
-- accounts (ABX): the full account context in one call, key people, roles, reporting lines and the brief;
-- the marketing org map of an account (`network_get_org_map`), plus setting org fields and confirming reporting lines;
-- three prompts (`warm_intro`, `lens_shortlist`, `abx_campaign`), and an `account://<id>` resource per account.
-
-It reads your local database live, so it works alongside the explorer. Anything that costs AI money (web profiles,
-scoring a lens, Ahoy calls) stays in the explorer, where you start it yourself. Full reference:
-**[docs/MCP.md](docs/MCP.md)**.
-
-## 🏢 Accounts (ABX) and the Chrome extension
-
-Switch the explorer to **Accounts** (top right) to work account by account:
-
-- **Account:** a company you're targeting. It has a status (target, engaged, customer, paused), a domain, its LinkedIn
-  page, aliases, and an **ABX brief** in markdown (why now, pains, triggers, angle, plan). The brief autosaves.
-- **Org chart:** the key people, grouped by department → seniority. Each person is placed automatically from their
-  job title; click someone to correct it, set their **buying-committee role** (decision maker, champion, influencer,
-  end user, gatekeeper, blocker), who they **report to**, and notes.
-- **Coverage and gaps:** e.g. "no decision maker", "nobody at VP level or above", "no warm path".
-- **Warm paths:** your connections who work there now (one click adds them), or used to.
-- **⧉ Copy for AI:** the whole account as one markdown document.
-
-Ways to add people:
-1. **From LinkedIn** with the [Chrome extension](extension/README.md). Click **＋ Network Builder** on any profile,
-   connection or not. The full profile (about, experience with descriptions, education, skills) is saved. People who
-   aren't connections stay under the account and never enter your network, lenses or exports.
-   To map a whole team, run a LinkedIn people search (e.g. "marketing" at that company) and click
-   **⇣ Map to Network Builder** (see [Map a marketing org](#map-a-marketing-org) below). It reads the visible list in
-   that tab only after you press Start, at human pace,
-   up to 300 rows a run (500 max) and 1,000 a day, and stops on any LinkedIn security check or limit page.
-   Everyone it sees is saved as a light contact (name, headline, link); "LinkedIn Member" rows are kept only as counts.
-   Full profiles stay one click per person. LinkedIn's terms restrict automated browsing, so use it sparingly.
-2. **From your network.** Select people in **People**, then **Add to account ▾**.
-3. **From Claude**, with `network_account_add_people`.
-
-Then ask Claude Code: *"Plan an ABX campaign for Ledgerly"* (the `abx_campaign` prompt). It calls `network_get_account`,
-which returns the brief, buying committee, org chart, full profiles and warm paths in one go.
-
-### Map a marketing org
-
-For one account, the **Marketing org** view (switch at the top of the org chart) shows everyone in marketing, how big
-the team is, how it's structured (sub-functions, teams, legal entities, a reporting tree) and what each person does.
-Every inferred fact shows where it came from and how sure it is. Everything uses free sources: your browser, and web
-search and Claude through your own Claude Code login.
-
-1. **Headcount.** Open the company's **People** tab on LinkedIn, *without* a keyword search. Make the member count and
-   the **What they do** box visible, then click **⇣ Map to Network Builder → Capture headcount only**. It saves
-   "N associated members" and the visible What they do counts (Marketing, Sales, …) and reads no people.
-   LinkedIn's People tab now lists only the **top 5** "What they do" functions (no Show more), and its job-function
-   filter doesn't filter the page. So the LinkedIn marketing count exists only when Marketing is in that top 5;
-   otherwise the map shows the company total and no coverage percentage. (LinkedIn Premium's company **Insights** tab
-   shows headcount by function; it could be a future source, but nothing reads it today.)
-2. **Walk the people.** Run a LinkedIn people search for the team (e.g. *marketing*, *Kommunikation*, *brand*, filtered
-   to the company) and click **Start mapping**. Each named row becomes a light contact on the account; "LinkedIn
-   Member" rows are only counted.
-   - LinkedIn now sends a keyword search on a company's People tab to the people search results (10 per page with a
-     **Next** button). Those pages show no results count, which is why the headcount comes from step 1. Filtering the
-     People tab by keyword just redirects, so walk the search instead.
-   - **Group companies** have a LinkedIn page per entity. Do steps 1 and 2 for each entity page and pick the same
-     account each time; the counts add up and entities are kept apart.
-3. **✦ Classify & suggest reporting lines.** In the Marketing org view. Claude (Haiku) sorts everyone into
-   sub-functions and seniority, flags noise (HR/employer marketing, sales hybrids, people at another employer; a
-   vendor-funded marketer stays in the org with a tag) and suggests who reports to whom, with a confidence and a reason.
-4. **🌐 Research on the web.** Searches company pages, press releases, job ads and interviews (never LinkedIn) for the
-   marketing leaders, team structure, entities and "reports to" statements. Each finding needs an evidence URL and a
-   quote. It backs off when web search is rate-limited and waits for you to **Resume**.
-5. **Confirm the lines.** Suggested lines are dashed, with a confidence badge and reason. **✓ Confirm**, **Change…** or
-   **↺** each one; your choice always wins over later suggestions. Fix anyone's sub-function, team, entity or "in the
-   org?" in their drawer.
-
-Then ask Claude: *"Summarise Ledgerly's marketing org and who we should talk to"*. `network_get_org_map` returns the
-tree (each line tagged `[confirmed]`, `[inferred 0.6]` or `[web 0.9]`), headcounts captured vs LinkedIn, sub-functions,
-flagged people and evidence.
-
-**Costs** (measured in live tests): classifying 48 people cost about **$0.02**; web research cost about **$0.21** for
-two passes, and a full run is estimated at **$0.30–1.40** per account. Both show an estimate and ask before they start.
-The LinkedIn steps cost nothing.
-
-**LinkedIn risk.** LinkedIn's terms restrict automated browsing and it may limit accounts that browse a lot. The walk is
-capped (300 rows a run by default, 500 max, 1,000 a day), runs only in the visible tab after your click, at human pace,
-and stops on any security check. Map one team at a time and stop if you see a check.
-
-**GDPR and privacy.** The org map is personal data about people who didn't sign up for it:
-- It stays local, in your SQLite file. Classification sends titles only (no names); web research sends the company
-  and the people already known, and keeps only what public pages state, each with its source.
-- It only uses what is visible to you: list rows on your screen and public web pages with a source link. No hidden
-  fields, no paid data brokers, no enrichment of emails or phone numbers.
-- When you contact someone you found this way, tell them where you got their details (GDPR Art. 14). If they object,
-  remove them from the account; a later list walk can add them again, so check after re-walking.
-
-## 🔗 Ahoy CRM integration
-
-If [Ahoy](https://ahoy.ai) is connected to your Claude Code, as a claude.ai connector or via `claude mcp add`, the
-explorer can work with your live CRM. It uses the same Claude login, so there are no extra keys. Check that Ahoy shows
-as connected:
-
-```bash
-claude mcp list        # look for "Ahoy … ✔ Connected"
-```
-
-1. **Check against Ahoy (read-only).** Select people (a whole lens works), then choose **Ahoy ▾ → Check in Ahoy**.
-   - Each person is matched to an Ahoy contact by LinkedIn URL, email, then name plus company.
-   - Each company is matched by name variants, and its domain is fetched.
-   - The **Ahoy** column shows **✓ Ahoy**, **New**, **Pick** (several possible matches) or **Failed**.
-   - ⚠ flags companies that are in Ahoy with no domain (Ahoy's CSV import would duplicate them) and contacts linked to
-     a different company.
-   - Filter by any of these under **More filters → Ahoy CRM**. Cost is about $0.005 per person.
-2. **Pick the right record.** Open a row marked **Pick**. The Ahoy CRM panel lists the candidates: choose **This is
-   them**, or **None of these — new contact**.
-3. **Send to Ahoy as a proposal.** Choose **Ahoy ▾ → Send to Ahoy**. network-builder builds the changes itself:
-   - new companies (once each);
-   - new contacts, linked to their company;
-   - a note on every contact with the fit score and research.
-
-   People already in Ahoy only get a note. Nothing changes in your CRM until you **approve the proposal in the Ahoy
-   app**. Each proposal holds at most 50 changes. Sent people show a link to their proposal and are never sent twice.
-
-Prefer files? **Export CSV → Ahoy CRM import** downloads a zip of Companies, Contacts and Notes CSVs using Ahoy's
-field names.
-
-## 🔐 Privacy
-
-- **Your data stays on your computer**, in `~/.network-builder/`:
-  - `network.db` (SQLite)
-  - `outputs/` (exports)
-  - `dossier.md` (what web profiles capture, which you can edit)
-- To keep data somewhere else, set `NETWORK_BUILDER_HOME`.
-- **What leaves your machine:** only the AI calls Claude Code makes on your behalf.
-  - Headlines go to Claude for scoring.
-  - Names, titles and companies go into web searches for the profiles **you** start.
-  - For a marketing org map you start: the account's people's titles (never their names) go to Claude for
-    classification; web research sends the company name and the known people's names and titles to Claude, which
-    searches the web for the company. See [Map a marketing org](#map-a-marketing-org).
-  - If you use the Ahoy integration, the people you select are looked up in (and, as approved proposals, written to)
-    your own Ahoy CRM.
-- The local server listens on `127.0.0.1` only, checks Host and Origin, and needs a per-session token. Other websites
-  can't trigger paid work.
-- Your connections are personal data. Use exports responsibly and in line with LinkedIn's terms and your local privacy
-  law.
-
-## 📚 Reference
-
-<details>
-<summary><b>Commands</b></summary>
+<details><summary><b>Command-line reference</b></summary>
 
 | Command | What it does |
 |---|---|
-| `network-builder` | Open the explorer (runs the guided setup if you have no data yet) |
-| `network-builder import <csv> [-p "goal"]` | Import or refresh people from a CSV, and optionally score a lens |
-| `network-builder -p "goal"` | Create a lens from the terminal (or update stale scores), then open it |
-| `network-builder lists` | Show saved lists |
-| `network-builder export --list <name> [--preset crm\|full\|ahoy] [-o file.csv]` | Export a saved list to CSV (`ahoy` writes companies, contacts and notes files) |
-| `network-builder lens list` | Lenses with scored and stale counts |
-| `network-builder lens rescore <id\|goal> [--goal "<new goal>"] [--stale] [--rerank-top N] [-y]` | Re-score a lens (`--goal` rewords it first, keeping pins and threshold) |
-| `network-builder lens rm <id\|goal>` | Delete a lens and its scores |
+| `network-builder` | Open the app in your browser (guided import if you have no data yet) |
+| `network-builder setup [--status] [--agent]` | Set everything up, or check it (safe to run again) |
+| `network-builder claude ["question"]` | Open Claude Code on your network |
+| `network-builder import <csv> [-p "goal"]` | Import or refresh connections, and optionally score a lens |
+| `network-builder -p "goal"` | Create a lens (or update stale scores), then open it |
+| `network-builder lists` · `export --list <name> [--preset crm\|full\|ahoy]` | Saved lists, and export one to CSV |
+| `network-builder lens list` · `lens rescore <lens> [--goal …] [--stale]` · `lens rm <lens>` | Manage lenses |
 | `network-builder db` | Database stats and total spend |
-| `network-builder mcp [--db path] [-o dir]` | Run the MCP server over stdio for Claude Code and other MCP clients |
+| `network-builder mcp` | The MCP server Claude Code uses ([docs](docs/MCP.md)) |
+| `network-builder uninstall [--delete-data]` | Remove it |
 
-</details>
-
-<details>
-<summary><b>Options</b></summary>
-
-| Option | Default | |
-|---|---|---|
-| `-i, --input <csv>` | | Import a CSV, then open the explorer |
-| `--db <path>` | `~/.network-builder/network.db` | Database file |
-| `-o, --out-dir <path>` | `~/.network-builder/outputs` | Exports and snapshots |
-| `--dossier <path>` | `~/.network-builder/dossier.md` | What web profiles capture |
-| `--research-model <model>` | `sonnet` | Model for deep profiles and lens re-checks |
-| `-c, --concurrency <n>` | 2 | Deep profiles in parallel |
-| `--light-concurrency <n>` | 3 | Light profiles in parallel (web search is rate-limited, so raise with care) |
-| `--rerank-top <n>` | 150 | For new lenses: how many top candidates get the closer re-check (0 = off) |
-| `--no-open` / `--port <n>` | | Don't open the browser / use a fixed port |
-| `--no-serve` | | Import or score, then exit without opening the explorer |
-| `--dry-run` | | Show what would happen without calling or writing anything |
-
-</details>
-
-<details>
-<summary><b>Troubleshooting</b></summary>
-
-- **"Claude Code CLI not available" or "not logged in"**: run `npm i -g @anthropic-ai/claude-code`, then `claude` once
-  to log in. Check that `claude --version` works in the same terminal.
-- **"needs Node.js 22.13 or newer"**: network-builder uses Node's built-in SQLite. Upgrade from
-  [nodejs.org](https://nodejs.org) or run `nvm install --lts`.
-- **Profiles show "paused (rate limit)"**: web search is rate-limited on your plan. The queue backs off and resumes on
-  its own. If it keeps hitting the limit, it waits for you to click **Resume**.
-- **"Identity not confirmed" on a light profile**: two searches weren't enough, which is common for less public people.
-  Use a deep profile for people who matter, or add them to a lens by hand.
-- **Explorer "already running"**: another network-builder is open on the same database. Use the URL it prints, or stop
-  it with Ctrl-C.
-- **Windows**: not tested yet. macOS and Linux are supported.
+Options: `--db <path>`, `-o/--out-dir <path>`, `--research-model <model>` (default `sonnet`), `-c/--concurrency <n>`,
+`--light-concurrency <n>`, `--rerank-top <n>` (default 150), `--no-open`, `--port <n>`, `--no-serve`, `--dry-run`. Set
+`NETWORK_BUILDER_HOME` to keep data elsewhere.
 
 </details>
 
@@ -463,16 +253,17 @@ field names.
 git clone https://github.com/lyonsv/network-builder && cd network-builder
 pnpm install
 pnpm dev                 # run from source
-pnpm test                # vitest
-pnpm typecheck && pnpm build
+pnpm typecheck && pnpm test && pnpm build
+cd desktop && pnpm install && pnpm build    # the Mac app
+scripts/release-assets.sh                   # release files the installer downloads
 ```
 
-- **The explorer UI** is a single dependency-free HTML file (`src/web/explorer.html`), served by a small `node:http`
-  server.
-- **AI calls** go through `claude -p` with JSON schemas (`src/llm/`).
-- **Specs:** `src/web/CONTRACT.md` documents the API and data model.
+- **The app's UI** is one dependency-free HTML file (`src/web/explorer.html`) served by a small `node:http` server;
+  the API and data model are in `src/web/CONTRACT.md`.
+- **AI calls** go through `claude -p` with JSON schemas (`src/llm/`). **Setup** is `src/setup/`. Architecture and
+  product rules: [AGENTS.md](AGENTS.md).
 
-Issues and pull requests are welcome.
+Issues and pull requests are welcome. Requires Node.js 22.13+.
 
 ## License
 

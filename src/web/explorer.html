@@ -141,7 +141,6 @@ button, input, select { font: inherit; color: inherit; }
 .btn.danger { color: var(--bad); }
 
 /* ---------- view bar / dropdowns ---------- */
-.viewbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 0 12px; }
 .seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: var(--panel); }
 .seg button { border: 0; background: transparent; padding: 5px 11px; font-size: 12.5px; cursor: pointer; color: var(--muted); }
 .seg button + button { border-left: 1px solid var(--border); }
@@ -204,8 +203,6 @@ td.co-cell { max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-
 .dd-action:hover:not(:disabled) { background: var(--panel-2); }
 .dd-action:disabled { color: var(--faint); cursor: not-allowed; }
 tbody tr.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.kbd-hint { color: var(--faint); font-size: 12px; white-space: nowrap; }
-.kbd-hint kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--panel); color: var(--muted); }
 
 /* ---------- static notice ---------- */
 .notice {
@@ -216,10 +213,19 @@ tbody tr.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -
 .notice code { font-family: var(--mono); font-size: 12px; background: color-mix(in srgb, var(--panel) 70%, transparent); padding: 2px 6px; border-radius: 5px; color: var(--text); user-select: all; word-break: break-all; }
 
 /* ---------- table ---------- */
-main { padding: 14px 0 120px; }
+main { padding: 10px 0 120px; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .tablewrap { overflow-x: auto; }
-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1100px; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 960px; }
+/* the table fits the window (no sideways scroll at ≥ 1280px): fixed layout, flexible Title (+ Why with a lens) */
+table.fit { table-layout: fixed; min-width: 900px; }
+table.fit td, table.fit th { overflow: hidden; }
+table.fit th { text-overflow: ellipsis; }
+table.fit td.title, table.fit td.why { max-width: none; white-space: normal; line-height: 1.35; }
+table.fit td.title > .clamp, table.fit td.why > .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
+table.fit .name, table.fit td.small, table.fit td.co-cell, table.fit td.loc { text-overflow: ellipsis; }
+table.fit td.co-cell, table.fit td.loc, table.fit td.tags { max-width: none; }
+td.why { color: var(--muted); font-size: 13px; }
 thead th {
   position: sticky; top: 0; z-index: 2;
   background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 12px;
@@ -235,6 +241,10 @@ tbody tr.row:hover { background: var(--row-hover); }
 tbody tr.row.sel { background: var(--row-sel); }
 tbody tr.row.open td { border-bottom-color: transparent; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.scorecell { text-align: right; white-space: nowrap; }
+td.scorecell .chipline { display: block; margin-top: 2px; line-height: 1; }
+td.scorecell .chipline > span:first-child { margin-left: 0; }
+td.scorecell .pinchip { margin: 0 4px 0 0; vertical-align: 1px; }
 td.chk, th.chk { width: 34px; text-align: center; padding-left: 12px; padding-right: 4px; }
 td.chk input, th.chk input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
 .rank { color: var(--faint); font-variant-numeric: tabular-nums; }
@@ -317,8 +327,6 @@ tr.detail.shown .detail-inner { grid-template-rows: 1fr; }
 .foot .info { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .pager { display: flex; gap: 6px; align-items: center; }
 .empty { padding: 48px 20px; text-align: center; color: var(--muted); }
-.paths { margin-top: 14px; color: var(--faint); font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
-.paths code { font-family: var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 
 /* ---------- selection bar ---------- */
 .selbar {
@@ -354,15 +362,20 @@ dialog::backdrop { background: rgba(0,0,0,.35); }
 .dlg h3 { margin: 0 0 8px; font-size: 16px; }
 .dlg p { margin: 0 0 16px; color: var(--muted); }
 .dlg .row-btns { display: flex; justify-content: flex-end; gap: 8px; }
-.toasts { position: fixed; right: 16px; top: 16px; z-index: 50; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toasts { position: fixed; left: 16px; bottom: 16px; z-index: 50; display: flex; flex-direction: column; gap: 8px; pointer-events: none; transition: bottom .2s ease; }
+body.has-selbar .toasts { bottom: 78px; }
 .toast {
-  pointer-events: auto; padding: 9px 14px; border-radius: 10px; font-size: 13px; max-width: 380px;
+  pointer-events: auto; padding: 9px 10px 9px 14px; border-radius: 10px; font-size: 13px; max-width: min(420px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 4px;
   background: var(--panel); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
   animation: tin .18s ease;
 }
 .toast.bad { border-color: color-mix(in srgb, var(--bad) 50%, transparent); color: var(--bad); }
 .toast.good { border-color: color-mix(in srgb, var(--good) 50%, transparent); }
-@keyframes tin { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes tin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.toast .tmsg { flex: 1; min-width: 0; }
+.toast .tx { border: 0; background: none; color: var(--faint); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px; margin-left: 6px; border-radius: 5px; }
+.toast .tx:hover { color: var(--text); background: var(--panel-2); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 @media (max-width: 640px) { .wrap { padding: 0 12px; } .goal { white-space: normal; } }
@@ -385,13 +398,7 @@ td.crmcell { white-space: nowrap; }
 .crmbox .cand .who small { display: block; color: var(--muted); }
 .crmbox .row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .starters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; width: 100%; font-size: 12.5px; color: var(--muted); }
-.lensws { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; margin: -4px 0 12px; border: 1px solid var(--accent-soft); background: color-mix(in srgb, var(--accent-soft) 45%, var(--panel)); border-radius: 10px; }
-.lensws[hidden] { display: none; }
 .lenstabs button b { font-weight: 700; margin-left: 3px; }
-.lensws .thr { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
-.lensws .thr input[type=range] { width: 130px; }
-.lensws .thr input[type=number] { width: 52px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--panel); font-size: 12.5px; }
-.lensws .thr .hint { font-size: 11.5px; }
 .lact { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 24px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; line-height: 1; }
 .lact:hover { border-color: var(--accent); color: var(--accent); }
 .lact.rm:hover { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
@@ -425,11 +432,10 @@ tr.row.leaving { opacity: 0; transform: translateX(12px); transition: opacity .1
 .newlens input:focus { border-style: solid; border-color: var(--accent); }
 .newlens .est { color: var(--faint); font-size: 12px; white-space: nowrap; }
 .jobchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
-.presets { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 0 0 12px; font-size: 12.5px; color: var(--faint); }
 .preset { border: 1px solid var(--border); background: var(--panel); color: var(--muted); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-size: 12.5px; }
 .preset:hover { color: var(--accent); border-color: var(--accent); }
 .preset[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; }
-.basis { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 4px; line-height: 16px; margin-left: 4px; vertical-align: 1px; text-transform: uppercase; letter-spacing: .03em; }
+.basis { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 0 5px; border-radius: 4px; line-height: 16px; margin-left: 4px; vertical-align: 1px; white-space: nowrap; }
 .b-headline { background: var(--panel-2); color: var(--faint); border: 1px solid var(--border); }
 .b-light { background: var(--info-soft); color: var(--info); }
 .b-deep { background: var(--good-soft); color: var(--good); }
@@ -646,6 +652,102 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
 .ext-code { width: 100%; font: 12px var(--mono); padding: 8px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); }
 #dlgExt ol { padding-left: 18px; line-height: 1.6; margin: 8px 0; }
 #dlgExt code { font: 12px var(--mono); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; word-break: break-all; }
+
+/* ---------- first-hour UX (v0.6) ---------- */
+.head { padding: 12px 0 8px; }
+.lensbar { padding: 0 0 8px; gap: 6px; }
+.lensbar .sp { flex: 1; }
+.lensbar select#lensSel { max-width: 280px; }
+@media (max-width: 1400px) { .lensbar select#lensSel { max-width: 200px; } .thr input[type=range] { width: 56px; } }
+#lensJob:empty, #lensThrHint:empty { display: none; }
+.narrow-only { display: none; }
+@media (max-width: 1400px) { .wide-only { display: none; } .narrow-only { display: inline; } }
+.brand .app { white-space: nowrap; }
+.brand { flex: 1 1 360px; }
+.lensbar.composing .lw { display: none !important; }
+.lensbar:not(.composing) .newlens.hidden { display: none; }
+.toolbar { padding: 0 0 10px; gap: 6px; }
+.toolbar .search { flex: 1 1 260px; }
+.locctl input { border: 0; background: transparent; width: 110px; color: var(--text); font-size: 13px; padding: 2px 0; }
+.lenstabs button { padding: 5px 10px; }
+.thr { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.thr input[type=range] { width: 90px; accent-color: var(--accent); }
+.thr input[type=number] { width: 50px; padding: 3px 5px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--panel); font-size: 12.5px; }
+.thr b { color: var(--text); font-weight: 600; }
+.hist { display: inline-flex; align-items: flex-end; gap: 1px; height: 22px; padding: 0 2px; cursor: help; }
+.hist i { display: block; width: 5px; min-height: 1px; border-radius: 1.5px 1.5px 0 0; background: var(--border-strong); }
+.hist i.on { background: var(--good); }
+.hist i.near { background: var(--warn); }
+.nearbtn { border: 0; background: var(--warn-soft); color: var(--warn); border-radius: 999px; padding: 1px 9px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.nearbtn:hover { text-decoration: underline; }
+.est-note { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.helpbtn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--panel); color: var(--muted); font-weight: 700; cursor: pointer; flex: none; }
+.helpbtn:hover { color: var(--accent); border-color: var(--accent); }
+.gsbtn { cursor: pointer; font: inherit; font-size: 12.5px; color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.dd-pop.menu { min-width: 260px; max-height: min(72vh, 640px); }
+.dd-sec { padding: 4px 8px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
+.dd-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 13px; }
+.dd-action .cost, .dd-action small { color: var(--muted); font-size: 12px; }
+.dd-action small { display: block; margin-top: 1px; white-space: normal; }
+.dd-action:disabled small { color: var(--faint); }
+.dd-action .step { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; margin-right: 6px; }
+.dd-action:disabled .step { background: var(--panel-2); color: var(--faint); }
+.paid { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--warn); background: var(--warn-soft); border-radius: 4px; padding: 0 4px; line-height: 15px; }
+/* selection bar: one row, grouped */
+.selbar { flex-wrap: nowrap; gap: 6px; padding: 7px 8px 7px 14px; }
+.selbar .grp { display: inline-flex; gap: 4px; align-items: center; }
+.selbar .sep { margin: 0 2px; }
+.selbar .count { font-variant-numeric: tabular-nums; flex-wrap: nowrap; white-space: nowrap; }
+@media (max-width: 1100px) { .selbar { flex-wrap: wrap; } }
+/* getting started */
+.gs { padding: 12px 14px 14px; margin: 4px 0 8px; }
+.gs-h { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.gs-h b { font-size: 14px; }
+.gs-h .prog { color: var(--muted); font-size: 12.5px; }
+.gs-h .sp { flex: 1; }
+.gs-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+@media (max-width: 1000px) { .gs-steps { grid-template-columns: 1fr 1fr; } }
+.gs-step { border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; background: var(--panel); min-width: 0; }
+.gs-step.done { background: var(--panel-2); }
+.gs-step.cur { border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.gs-step .t { font-weight: 600; font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
+.gs-step .n { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 700; background: var(--panel-2); color: var(--muted); flex: none; }
+.gs-step.done .n { background: var(--good); color: #fff; }
+.gs-step.cur .n { background: var(--accent); color: var(--accent-text); }
+.gs-step .d { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.gs-step .a { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 4px; }
+.gs-step.done .t { color: var(--muted); }
+/* help sheet */
+.sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); z-index: 45; background: var(--panel); border-left: 1px solid var(--border-strong); box-shadow: -10px 0 40px rgba(0,0,0,.15); overflow: auto; padding: 18px 20px 40px; }
+.sheet h2 { margin: 0 0 4px; font-size: 18px; }
+.sheet h3 { margin: 20px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.sheet .x { position: absolute; top: 12px; right: 14px; }
+.sheet p { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.gloss { margin: 0; font-size: 13px; }
+.gloss dt { font-weight: 600; }
+.gloss dd { margin: 1px 0 10px; color: var(--muted); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 13px; }
+.keys kbd, .kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel-2); color: var(--text); white-space: nowrap; }
+.paths2 code { display: block; font: 12px var(--mono); background: var(--panel-2); border-radius: 6px; padding: 5px 8px; margin: 2px 0 8px; overflow-wrap: anywhere; color: var(--text); }
+.pcards { display: grid; gap: 8px; }
+.pcard2 { border: 1px solid var(--border); border-radius: 9px; padding: 9px 10px; background: var(--panel-2); display: flex; gap: 8px; align-items: flex-start; }
+.pcard2 .q { flex: 1; font-size: 13px; color: var(--text); }
+.pcard2 .q small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+/* empty states */
+.empty { padding: 40px 20px 44px; }
+.empty h3 { margin: 0 0 6px; color: var(--text); font-size: 16px; }
+.empty p { margin: 0 auto 12px; max-width: 560px; }
+.empty .row-btns { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.empty ol { display: inline-block; text-align: left; margin: 6px 0 14px; line-height: 1.7; }
+.empty .spin { display: inline-block; vertical-align: -1px; margin-right: 6px; }
+.offer { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border-radius: 9px; background: var(--accent-soft); color: var(--text); font-size: 13px; }
+.offer .btn { border-color: transparent; }
+.hintline { flex-basis: 100%; font-size: 12.5px; color: var(--muted); }
+.hintline b { color: var(--text); font-weight: 600; }
+.bd-legend { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
+.bd thead th { text-align: center; padding: 3px 2px; }
+.bd thead th:first-child { text-align: left; }
+.bd td { padding: 2px 2px; }
 </style>
 </head>
 <body>
@@ -660,77 +762,79 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
         </div>
         <div class="seg modesw" id="modeSw" role="group" aria-label="View">
           <button type="button" data-mode="people" aria-pressed="true" title="Your LinkedIn connections, lenses and lists">👥 People</button>
-          <button type="button" data-mode="accounts" aria-pressed="false" title="Target accounts: key people by org chart, buying committee and your ABX brief">🏢 Accounts<b id="acctN"></b></button>
+          <button type="button" data-mode="accounts" aria-pressed="false" title="Target accounts: key people by department and seniority, buying committee and your account brief">🏢 Accounts<b id="acctN"></b></button>
         </div>
       </div>
-      <button type="button" class="chip extbtn" id="extBtn" hidden><span class="dot"></span><span id="extBtnT">🧩 Chrome extension</span></button>
+      <button type="button" class="chip gsbtn" id="gsPill" hidden title="Show the getting-started checklist">Getting started <b id="gsPillN"></b></button>
+      <button type="button" class="chip extbtn" id="extBtn" hidden><span class="dot"></span><span id="extBtnT">🧩 LinkedIn extension</span></button>
       <div class="stats" id="stats" aria-live="polite"></div>
+      <button type="button" class="helpbtn" id="helpBtn" title="Help: glossary, keyboard shortcuts, Claude Code prompts, where your data lives (?)" aria-label="Help">?</button>
     </div>
     <div class="lensbar" id="lensbar">
-      <span class="lbl" title="A lens scores your whole network against one goal. Switch lenses to rank the same people for different purposes.">Lens</span>
+      <span class="lbl" title="A lens scores your whole network 0–100 against one goal (“heads of marketing in Ireland”). People at or above the cut-off are in the lens. Press ? for the glossary.">Lens</span>
       <select id="lensSel" aria-label="Active lens"></select>
-      <button class="btn sm ghost" id="lensEdit" type="button" title="Reword this lens and re-score it (your manual adds/removes and threshold are kept)" hidden>✎ Edit</button>
-      <button class="btn sm ghost danger" id="lensDel" type="button" title="Delete this lens (its scores only — no people or profiles are deleted)" hidden>🗑</button>
-      <button class="btn sm" id="lensStale" type="button" hidden></button>
-      <button class="btn sm ghost" id="lensAll" type="button" hidden></button>
-      <span id="lensJob"></span>
-      <form class="newlens" id="newLensForm" autocomplete="off">
-        <input id="newLensGoal" type="text" maxlength="200" placeholder="New lens — e.g. “heads of marketing in fintech”" aria-label="New lens goal">
-        <span class="est" id="newLensEst"></span>
-        <button class="btn sm primary" id="newLensBtn" type="submit">Score network</button>
-      </form>
-      <div class="starters" id="lensStarters" hidden></div>
-    </div>
-    <div class="lensws" id="lensWs" hidden>
-      <div class="seg lenstabs" role="group" aria-label="Lens membership">
+      <details class="dd lw" id="lensMenuDd" hidden>
+        <summary class="btn sm ghost" title="Lens actions: edit, re-score, delete" aria-label="Lens actions">⋯</summary>
+        <div class="dd-pop menu" id="lensMenuPop"></div>
+      </details>
+      <span id="lensJob" class="lw"></span>
+      <button class="btn sm lw" id="lensStale" type="button" hidden></button>
+      <div class="seg lenstabs lw" id="lensTabs" role="group" aria-label="Lens membership" hidden>
         <button type="button" data-lv="in" title="People in this lens (on a focused row: r removes, a adds)">In lens <b id="lvIn"></b></button>
-        <button type="button" data-lv="out" title="Not in the lens and not removed — add the good ones, remove (dismiss) the rest">Candidates <b id="lvOut"></b></button>
+        <button type="button" data-lv="out" title="Scored but below the cut-off, and not removed — add the good ones, dismiss the rest">Candidates <b id="lvOut"></b></button>
         <button type="button" data-lv="removed" title="People you removed — hidden everywhere else in this lens; restore from here if you change your mind">Removed <b id="lvRem"></b></button>
         <button type="button" data-lv="all" title="In lens + candidates (people you removed only show under Removed)">Everyone</button>
       </div>
-      <span class="thr" title="People scoring at or above this are in the lens automatically. People you add by hand always stay in; people you remove always stay out.">
-        Include score ≥
-        <input id="lensThrRange" type="range" min="0" max="100" step="1" aria-label="Lens score cut-off">
-        <input id="lensThr" type="number" min="0" max="100" step="1" aria-label="Lens score cut-off">
-        <span class="hint" id="lensThrHint"></span>
+      <span class="thr lw" id="lensThrBox" hidden title="Lens cut-off: people scoring at or above this are in the lens. People you add by hand always stay in; people you remove always stay out.">
+        <span><span class="wide-only">Lens c</span><span class="narrow-only">C</span>ut-off</span>
+        <input id="lensThrRange" type="range" min="0" max="100" step="1" aria-label="Lens cut-off">
+        <input id="lensThr" type="number" min="0" max="100" step="1" aria-label="Lens cut-off">
+        <span class="hist" id="lensHist" aria-hidden="true"></span>
+        <span id="lensThrHint"></span>
       </span>
-      <span style="flex:1"></span>
-      <button class="btn sm" id="lensBulk" type="button"></button>
-      <button class="btn sm danger" id="lensBulkDismiss" type="button" hidden></button>
-      <button class="btn sm primary" id="lensExport" type="button" title="Export everyone in this lens as CSV (CRM or full)">⬇ Export lens</button>
+      <form class="newlens hidden" id="newLensForm" autocomplete="off">
+        <input id="newLensGoal" type="text" maxlength="200" placeholder="Who do you want to find? e.g. “heads of marketing in Ireland”" aria-label="New lens: who do you want to find?">
+        <span class="est" id="newLensEst"></span>
+        <button class="btn sm primary" id="newLensBtn" type="submit">Create lens</button>
+        <button class="btn sm ghost" id="newLensX" type="button" hidden title="Close (Esc)" aria-label="Close the new-lens box">✕</button>
+      </form>
+      <span class="sp"></span>
+      <button class="btn sm ghost lw" id="newLensOpen" type="button" hidden title="New lens: score your network for another goal" aria-label="New lens">＋</button>
+      <button class="btn sm primary lw" id="lensExport" type="button" hidden title="Export everyone in this lens (CRM, Ahoy or full CSV)">⬇ Export lens</button>
     </div>
     <div class="toolbar" role="search">
       <label class="search">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <span class="sr">Search</span>
-        <input id="q" type="search" placeholder="Search names, titles, companies, career, investments…  &quot;exact phrase&quot;  ( / )" autocomplete="off">
+        <input id="q" type="search" placeholder="Search names, titles, companies…   ( / )" autocomplete="off">
       </label>
-      <label class="ctl" title="Also match the active lens's reasons. Off by default: reasons often mention the goal even when ruling someone out.">
-        <input id="searchReasons" type="checkbox"> include lens reasons</label>
-      <span class="ctl" id="minScoreCtl" title="Only show people scoring at least this in the active lens (a view filter — it doesn't change who is in the lens)">Show score ≥
-        <input id="minScoreRange" type="range" min="0" max="100" step="1">
-        <input id="minScore" type="number" min="0" max="100" step="1" aria-label="Minimum lens score">
-      </span>
       <span id="msSen"></span>
       <span id="msFn"></span>
+      <label class="ctl locctl" title="Matches the location text people wrote (headline or web profile). “Ireland” won’t match “Dublin” — to find everyone in a region, create a lens such as “… based in Ireland”.">Location
+        <input id="loc" type="text" autocomplete="off" placeholder="e.g. dublin"></label>
       <span id="msTags"></span>
-      <label class="ctl">Profile
-        <select id="dossier">
-          <option value="any">Any</option>
-          <option value="none">No web profile</option>
-          <option value="has">Has web profile</option>
-          <option value="light">Light</option>
-          <option value="deep">Deep</option>
-          <option value="active">Queued / running</option>
-        </select>
-      </label>
       <details class="dd" id="moreDd">
         <summary class="ctl">More filters <span id="moreBadge"></span> ▾</summary>
         <div class="dd-pop morepop">
+          <span class="ctl" id="minScoreCtl" title="Only show people scoring at least this in the active lens. View only: it doesn’t change who is in the lens (that’s the Lens cut-off).">Min score (view only)
+            <span><input id="minScoreRange" type="range" min="0" max="100" step="1">
+            <input id="minScore" type="number" min="0" max="100" step="1" aria-label="Minimum lens score (view only)"></span>
+          </span>
+          <label class="ctl" title="Also match the active lens’s reasons. Off by default: reasons often mention the goal even when ruling someone out.">Search lens reasons too
+            <input id="searchReasons" type="checkbox"></label>
+          <label class="ctl">Web profile
+            <select id="dossier">
+              <option value="any">Any</option>
+              <option value="none">No web profile</option>
+              <option value="has">Has web profile</option>
+              <option value="light">Light</option>
+              <option value="deep">Deep</option>
+              <option value="active">Queued / running</option>
+            </select>
+          </label>
           <label class="ctl">Company contains <input id="co" type="text" autocomplete="off" placeholder="e.g. capital"></label>
           <label class="ctl">Past company contains <input id="past" type="text" autocomplete="off" placeholder="e.g. google"></label>
           <label class="ctl">Talking about contains <input id="talk" type="text" autocomplete="off" placeholder="e.g. ai agents"></label>
-          <label class="ctl">Location contains <input id="loc" type="text" autocomplete="off" placeholder="e.g. dublin"></label>
           <label class="ctl">Industry contains <input id="ind" type="text" autocomplete="off" placeholder="e.g. fintech"></label>
           <label class="ctl">Confidence
             <select id="conf">
@@ -764,49 +868,59 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
           </span>
         </div>
       </details>
-      <button class="btn ghost sm" id="reset" type="button">Reset filters</button>
-    </div>
-    <div class="presets" id="presets"></div>
-    <div class="viewbar">
-      <div class="seg" role="group" aria-label="Show rows">
-        <button type="button" data-show="all" aria-pressed="true">All</button>
-        <button type="button" data-show="sel" aria-pressed="false">Selected <b id="segSelN">0</b></button>
-        <button type="button" data-show="unsel" aria-pressed="false">Not selected</button>
-      </div>
-      <button class="btn sm primary" id="addFiltered" type="button" title="Select every row matching the current filters (all pages)">＋ Select filtered</button>
-      <button class="btn sm" id="removeFiltered" type="button" title="Deselect every row matching the current filters (does not change any lens)">− Deselect filtered</button>
-      <button class="btn sm ghost" id="invertFiltered" type="button" title="Flip selection for the rows matching the current filters">Invert</button>
-      <span class="ctl">Top
-        <input id="topN" type="number" min="1" step="1" value="20" aria-label="Number of top rows to select">
-        <button class="btn sm" id="selTop" type="button" title="Replace the selection with the top N rows of the current view">Select</button>
-      </span>
-      <span class="kbd-hint" title="Keyboard: j/k or ↑/↓ move between rows · x or Space toggles selection · Enter expands · / search"><kbd>j</kbd><kbd>k</kbd> move · <kbd>x</kbd> select · <kbd>r</kbd>/<kbd>a</kbd> remove/add (lens)</span>
+      <button class="btn ghost sm" id="reset" type="button" hidden>Reset filters</button>
       <span style="flex:1"></span>
       <details class="dd" id="listsDd">
         <summary class="btn sm">Lists <span id="listsN"></span> ▾</summary>
         <div class="dd-pop right wide" id="listsPop"></div>
       </details>
-      <details class="dd" id="colsDd">
-        <summary class="btn sm">Columns ▾</summary>
-        <div class="dd-pop right" id="colsPop"></div>
+      <details class="dd" id="viewDd">
+        <summary class="btn sm" title="Show selected rows, select in bulk, columns, CSV download, snapshot">⋯ View</summary>
+        <div class="dd-pop right menu" id="viewPop">
+          <div class="dd-sec">Show</div>
+          <div class="dd-row">
+            <div class="seg" role="group" aria-label="Show rows">
+              <button type="button" data-show="all" aria-pressed="true">All</button>
+              <button type="button" data-show="sel" aria-pressed="false">Selected <b id="segSelN">0</b></button>
+              <button type="button" data-show="unsel" aria-pressed="false">Not selected</button>
+            </div>
+          </div>
+          <div class="dd-sec">Select</div>
+          <button class="dd-action" id="addFiltered" type="button" title="Select every row matching the current filters (all pages)">＋ Select filtered</button>
+          <button class="dd-action" id="removeFiltered" type="button" title="Deselect every row matching the current filters (does not change any lens)">− Deselect filtered</button>
+          <button class="dd-action" id="invertFiltered" type="button" title="Flip selection for the rows matching the current filters">Invert selection (shown rows)</button>
+          <div class="dd-row">Top
+            <input id="topN" type="number" min="1" step="1" value="20" aria-label="Number of top rows to select" style="width:56px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:6px;background:var(--panel)">
+            <button class="btn sm" id="selTop" type="button" title="Replace the selection with the top N rows of the current view">Select top N</button>
+          </div>
+          <div class="dd-sep"></div>
+          <div class="dd-sec">Columns</div>
+          <div id="colsPop"></div>
+          <div class="dd-sep"></div>
+          <div class="dd-sec">Download</div>
+          <button class="dd-action" id="dlCsv" type="button" title="Every field, for the rows the current filters show">⬇ Shown rows as CSV</button>
+          <button class="dd-action" id="dlCsvAll" type="button" title="Every field, for everyone in your network">⬇ Everyone as CSV</button>
+          <button class="dd-action" id="snapNow" type="button" hidden title="A read-only HTML copy of the explorer, written to the outputs folder (see ? → Where your data lives)">Save a read-only snapshot</button>
+          <div class="dd-sep"></div>
+          <button class="dd-action" id="viewHelp" type="button">Keyboard shortcuts and glossary <span class="kbd">?</span></button>
+        </div>
       </details>
-      <button class="btn sm" id="dlCsv" type="button" title="Download the currently filtered rows as CSV, all fields (shift-click for everyone)">⬇ Filtered CSV</button>
-      <button class="btn sm" id="snapNow" type="button" hidden title="Write a read-only HTML snapshot of the explorer to the outputs folder">Snapshot</button>
     </div>
   </div>
 </header>
 
 <main class="wrap">
   <div id="notice"></div>
+  <section class="card gs" id="gs" hidden aria-label="Getting started"></section>
   <div class="resultsbar" id="resultsBar" aria-live="polite"></div>
-  <div class="card" style="margin-top:14px">
+  <div class="card" style="margin-top:4px">
     <div class="tablewrap">
       <table>
         <thead><tr id="headRow"></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
-    <div id="empty" class="empty" hidden>No people match these filters.</div>
+    <div id="empty" class="empty" hidden></div>
     <div class="foot">
       <div class="info" id="pageInfo"></div>
       <div class="pager">
@@ -823,7 +937,6 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       </div>
     </div>
   </div>
-  <div class="paths" id="paths"></div>
 </main>
 
 <section class="wrap acc" id="accView" hidden aria-label="Accounts">
@@ -845,31 +958,45 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
 
 <div class="selbar" id="selbar" role="region" aria-label="Selection actions">
   <span class="count" id="selCount"></span>
-  <button class="btn primary sm" id="exportSel" type="button">⬇ Export CSV</button>
-  <button class="btn sm" id="saveListSel" type="button">Save as list</button>
-  <button class="btn ghost sm" id="viewSel" type="button">Review</button>
   <span class="sep"></span>
-  <span class="est" id="selEst"></span>
-  <button class="btn sm" id="lightSel" type="button">Build light profiles</button>
-  <button class="btn sm" id="deepSel" type="button">Deep profile</button>
-  <button class="btn sm" id="cancelQueued" type="button">Cancel queued</button>
-  <details class="dd" id="ahoySelDd">
-    <summary class="btn sm" id="ahoySelBtn">Ahoy ▾</summary>
-    <div class="dd-pop up" id="ahoySelPop"></div>
-  </details>
+  <span class="grp">
+    <button class="btn primary sm" id="exportSel" type="button" title="CSV for any CRM, Ahoy import files, or every field">⬇ Export</button>
+    <button class="btn sm" id="saveListSel" type="button">Save as list</button>
+    <button class="btn sm ghost" id="updListSel" type="button" hidden></button>
+  </span>
   <span class="sep" id="lensSelSep"></span>
-  <button class="btn sm danger" id="lensSelRm" type="button" hidden></button>
-  <button class="btn sm" id="lensSelAdd" type="button" hidden></button>
-  <details class="dd" id="lensSelDd">
-    <summary class="btn sm" id="lensSelBtn">Lenses ▾</summary>
-    <div class="dd-pop up wide" id="lensSelPop"></div>
-  </details>
-  <details class="dd" id="acctSelDd">
-    <summary class="btn sm" id="acctSelBtn" title="Put the selected people on a target account">Add to account ▾</summary>
-    <div class="dd-pop up wide" id="acctSelPop"></div>
-  </details>
+  <span class="grp">
+    <button class="btn sm" id="lensSelAdd" type="button" hidden></button>
+    <button class="btn sm danger" id="lensSelRm" type="button" hidden></button>
+    <details class="dd" id="lensSelDd">
+      <summary class="btn sm" id="lensSelBtn">Lenses ▾</summary>
+      <div class="dd-pop up wide" id="lensSelPop"></div>
+    </details>
+    <details class="dd" id="acctSelDd">
+      <summary class="btn sm" id="acctSelBtn" title="Put the selected people on a target account">Account ▾</summary>
+      <div class="dd-pop up wide" id="acctSelPop"></div>
+    </details>
+  </span>
   <span class="sep"></span>
-  <button class="btn ghost sm" id="clearSel" type="button">Clear</button>
+  <span class="grp">
+    <details class="dd" id="researchDd">
+      <summary class="btn sm" id="researchBtn" title="Web profiles for the selected people (paid: runs on your Claude plan, asks first for more than 10)">Research <span class="paid">$</span> ▾</summary>
+      <div class="dd-pop up menu" id="researchPop">
+        <div class="dd-head"><span id="selEst"></span></div>
+        <button class="dd-action" id="lightSel" type="button"></button>
+        <button class="dd-action" id="deepSel" type="button"></button>
+        <button class="dd-action" id="cancelQueued" type="button"></button>
+        <div class="dd-note">A web profile makes lens scores more accurate (the “headline only” badge changes) and adds career and recent activity to exports.</div>
+      </div>
+    </details>
+    <details class="dd" id="ahoySelDd">
+      <summary class="btn sm" id="ahoySelBtn">Ahoy ▾</summary>
+      <div class="dd-pop up menu" id="ahoySelPop"></div>
+    </details>
+  </span>
+  <span class="sep"></span>
+  <button class="btn ghost sm" id="viewSel" type="button">Show selected</button>
+  <button class="btn ghost sm" id="clearSel" type="button" title="Deselect everyone (Undo is offered)">Clear</button>
 </div>
 
 <dialog id="dlg">
@@ -901,13 +1028,13 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     <label class="lbl" for="dlgExName">List name (used in the file name)</label>
     <input type="text" id="dlgExName" autocomplete="off" maxlength="80">
     <div class="radios">
-      <label><input type="radio" name="preset" value="crm" checked><span>CRM upload<small>First Name, Last Name, Email, Job Title, Company, LinkedIn URL, seniority, function, tags, location, profile summary, career, investments, boards + the active lens score/reason</small></span></label>
+      <label><input type="radio" name="preset" value="crm" checked><span>CRM upload<small>First Name, Last Name, Email, Job Title, Company, LinkedIn URL, seniority, function, tags, location, profile summary, career, investments, boards + the active lens score/reason</small><small id="dlgExEmail" hidden></small></span></label>
       <label><input type="radio" name="preset" value="ahoy"><span>Ahoy CRM import<small>Separate Companies (Company Name, Domain, Industry), Contacts and Notes (Title, Content) CSVs using Ahoy's field names: names split and cleaned, each contact's Company matching the Companies file, fit reasons in Notes (not Summary). Downloads as one .zip. Domains are left blank — reconcile against your CRM before importing.</small></span></label>
       <label><input type="radio" name="preset" value="full"><span>Full<small>Every field, including the full web profile and scores for every lens</small></span></label>
     </div>
     <div class="row-btns">
       <button class="btn" value="cancel" type="submit">Cancel</button>
-      <button class="btn" value="save" type="submit" id="dlgExSave" title="Write the CSV into the outputs folder">Save to outputs</button>
+      <button class="btn" value="save" type="submit" id="dlgExSave" title="Write the file into the outputs folder (see ? → Where your data lives)">Save to outputs</button>
       <button class="btn primary" value="download" type="submit" id="dlgExDl">Download</button>
     </div>
   </form>
@@ -930,6 +1057,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     </div>
   </form>
 </dialog>
+<aside class="sheet" id="help" hidden role="dialog" aria-modal="false" aria-labelledby="helpTitle" tabindex="-1"></aside>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script id="nb-data" type="application/json">__NB_DATA__</script>
@@ -950,7 +1078,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   state.lists = Array.isArray(state.lists) ? state.lists : [];
   state.queue = state.queue || { queued: [], running: [], pausedUntil: null, lensJob: null, seq: 0 };
   state.costs = state.costs || { enrich: 0, dossier: 0, lens: 0, research: 0, total: 0, incomplete: false };
-  state.estimates = state.estimates || { lightUsd: 0.015, deepUsd: 0.13, lensUsdPer1000: 0.3, lensRerankUsdPer100: 0.5 };
+  state.estimates = state.estimates || { lightUsd: 0.015, deepUsd: 0.17, lensUsdPer1000: 0.3, lensRerankUsdPer100: 0.5, lensRerankTop: 150 };
 
   var LIVE = !!(state.api && state.api.token && /^https?:$/.test(location.protocol));
   var TOKEN = LIVE ? state.api.token : '';
@@ -966,7 +1094,6 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     'media/creative', 'education/research', 'healthcare', 'public sector', 'other', 'unknown'];
   var TAGS = ['investor', 'angel', 'vc', 'founder', 'exited founder', 'executive', 'operator', 'advisor',
     'board member', 'recruiter', 'consultant', 'academic', 'creator', 'public sector', 'open to work'];
-  var PRESETS = ['investor', 'founder', '"head of marketing"', 'CTO', 'recruiter', 'board', 'Google', '"product manager"'];
 
   // CSV export presets (v6). Keep CRM_COLUMNS in sync with the server's v6 CRM preset (a test reads this marker).
   // Row mappers: crmRow(p, lens) / fullRow(p, lensList) — pure functions of an ExplorerPerson (+ lens objects).
@@ -1071,7 +1198,9 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   var DEFAULT_UI = {
     q: '', searchReasons: false, minScore: 0, dossier: 'any', conf: 'any', idc: 'any', crmf: 'any', from: '', to: '',
     co: '', past: '', talk: '', loc: '', ind: '', sen: [], fn: [], tags: [], lens: '',
-    sortKey: 'name', sortDir: 1, pageSize: 100, show: 'all', hidden: [], listId: '', lensView: 'in'
+    sortKey: 'name', sortDir: 1, pageSize: 100, show: 'all', hidden: [], listId: '', lensView: 'in',
+    // columns hidden while a lens is active (its own set, so the Why column fits without sideways scrolling)
+    hiddenLens: ['seniority', 'function', 'tags', 'connected']
   };
   function cloneDefaults() {
     var o = {};
@@ -1155,25 +1284,34 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     try { return new URL(t).href; } catch (e) { return ''; }
   }
   function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
+  /** One money format everywhere: 2 decimals, "< $0.01" below a cent. */
   function usd(n) {
     n = Number(n) || 0;
-    if (n > 0 && n < 0.01) return '$' + n.toFixed(4);
-    return '$' + n.toFixed(2);
+    if (n > 0 && n < 0.005) return '< $0.01';
+    return '$' + (Math.round(n * 100) / 100).toFixed(2);
   }
+  /** "≈ $X on your Claude plan" — the one sentence used for every estimate. */
+  function onPlan(n) { return '≈ ' + usd(n) + ' on your Claude plan'; }
+  var PLAN_NOTE = 'Costs are what Claude Code reports for these calls on your own login. They count against your Claude plan; network-builder never bills you.';
+  /** per-person web-profile prices, rounded up to the cent so every place shows the same figure */
+  function perLight() { return Math.ceil((Number(EST.lightUsd) || 0.015) * 100 - 1e-9) / 100; }
+  function perDeep() { return Math.ceil((Number(EST.deepUsd) || 0.17) * 100 - 1e-9) / 100; }
   function scoreClass(n) { return n >= 80 ? 's-hi' : n >= 50 ? 's-mid' : 's-lo'; }
   function scorePill(n) {
     if (typeof n !== 'number' || !isFinite(n)) return h('span', { class: 'pill s-none', text: '–' });
     return h('span', { class: 'pill ' + scoreClass(n), text: String(Math.round(n)) });
   }
   var BASIS = {
-    headline: { cls: 'b-headline', txt: 'title', tip: 'Scored from the LinkedIn headline + parsed profile only' },
-    'dossier-light': { cls: 'b-light', txt: 'light', tip: 'Scored with a light web profile' },
-    'dossier-deep': { cls: 'b-deep', txt: 'deep', tip: 'Scored with a deep web profile' }
+    headline: { cls: 'b-headline', txt: 'headline only', tip: 'Scored from the LinkedIn headline and parsed profile only. A web profile (Research ▾) gives the score real evidence.' },
+    'dossier-light': { cls: 'b-light', txt: 'light profile', tip: 'Scored with a light web profile' },
+    'dossier-deep': { cls: 'b-deep', txt: 'deep profile', tip: 'Scored with a deep web profile' }
   };
   function basisChip(b) {
     var x = BASIS[b] || BASIS.headline;
     return h('span', { class: 'basis ' + x.cls, title: x.tip, text: x.txt });
   }
+  /** Reasons sometimes start with the model's evidence token ("[headline] …"); the basis chip already says that. Display only. */
+  function reasonText(r) { return String(r || '').replace(/^\s*\[(?:headline|title|light|deep|dossier[^\]]*|web[^\]]*)\]\s*/i, ''); }
   function staleChip() { return h('span', { class: 'stale', title: 'This person’s info changed since they were scored — “Update stale” re-scores them', text: 'stale' }); }
   function fmtDate(iso) { var d = new Date(iso); return iso && !isNaN(d) ? d.toLocaleDateString() : (iso || ''); }
   function fmtTime(iso) { var d = new Date(iso); return iso && !isNaN(d) ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''; }
@@ -1182,13 +1320,25 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var t;
     return function () { clearTimeout(t); var a = arguments; t = setTimeout(function () { fn.apply(null, a); }, ms); };
   }
-  /** action: optional { label, fn } rendered as a link button (e.g. Undo). */
+  /** One toast at a time (a new one replaces the last), bottom-left, ≥ 8 s, paused while hovered.
+   *  action: optional { label, fn } rendered as a link button (e.g. Undo). */
+  var toastTimer = null;
   function toast(msg, kind, action) {
-    var t = h('div', { class: 'toast' + (kind ? ' ' + kind : ''), role: 'status' }, msg,
+    var box = $('toasts');
+    clearTimeout(toastTimer);
+    box.textContent = '';
+    var close = function () { clearTimeout(toastTimer); t.remove(); };
+    var t = h('div', { class: 'toast' + (kind ? ' ' + kind : ''), role: kind === 'bad' ? 'alert' : 'status' },
+      h('span', { class: 'tmsg' }, msg),
       action ? h('button', { class: 'act-link', type: 'button', text: action.label,
-        on: { click: function () { t.remove(); action.fn(); } } }) : null);
-    $('toasts').appendChild(t);
-    setTimeout(function () { t.remove(); }, action ? 9000 : kind === 'bad' ? 7000 : 3500);
+        on: { click: function () { close(); action.fn(); } } }) : null,
+      h('button', { class: 'tx', type: 'button', 'aria-label': 'Dismiss', title: 'Dismiss', text: '×', on: { click: close } }));
+    var ms = kind === 'bad' ? 12000 : action ? 10000 : 8000;
+    var arm = function (d) { clearTimeout(toastTimer); toastTimer = setTimeout(close, d); };
+    t.addEventListener('mouseenter', function () { clearTimeout(toastTimer); });
+    t.addEventListener('mouseleave', function () { arm(4000); });
+    box.appendChild(t);
+    arm(ms);
   }
   /** Mirrors slugify() in src/io/output.ts (export file names use max 40, fallback 'list'). */
   function slug(s, maxLen) {
@@ -1407,35 +1557,52 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
 
   // ---------------------------------------------------------------- header / stats
   // `lensOnly` columns only show when a lens is active; `hideable` ones can be toggled from the Columns menu.
+  // `w` = width (px) in the fixed lens layout; columns without one (Title, Why) share the rest.
   var COLUMNS = [
-    { id: 'chk', label: '', cls: 'chk' },
-    { id: 'lensact', label: '', cls: 'lensact', lensOnly: true },
-    { id: 'score', key: 'score', label: 'Score', cls: 'num', title: 'Score in the active lens (0–100)', lensOnly: true },
-    { id: 'name', key: 'name', label: 'Name' },
+    { id: 'chk', label: '', cls: 'chk', w: 38 },
+    { id: 'lensact', label: '', cls: 'lensact', lensOnly: true, w: 66 },
+    { id: 'score', key: 'score', label: 'Score', cls: 'num', title: 'Score in the active lens (0–100); the badge says what it was based on', lensOnly: true, w: 104 },
+    { id: 'name', key: 'name', label: 'Name', w: 168 },
     { id: 'title', key: 'title', label: 'Title', hideable: true },
-    { id: 'company', key: 'company', label: 'Company', hideable: true },
-    { id: 'seniority', key: 'seniority', label: 'Seniority', hideable: true },
-    { id: 'function', key: 'function', label: 'Function', hideable: true },
-    { id: 'tags', key: 'tags', label: 'Tags', hideable: true },
-    { id: 'location', key: 'location', label: 'Location', hideable: true },
-    { id: 'connected', key: 'connected', label: 'Connected', hideable: true },
-    { id: 'reason', key: 'reason', label: 'Why (lens)', hideable: true, lensOnly: true },
-    { id: 'profile', key: 'profile', label: 'Web profile', hideable: true },
-    { id: 'crm', key: 'crm', label: 'Ahoy', hideable: true, title: 'Status in your Ahoy CRM (select people → Ahoy ▾ → Check)' },
-    { id: 'act', label: '', cls: 'act' }
+    { id: 'company', key: 'company', label: 'Company', hideable: true, w: 140 },
+    { id: 'seniority', key: 'seniority', label: 'Seniority', hideable: true, w: 106 },
+    { id: 'function', key: 'function', label: 'Function', hideable: true, w: 112 },
+    { id: 'tags', key: 'tags', label: 'Tags', hideable: true, w: 150 },
+    { id: 'location', key: 'location', label: 'Location', hideable: true, w: 120 },
+    { id: 'connected', key: 'connected', label: 'Connected', hideable: true, w: 112 },
+    { id: 'reason', key: 'reason', label: 'Why (lens)', hideable: true, lensOnly: true, title: 'The reason for the score, citing the evidence it used', grow: 1.6 },
+    { id: 'profile', key: 'profile', label: 'Web profile', hideable: true, w: 122 },
+    { id: 'crm', key: 'crm', label: 'Ahoy', hideable: true, title: 'Status in your Ahoy CRM (select people → Ahoy ▾ → Check). Appears after your first check.', w: 74, auto: 'crm' },
+    { id: 'act', label: '', cls: 'act', w: 58 }
   ];
+  function hiddenCols() { return ui.lens ? ui.hiddenLens : ui.hidden; }
+  function anyCrm() { for (var i = 0; i < people.length; i++) if (people[i].crm) return true; return false; }
+  function anyAct() {
+    if (ui.show === 'sel') return true;
+    for (var i = 0; i < people.length; i++) if (jobOf(people[i]) === 'queued') return true;
+    return false;
+  }
   function visibleCols() {
+    var hid = hiddenCols(), crm = anyCrm(), act = anyAct();
     return COLUMNS.filter(function (c) {
       if (c.lensOnly && !ui.lens) return false;
-      return !c.hideable || ui.hidden.indexOf(c.id) < 0;
+      if (c.auto === 'crm' && !crm) return false;
+      if (c.id === 'act' && !act) return false;
+      return !c.hideable || hid.indexOf(c.id) < 0;
     });
   }
   var headChk;
   function renderHead() {
     var tr = $('headRow');
     tr.textContent = '';
-    visibleCols().forEach(function (c) {
+    var fit = true, cols = visibleCols();
+    tr.closest('table').classList.toggle('fit', fit);
+    var fixed = 0, grow = 0;
+    cols.forEach(function (c) { if (c.w) fixed += c.w; else grow += c.grow || 1; });
+    cols.forEach(function (c) {
       var th = h('th', { class: (c.cls || '') + (c.key ? ' sortable' : ''), title: c.title, scope: 'col' });
+      // fixed layout: px for set columns, the rest share what's left (Why gets the bigger share)
+      if (fit) th.style.width = c.w ? c.w + 'px' : 'calc((100% - ' + (fixed + 4) + 'px) * ' + ((c.grow || 1) / grow).toFixed(3) + ')';
       if (c.id === 'chk') {
         headChk = h('input', { type: 'checkbox', 'aria-label': 'Select all filtered rows', title: 'Select / deselect all filtered rows' });
         headChk.addEventListener('change', function () {
@@ -1471,20 +1638,18 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   function renderColsMenu() {
     var pop = $('colsPop');
     pop.textContent = '';
-    pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: 'Show columns' }),
-      h('button', { class: 'btn ghost sm', type: 'button', text: 'Show all', on: { click: function () {
-        ui.hidden = []; savePrefs(); renderColsMenu(); refresh();
-      } } })));
+    var key = ui.lens ? 'hiddenLens' : 'hidden';
+    pop.appendChild(h('div', { class: 'dd-note', style: 'padding:2px 8px 4px', text: ui.lens ? 'With a lens active (its own set):' : 'Without a lens:' }));
     COLUMNS.forEach(function (c) {
-      if (!c.hideable) return;
+      if (!c.hideable || (c.lensOnly && !ui.lens)) return;
       var cb = h('input', { type: 'checkbox' });
-      cb.checked = ui.hidden.indexOf(c.id) < 0;
+      cb.checked = ui[key].indexOf(c.id) < 0;
       cb.addEventListener('change', function () {
-        ui.hidden = ui.hidden.filter(function (x) { return x !== c.id; });
-        if (!cb.checked) ui.hidden.push(c.id);
+        ui[key] = ui[key].filter(function (x) { return x !== c.id; });
+        if (!cb.checked) ui[key].push(c.id);
         savePrefs(); refresh();
       });
-      pop.appendChild(h('label', { class: 'opt' }, cb, h('span', { text: c.label + (c.lensOnly ? ' (when a lens is active)' : '') })));
+      pop.appendChild(h('label', { class: 'opt' }, cb, h('span', { text: c.label + (c.auto === 'crm' ? ' (after an Ahoy check)' : '') })));
     });
   }
 
@@ -1510,7 +1675,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     }
     append(box, chip('people', total.toLocaleString()));
     if (withProfile < total) append(box, chip('profiled', withProfile.toLocaleString() + '/' + total.toLocaleString(), null, 'People with a parsed headline profile (company, seniority, function, tags)'));
-    append(box, chip('web profiles', (light + deep).toLocaleString(), null, light.toLocaleString() + ' light · ' + deep.toLocaleString() + ' deep'));
+    if (light + deep) append(box, chip('web profiles', (light + deep).toLocaleString(), null, light.toLocaleString() + ' light · ' + deep.toLocaleString() + ' deep'));
     if (ahoyJob) {
       append(box, h('span', { class: 'chip', title: 'Ahoy CRM job (through your Ahoy connector in Claude Code)' }, h('span', { class: 'spin', 'aria-hidden': 'true' }),
         ' Ahoy ' + (ahoyJob.kind === 'send' ? 'send ' : 'check ') + (Number(ahoyJob.done) || 0).toLocaleString() + '/' + (Number(ahoyJob.total) || 0).toLocaleString()));
@@ -1527,25 +1692,41 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
           text: (txt ? txt + ' · ' : '') + 'paused until ' + fmtTime(pausedUntil) + ' (rate limit)' }));
       } else append(box, h('span', { class: 'chip', text: txt }));
     }
-    append(box, h('span', { class: 'chip', title: 'Total spend recorded in the database · profiles ' + usd(costs.enrich) + ' · web profiles ' + usd(costs.dossier) +
+    append(box, h('span', { class: 'chip', title: PLAN_NOTE + '\n\nReading headlines at import ' + usd(costs.enrich) + ' · web profiles ' + usd(costs.dossier) +
       ' · lenses (incl. earlier ranking) ' + usd(costs.lens) + ' · legacy research ' + usd(costs.research) + (costs.ahoy ? ' · Ahoy ' + usd(costs.ahoy) : '') + (costs.org ? ' · org map ' + usd(costs.org) : '') + (costs.incomplete ? ' (lower bound: some calls were cut off)' : '') },
-      h('b', { text: (costs.incomplete ? '≥ ' : '') + usd(costs.total) }), ' spent'));
+      h('b', { text: (costs.incomplete ? '≥ ' : '') + usd(costs.total) }), ' used'));
     if (LIVE) {
-      var label = connected === 'live' ? 'live' : connected === 'connecting' ? 'connecting…' : 'reconnecting…';
-      append(box, h('span', { class: 'chip ' + (connected === 'live' ? 'live' : 'offline'), text: label, title: 'Connected to the local network-builder server' }));
+      var label = connected === 'live' ? 'live' : connected === 'connecting' ? 'connecting…' : connected === 'gone' ? 'restarted — reopen' : connected === 'unreachable' ? 'not running' : 'reconnecting…';
+      append(box, h('span', { class: 'chip ' + (connected === 'live' ? 'live' : 'offline'), text: label,
+        title: connected === 'live' ? 'Connected to the local network-builder server' : connected === 'gone' ? 'The explorer restarted, so this tab’s session ended. Reopen it from the terminal (network-builder) or the app.'
+          : connected === 'unreachable' ? 'The explorer isn’t running. Start it again with network-builder (or open the app); this tab keeps retrying.' : 'Lost the connection — retrying' }));
     } else {
       append(box, h('span', { class: 'chip static', text: 'snapshot', title: 'Static snapshot — profiling and lenses are disabled' }));
     }
   }
 
-  var STARTER_LENSES = ['potential angel investors', 'heads of marketing and senior marketing leaders',
-    'founders who have sold a company', 'journalists and editors at news organisations',
-    'recruiters and talent leaders', 'potential customers: '];
+  // marketer-first starters; "[…]" marks a part to fill in (it's selected when the chip fills the box)
+  var STARTER_LENSES = ['heads of marketing based in Ireland', 'CMOs and marketing directors at B2B software companies',
+    'agency founders and managing directors', 'marketing ops and growth leaders at SaaS companies',
+    'potential customers for [your product]', 'potential angel investors'];
+  /** the New lens box is open while a lens is active (with no lens it is always shown) */
+  var composing = false;
+  function openNewLens(goal) {
+    if (!LIVE) return;
+    composing = true;
+    renderLensBar();
+    var inp = $('newLensGoal');
+    if (typeof goal === 'string') inp.value = goal;
+    inp.focus();
+    var m = /\[[^\]]*\]/.exec(inp.value);
+    if (m) inp.setSelectionRange(m.index, m.index + m[0].length);
+  }
+  function closeNewLens() { composing = false; renderLensBar(); }
   // ---------------------------------------------------------------- lens bar
   function renderLensBar() {
     var sel = $('lensSel');
     sel.textContent = '';
-    sel.appendChild(h('option', { value: '', text: 'No lens — explore everyone' }));
+    sel.appendChild(h('option', { value: '', text: lenses.length ? 'No lens — explore everyone' : 'No lens yet — explore everyone' }));
     lenses.forEach(function (l) {
       var bits = [l.goal], lc = lensCounts(l.id);
       bits.push(Math.max(lc.scored, Number(l.scored) || 0).toLocaleString() + ' scored');
@@ -1553,46 +1734,44 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       if (lc.unscored && lc.scored) bits.push(lc.unscored.toLocaleString() + ' new');
       sel.appendChild(h('option', { value: l.id, text: bits.join(' · ') }));
     });
+    if (LIVE) sel.appendChild(h('option', { value: '__new', text: '＋ New lens…' }));
     sel.value = ui.lens || '';
     sel.classList.toggle('active', !!ui.lens);
     var cur = lensById(ui.lens);
-    $('lensDel').hidden = !cur || !LIVE;
-    $('lensEdit').hidden = !cur || !LIVE;
-    $('lensEdit').disabled = !!lensJob;
+    if (!cur) composing = false;
+    var bar = $('lensbar');
+    bar.classList.toggle('composing', !!cur && composing);
+    $('newLensForm').classList.toggle('hidden', !LIVE || (!!cur && !composing));
+    $('newLensX').hidden = !cur || !composing;
+    $('lensMenuDd').hidden = !cur || !LIVE;
+    $('newLensOpen').hidden = !cur || !LIVE;
+    $('lensExport').hidden = !cur;
+    $('lensTabs').hidden = !cur;
+    $('lensThrBox').hidden = !cur;
     renderLensWs();
     var st = $('lensStale');
     var lcCur = cur ? lensCounts(cur.id) : { stale: 0, unscored: 0, needs: 0 };
     var nStale = lcCur.needs;
-    st.hidden = !cur || !nStale;
-    st.disabled = !LIVE || !!lensJob;
+    // hidden while any lens is scoring: the counts move under you and the server takes one lens job at a time
+    st.hidden = !cur || !nStale || !LIVE || !!lensJob;
     st.textContent = '↻ Update ' + nStale.toLocaleString() + (lcCur.unscored ? ' (stale + new)' : ' stale');
-    var all = $('lensAll');
-    all.hidden = !cur || !LIVE;
-    all.disabled = !!lensJob;
-    all.textContent = 'Re-score all ≈ ' + usd(lensCost(people.length, cur));
-    all.title = 'Re-score everyone in “' + (cur ? cur.goal : '') + '” with the current scoring rules (use after the rules improve, or for old headline-only scores)';
-    st.title = LIVE ? 'Re-score the ' + nStale + ' people who are new or whose info changed since they were scored (≈ ' + usd(lensCost(nStale, cur)) + ')' : 'Needs the live explorer';
+    st.title = 'Re-score the ' + nStale + ' people who are new or whose info changed since they were scored (' + onPlan(lensCost(nStale, cur)) + ')';
+    if ($('lensMenuDd').open) renderLensActions();
     var job = $('lensJob');
     job.textContent = '';
     if (lensJob) {
-      var jl = lensById(lensJob.lensId);
-      append(job, h('span', { class: 'jobchip', title: 'Lens scoring in progress' }, h('span', { class: 'spin', 'aria-hidden': 'true' }),
-        (lensJob.phase === 'rerank' ? 'Re-checking top' : 'Scoring') + ' “' + (jl ? jl.goal : lensJob.lensId) + '” ' +
-        (Number(lensJob.done) || 0).toLocaleString() + '/' + (Number(lensJob.total) || 0).toLocaleString()));
+      var jl = lensById(lensJob.lensId), here = cur && jl && jl.id === cur.id;
+      var jdone = (Number(lensJob.done) || 0).toLocaleString() + '/' + (Number(lensJob.total) || 0).toLocaleString();
+      append(job, h('span', { class: 'jobchip', title: (jl ? '“' + jl.goal + '”: ' : '') + (lensJob.phase === 'rerank'
+          ? 'the top scorers are re-checked by ' + modelName(jl && jl.rerankModel) + ' — some may move below the cut-off'
+          : 'everyone gets a first-pass score; people appear as they reach the cut-off') },
+        h('span', { class: 'spin', 'aria-hidden': 'true' }),
+        (lensJob.phase === 'rerank' ? 'Re-checking top ' : 'Scoring ') + (here ? '' : '“' + trunc(jl ? jl.goal : lensJob.lensId, 28) + '” ') + jdone));
     }
     paintNewLensEst();
-    var stx = $('lensStarters');
-    stx.hidden = lenses.length > 0 || !LIVE;
-    if (!stx.hidden && !stx.childNodes.length) {
-      append(stx, h('span', { text: 'Start with a lens:' }));
-      STARTER_LENSES.forEach(function (g) {
-        append(stx, h('button', { class: 'preset', type: 'button', text: g, title: 'Use this goal (you can edit it before scoring)',
-          on: { click: function () { $('newLensGoal').value = g; $('newLensGoal').focus(); } } }));
-      });
-    }
     $('newLensBtn').disabled = !LIVE || !!lensJob;
     $('newLensGoal').disabled = !LIVE;
-    $('newLensBtn').title = LIVE ? (lensJob ? 'Another lens is being scored — wait for it to finish' : '') : 'Creating lenses needs the live explorer';
+    $('newLensBtn').title = LIVE ? (lensJob ? 'Another lens is being scored — wait for it to finish' : 'Scores everyone for this goal (asks first, with the estimate)') : 'Creating lenses needs the live explorer';
     $('minScoreCtl').style.opacity = ui.lens ? '' : '.45';
     $('minScore').disabled = !ui.lens; $('minScoreRange').disabled = !ui.lens;
     if (mode !== 'accounts') {
@@ -1600,14 +1779,53 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       $('goal').title = cur ? cur.goal : 'Exploring everyone — pick or create a lens to score people for a goal';
     }
   }
-  /** first pass over n people + rerank of min(rerankTop, n) (lens = existing lens, or null for a new one: top 150) */
+  function trunc(t, n) { t = String(t || ''); return t.length > n ? t.slice(0, n - 1) + '…' : t; }
+  function modelName(m) { m = String(m || ''); return m ? m.charAt(0).toUpperCase() + m.slice(1) : 'a stronger model'; }
+  /** the "⋯" lens actions menu */
+  function renderLensActions() {
+    var pop = $('lensMenuPop'), cur = lensById(ui.lens);
+    pop.textContent = '';
+    if (!cur) return;
+    var close = function () { $('lensMenuDd').open = false; };
+    var top = lensTop(cur), busy = !!lensJob;
+    pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: trunc(cur.goal, 60) })));
+    pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: busy,
+      on: { click: function () { close(); editLens(); } } }, '✎ Edit the wording…', h('small', { text: busy ? 'Wait for the current scoring to finish' : 'Re-scores everyone; your adds, removes and cut-off are kept' })));
+    pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: busy,
+      on: { click: function () { close(); rescoreAll(); } } }, '↻ Re-score everyone',
+      h('small', { text: busy ? 'Wait for the current scoring to finish' : lensRange(people.length, cur) + ' · ' + (top ? 'top ' + top + ' re-checked by ' + modelName(cur.rerankModel) : 'no re-check') })));
+    pop.appendChild(h('button', { class: 'dd-action', type: 'button', on: { click: function () { close(); openNewLens(''); } } }, '＋ New lens…'));
+    pop.appendChild(h('div', { class: 'dd-sep' }));
+    pop.appendChild(h('button', { class: 'dd-action', type: 'button', style: 'color:var(--bad)', disabled: lensJob && lensJob.lensId === cur.id,
+      on: { click: function () { close(); deleteLens(); } } }, '🗑 Delete this lens', h('small', { text: 'Its scores only — people, profiles and lists stay' })));
+  }
+  /** rerank band: an existing lens keeps its own; a new one gets the server's (`--rerank-top`) */
+  function lensTop(lens) {
+    if (lens) return lens.rerankModel ? Math.max(0, Number(lens.rerankTop) || 0) : 0;
+    if (EST.lensRerankModel === '') return 0;
+    var t = Number(EST.lensRerankTop);
+    return isFinite(t) && EST.lensRerankTop !== undefined && EST.lensRerankTop !== null ? Math.max(0, t) : 150;
+  }
+  /** upper estimate: first pass over n people + re-check of min(rerank band, n) */
   function lensCost(n, lens) {
     n = Math.max(n, 1);
-    var top = lens ? (lens.rerankModel ? Number(lens.rerankTop) || 0 : 0) : 150;
-    return (Number(EST.lensUsdPer1000) || 0) * n / 1000 + (Number(EST.lensRerankUsdPer100) || 0) * Math.min(top, n) / 100;
+    return (Number(EST.lensUsdPer1000) || 0) * n / 1000 + (Number(EST.lensRerankUsdPer100) || 0) * Math.min(lensTop(lens), n) / 100;
+  }
+  /** a range: measured runs come in at about half the rounded-up per-call rates */
+  function lensRange(n, lens) {
+    var hi = lensCost(n, lens), a = usd(hi * 0.5), b = usd(hi);
+    return hi < 0.005 ? '< $0.01' : a === b ? '≈ ' + b : '≈ ' + a + '–' + b;
+  }
+  /** rough wall time: first pass in batches of 60, 8 at a time; re-check in batches of 25, 6 at a time */
+  function lensTime(n, lens) {
+    var top = Math.min(lensTop(lens), Math.max(n, 1));
+    var secs = 15 + Math.ceil(Math.ceil(Math.max(n, 1) / 60) / 8) * 25 + (top ? Math.ceil(Math.ceil(top / 25) / 6) * 35 : 0);
+    return secs <= 90 ? 'about a minute' : secs < 150 ? 'about 2 minutes' : 'about ' + Math.round(secs / 60) + ' minutes';
   }
   function paintNewLensEst() {
-    $('newLensEst').textContent = LIVE ? '≈ ' + usd(lensCost(people.length)) : '';
+    var e = $('newLensEst');
+    e.textContent = LIVE ? lensRange(people.length) + ' · ' + lensTime(people.length) : '';
+    e.title = PLAN_NOTE;
   }
   function setLens(id) {
     var changed = (id || '') !== ui.lens;
@@ -1642,14 +1860,16 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   function createLens(goal) {
     goal = String(goal || '').trim();
     if (!goal) { $('newLensGoal').focus(); return; }
-    var est = lensCost(people.length);
-    confirmDlg('Score your network for “' + goal + '”?',
-      'Every one of your ' + people.length.toLocaleString() + ' people gets a 0–100 score with a reason, using their headline, parsed profile and any web profile. ' +
-      'The top candidates are then re-checked by a stronger model. Estimated cost ≈ ' + usd(est) + ' (rough). Results stream in as they finish.',
-      'Score network').then(function (ok) {
+    var top = Math.min(lensTop(null), people.length);
+    confirmDlg('Create the lens “' + goal + '”?',
+      'Every one of your ' + people.length.toLocaleString() + ' people gets a 0–100 score with a reason, from their headline, parsed profile and any web profile' +
+      (top ? ', then the top ' + top.toLocaleString() + ' are re-checked by ' + modelName(EST.lensRerankModel || 'sonnet') : '') + '. ' +
+      'People scoring 70 or more are “In lens”; you can move the cut-off and add or remove people by hand. ' +
+      lensRange(people.length) + ' on your Claude plan · ' + lensTime(people.length) + '. People appear as they are scored.',
+      'Create lens').then(function (ok) {
       if (!ok) return;
       api('/api/lenses', { goal: goal }).then(function (res) {
-        if (res && res.lens) { upsertLens(res.lens); $('newLensGoal').value = ''; setLens(res.lens.id); }
+        if (res && res.lens) { upsertLens(res.lens); $('newLensGoal').value = ''; composing = false; setLens(res.lens.id); }
         var n = res && typeof res.scoring === 'number' ? res.scoring : people.length;
         if (res && res.existing) toast(n ? 'Lens “' + goal + '” already exists — updating ' + n.toLocaleString() + ' stale or new scores' : 'Lens “' + goal + '” already exists and is up to date', n ? 'good' : undefined);
         else toast('Scoring ' + n.toLocaleString() + ' people for “' + goal + '”', 'good');
@@ -1662,7 +1882,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var cur = lensById(ui.lens);
     if (!cur) return;
     var n = lensCounts(cur.id).needs;
-    confirmDlg('Update ' + n + ' scores?', 'Scores the people who are new to “' + cur.goal + '” or whose info changed since they were scored (≈ ' + usd(lensCost(n, cur)) + ').', 'Update').then(function (ok) {
+    confirmDlg('Update ' + n + ' scores?', 'Scores the people who are new to “' + cur.goal + '” or whose info changed since they were scored. ' + lensRange(n, cur) + ' on your Claude plan · ' + lensTime(n, cur) + '.', 'Update').then(function (ok) {
       if (!ok) return;
       api('/api/lenses/' + encodeURIComponent(cur.id) + '/refresh', {}).then(function (res) {
         if (res && res.lens) { upsertLens(res.lens); renderLensBar(); }
@@ -1673,9 +1893,11 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   function rescoreAll() {
     var cur = lensById(ui.lens);
     if (!cur) return;
-    var est = lensCost(people.length, cur);
+    var top = Math.min(lensTop(cur), people.length);
     confirmDlg('Re-score everyone for “' + cur.goal + '”?',
-      'All ' + people.length.toLocaleString() + ' people are scored again with the current rules (headline, parsed profile and any web profile), and the top candidates re-checked by the stronger model. Existing scores are replaced as results arrive. Estimated cost ≈ ' + usd(est) + ' (rough).',
+      'All ' + people.length.toLocaleString() + ' people are scored again with the current rules (headline, parsed profile and any web profile)' +
+      (top ? ', and the top ' + top.toLocaleString() + ' re-checked by ' + modelName(cur.rerankModel) : '') + '. Existing scores are replaced as results arrive; your adds, removes and cut-off stay. ' +
+      lensRange(people.length, cur) + ' on your Claude plan · ' + lensTime(people.length, cur) + '.',
       'Re-score all').then(function (ok) {
       if (!ok) return;
       api('/api/lenses/' + encodeURIComponent(cur.id) + '/refresh', { all: true }).then(function (res) {
@@ -1687,8 +1909,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   function editLens() {
     var cur = lensById(ui.lens);
     if (!cur) return;
-    var est = lensCost(people.length, cur);
-    promptDlg('Edit lens', 'Describe who belongs in this lens — be specific about roles, seniority and what makes someone a fit. Everyone is then re-scored for the new wording (≈ ' + usd(est) + '). Your manual adds/removes and threshold are kept.',
+    promptDlg('Edit lens', 'Describe who belongs in this lens — be specific about roles, seniority, location and what makes someone a fit. Everyone is then re-scored for the new wording (' + lensRange(people.length, cur) + ' on your Claude plan · ' + lensTime(people.length, cur) + '). Your adds, removes and cut-off are kept.',
       cur.goal, 'Save & re-score', 300).then(function (goal) {
       if (!goal || goal === cur.goal) return;
       api('/api/lenses/' + encodeURIComponent(cur.id), { goal: goal, rescore: true }, 'PUT').then(function (res) {
@@ -1805,7 +2026,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var done = sendPins(lensId, reqs);
     if (!quiet) {
       var n = moved || ids.length;
-      toast((wantIn ? 'Added ' : 'Removed ') + (n === 1 && ids.length === 1 ? (get(ids[0]) || {}).fullName || '1 person' : n.toLocaleString() + ' people') + (wantIn ? ' to “' : ' from “') + l.goal + '”', 'good', {
+      toast((wantIn ? 'Added ' : 'Removed ') + (n === 1 && ids.length === 1 ? (get(ids[0]) || {}).fullName || '1 person' : n.toLocaleString() + ' people') + (l.id === ui.lens ? '' : (wantIn ? ' to “' : ' from “') + trunc(l.goal, 40) + '”'), 'good', {
         label: 'Undo', fn: function () {
           var g = { 'in': [], out: [], '': [] };
           before.forEach(function (b) { g[b.pin].push(b.id); });
@@ -1851,33 +2072,45 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     }, function (e) { pinPending--; toast('Could not save the cut-off: ' + e.message, 'bad'); });
   }, 600);
 
+  /** score distribution of the active lens: 10 bins (0–9 … 90–100), people removed by hand left out */
+  function lensHistogram(l) {
+    var bins = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], thr = thrOf(l), near = 0, nearLo = Math.max(0, thr - 10);
+    for (var i = 0; i < people.length; i++) {
+      var p = people[i], sc = scoreOf(p, l.id);
+      if (!sc || pinOf(l, p.id) === 'out') continue;
+      var v = Number(sc.score) || 0;
+      bins[Math.min(9, Math.floor(v / 10))]++;
+      if (v >= nearLo && v < thr && !isMember(l, p)) near++;
+    }
+    return { bins: bins, near: near, nearLo: nearLo, thr: thr };
+  }
   function renderLensWs() {
     var cur = lensById(ui.lens);
-    $('lensWs').hidden = !cur;
     if (!cur) return;
     $('lvIn').textContent = lensTabCounts['in'].toLocaleString();
     $('lvOut').textContent = lensTabCounts.out.toLocaleString();
     $('lvRem').textContent = lensTabCounts.removed.toLocaleString();
-    var tabs = document.querySelectorAll('#lensWs [data-lv]');
+    var tabs = document.querySelectorAll('#lensTabs [data-lv]');
     for (var i = 0; i < tabs.length; i++) tabs[i].setAttribute('aria-pressed', tabs[i].getAttribute('data-lv') === ui.lensView ? 'true' : 'false');
     var t = thrOf(cur);
     if (document.activeElement !== $('lensThr')) $('lensThr').value = String(t);
     if (document.activeElement !== $('lensThrRange')) $('lensThrRange').value = String(t);
     $('lensThr').disabled = $('lensThrRange').disabled = !LIVE;
+    // mini histogram + near-miss hint, so people just under the cut-off are visible
+    var hs = lensHistogram(cur), max = Math.max.apply(null, hs.bins) || 1, hist = $('lensHist');
+    hist.textContent = '';
+    hs.bins.forEach(function (n, b) {
+      var lo = b * 10;
+      append(hist, h('i', { class: lo >= t ? 'on' : lo + 10 > hs.nearLo && lo < t ? 'near' : '', style: 'height:' + (n ? 3 + Math.round(19 * Math.sqrt(n / max)) : 1) + 'px' }));
+    });
+    hist.title = 'How everyone scored, 0 → 100: ' + hs.bins.map(function (n, b) { return (b * 10) + (b === 9 ? '–100' : '–' + (b * 10 + 9)) + ': ' + n; }).join(' · ');
+    var hint = $('lensThrHint');
+    hint.textContent = '';
     var pi = (cur.pinnedIn || []).length;
-    $('lensThrHint').textContent = pi ? '+ ' + pi + ' added by hand' : '';
-    var n = view.length, b = $('lensBulk');
-    var kind = ui.lensView === 'in' ? 'rm' : ui.lensView === 'removed' ? 'restore' : ui.lensView === 'out' ? 'add' : '';
-    b.hidden = !kind || !LIVE;
-    b.disabled = !n;
-    b.textContent = kind === 'rm' ? '✕ Remove these ' + n.toLocaleString() : kind === 'restore' ? '↺ Restore these ' + n.toLocaleString() : '＋ Add these ' + n.toLocaleString();
-    b.title = (kind === 'rm' ? 'Remove every person shown (all pages) from' : 'Add every person shown (all pages) to') + ' “' + cur.goal + '” — filter first to target a group';
-    b.className = 'btn sm' + (kind === 'rm' ? ' danger' : '');
-    var dz = $('lensBulkDismiss');
-    dz.hidden = kind !== 'add' || !LIVE;
-    dz.disabled = !n;
-    dz.textContent = '✕ Remove these ' + n.toLocaleString();
-    dz.title = 'Dismiss every candidate shown (all pages): they move to “Removed” and stay out even if their score rises';
+    if (hs.near) append(hint, h('button', { class: 'nearbtn', type: 'button', text: hs.near.toLocaleString() + ' at ' + hs.nearLo + '–' + (t - 1),
+      title: hs.near + ' people scored ' + hs.nearLo + '–' + (t - 1) + ', just below the cut-off. Show them on the Candidates tab (highest first) to add the good ones.',
+      on: { click: function () { ui.sortKey = 'score'; ui.sortDir = -1; setLensView('out'); } } }));
+    $('lensTabs').querySelector('[data-lv="in"]').title = 'People in this lens: at or above the cut-off' + (pi ? ', plus ' + pi + ' added by hand' : '') + ' (on a focused row: r removes, a adds)';
     $('lensExport').textContent = '⬇ Export lens (' + memberCount(cur).toLocaleString() + ')';
   }
   function lensBulk(e, forceOut) {
@@ -1897,7 +2130,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var out = [];
     function add(label, clear) { out.push({ label: label, clear: clear }); }
     if (ui.q.trim()) add('Search: ' + ui.q.trim(), function () { ui.q = ''; });
-    if (ui.lens && ui.minScore > 0) add('Showing score ≥ ' + ui.minScore, function () { ui.minScore = 0; });
+    if (ui.lens && ui.minScore > 0) add('Min score ' + ui.minScore + ' (view only)', function () { ui.minScore = 0; });
     ui.sen.forEach(function (v) { add('Seniority: ' + v, function () { ui.sen = ui.sen.filter(function (x) { return x !== v; }); }); });
     ui.fn.forEach(function (v) { add('Function: ' + v, function () { ui.fn = ui.fn.filter(function (x) { return x !== v; }); }); });
     ui.tags.forEach(function (v) { add('Tag: ' + v, function () { ui.tags = ui.tags.filter(function (x) { return x !== v; }); }); });
@@ -1911,17 +2144,33 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var CRMF = { unchecked: 'Not checked in Ahoy', in_crm: 'Already in Ahoy', 'new': 'New to Ahoy', ambiguous: 'Ahoy: needs a pick', error: 'Ahoy check failed', sent: 'Sent to Ahoy', unsent: 'Not sent to Ahoy' };
     if (ui.crmf && ui.crmf !== 'any') add(CRMF[ui.crmf] || ui.crmf, function () { ui.crmf = 'any'; });
     if (ui.from || ui.to) add('Connected ' + (ui.from || '…') + ' – ' + (ui.to || '…'), function () { ui.from = ''; ui.to = ''; });
-    if (ui.show === 'sel') add('Selected only', function () { ui.show = 'all'; });
-    if (ui.show === 'unsel') add('Not selected only', function () { ui.show = 'all'; });
+    if (ui.show === 'sel') { add('Selected only', function () { ui.show = 'all'; }); out[out.length - 1].kind = 'show'; }
+    if (ui.show === 'unsel') { add('Not selected only', function () { ui.show = 'all'; }); out[out.length - 1].kind = 'show'; }
     return out;
   }
-  function afterFilterEdit() { syncControls(); renderFilterMenus(); renderPresets(); page = 0; savePrefs(); refresh(); }
+  function afterFilterEdit() { syncControls(); renderFilterMenus(); page = 0; savePrefs(); refresh(); }
+  /** a search that reads like a question ("marketing leaders in Ireland") or finds little → offer a lens for it */
+  function lensOfferFor(q) {
+    q = String(q || '').trim();
+    if (!LIVE || !q || q.length < 3) return null;
+    var words = parseQuery(q).length;
+    if (words < 3 && view.length >= 5) return null;
+    if (lenses.some(function (l) { return l.goal.trim().toLowerCase() === q.toLowerCase(); })) return null;
+    return h('span', { class: 'offer' },
+      view.length ? h('span', { text: 'Looking for a kind of person?' }) : null,
+      h('button', { class: 'btn sm primary', type: 'button', disabled: !!lensJob, title: lensJob ? 'Another lens is being scored — wait for it to finish' : PLAN_NOTE,
+        text: 'Score everyone for “' + trunc(q, 48) + '” as a lens (' + lensRange(people.length) + ', ' + lensTime(people.length) + ') →',
+        on: { click: function () { $('newLensGoal').value = q; createLens(q); } } }));
+  }
+  var CITY_EG = { ireland: 'Dublin, Cork, Galway…', irish: 'Dublin, Cork, Galway…', uk: 'London, Manchester…', 'united kingdom': 'London, Manchester…', england: 'London, Leeds…',
+    usa: 'New York, Boston…', us: 'New York, Boston…', 'united states': 'New York, Boston…', germany: 'Berlin, Munich…', france: 'Paris, Lyon…' };
+  var REGION_WORDS = /^(ireland|irish|uk|united kingdom|britain|england|scotland|wales|usa|us|united states|america|europe|emea|germany|france|spain|italy|netherlands|nordics|apac|asia|australia|canada|india|dach|benelux|latam)$/i;
   function renderResultsBar() {
     var box = $('resultsBar');
     box.textContent = '';
     var cur = lensById(ui.lens);
     var one = view.length === 1, lv = cur ? ui.lensView : 'all';
-    var ctx = lv === 'in' ? (one ? 'person' : 'people') + ' in this lens' : lv === 'out' ? (one ? 'candidate' : 'candidates') + ' not in this lens'
+    var ctx = lv === 'in' ? (one ? 'person' : 'people') + ' in this lens' : lv === 'out' ? (one ? 'candidate' : 'candidates') + ' below the cut-off'
       : lv === 'removed' ? (one ? 'person' : 'people') + ' removed from this lens' : (one ? 'person' : 'people');
     append(box, [h('span', { class: 'big', text: view.length.toLocaleString() }), ' ' + ctx]);
     if (view.length !== people.length) append(box, h('span', { text: '· of ' + people.length.toLocaleString() }));
@@ -1930,7 +2179,19 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       append(box, h('span', { class: 'fchip' }, f.label,
         h('button', { type: 'button', title: 'Clear this filter', 'aria-label': 'Clear ' + f.label, text: '×', on: { click: function () { f.clear(); afterFilterEdit(); } } })));
     });
-    if (af.length > 1) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: 'Clear all', on: { click: function () { $('reset').click(); } } }));
+    if (af.length) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: af.length > 1 ? 'Clear all' : 'Clear', on: { click: function () { $('reset').click(); } } }));
+    // bulk lens edits for the people shown: only once a search/filter narrows the view (never "remove all 235" by accident)
+    var narrowed = af.some(function (f) { return f.kind !== 'show'; });
+    if (cur && LIVE && narrowed && view.length && lv !== 'all') {
+      var kind = lv === 'in' ? 'rm' : lv === 'removed' ? 'restore' : 'add';
+      append(box, h('button', { class: 'btn sm' + (kind === 'rm' ? ' danger' : ''), type: 'button',
+        text: kind === 'rm' ? '✕ Remove these ' + view.length.toLocaleString() : kind === 'restore' ? '↺ Restore these ' + view.length.toLocaleString() : '＋ Add these ' + view.length.toLocaleString(),
+        title: (kind === 'rm' ? 'Remove every person shown (all pages) from' : 'Add every person shown (all pages) to') + ' “' + cur.goal + '”',
+        on: { click: function (e) { lensBulk(e); } } }));
+      if (kind === 'add') append(box, h('button', { class: 'btn sm ghost danger', type: 'button', text: '✕ Dismiss these ' + view.length.toLocaleString(),
+        title: 'Dismiss every candidate shown (all pages): they move to “Removed” and stay out even if their score rises',
+        on: { click: function (e) { lensBulk(e, true); } } }));
+    }
     append(box, h('span', { style: 'flex:1' }));
     var inSel = 0;
     for (var i = 0; i < view.length; i++) if (selected.has(view[i])) inSel++;
@@ -1938,6 +2199,12 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     if (view.length && inSel < view.length) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: 'Select these ' + view.length.toLocaleString(),
       on: { click: function () { $('addFiltered').click(); } } }));
     if (inSel) append(box, h('button', { class: 'btn sm ghost', type: 'button', text: 'Deselect these', on: { click: function () { $('removeFiltered').click(); } } }));
+    // hints that connect search to lenses (only when there are results — the empty state has its own)
+    if (view.length && ui.q.trim()) { var off = lensOfferFor(ui.q); if (off) append(box, h('div', { class: 'hintline' }, off)); }
+    if (ui.loc) {
+      append(box, h('div', { class: 'hintline' }, 'Location matches the text people wrote', REGION_WORDS.test(ui.loc.trim())
+        ? [' — “' + ui.loc + '” won’t find people who only wrote a city (', h('b', { text: CITY_EG[ui.loc.trim().toLowerCase()] || 'e.g. a city name' }), '). For a whole region, create a lens such as “… based in ' + ui.loc + '”.'] : '.'));
+    }
   }
 
   // ---------------------------------------------------------------- Ahoy CRM
@@ -1992,12 +2259,13 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       api('/api/ahoy/check', { ids: ids }).then(function (res) {
         if (res && res.queue) applyQueue(res.queue, true);
         renderStats();
-        toast('Checking ' + ids.length.toLocaleString() + ' ' + (ids.length === 1 ? 'person' : 'people') + ' against Ahoy (read-only)…', 'good');
+        markGs('out');
+        toast('Checking ' + ids.length.toLocaleString() + ' in Ahoy (read-only)…', 'good');
       }).catch(function (e) { toast(/409/.test(e.message) || /already/.test(e.message) ? 'An Ahoy check or send is already running.' : 'Ahoy check failed: ' + e.message, 'bad'); });
     };
     if (ids.length <= 10) return go();
     confirmDlg('Check ' + ids.length.toLocaleString() + ' people against Ahoy?',
-      'Read-only: each person is looked up in your Ahoy CRM (contact by LinkedIn URL / email / name, company by name, plus its domain), through your Ahoy connector in Claude Code. Nothing is changed in Ahoy. Estimated ≈ ' + usd(est) + '.',
+      'Read-only: each person is looked up in your Ahoy CRM (contact by LinkedIn URL / email / name, company by name, plus its domain), through your Ahoy connector in Claude Code. Nothing is changed in Ahoy. ' + onPlan(est) + '.',
       'Check').then(function (ok) { if (ok) go(); });
   }
   function ahoyResolve(id, contactId) {
@@ -2020,7 +2288,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
         ', link ' + sm.linkedCompanies + ' contact' + (sm.linkedCompanies === 1 ? '' : 's') + ' to their company, and add ' + sm.notes + ' note' + (sm.notes === 1 ? '' : 's') +
         (lens ? ' with the “' + lens.goal + '” fit and research' : ' with their research') + '. ' +
         (sm.existingContacts ? sm.existingContacts + ' already in Ahoy only get a note. ' : '') +
-        (skipTxt ? 'Skipped: ' + skipTxt + '. ' : '') + 'Estimated ≈ ' + usd(n * (Number(EST.ahoySendUsdPerProposal) || 0.02)) + '.',
+        (skipTxt ? 'Skipped: ' + skipTxt + '. ' : '') + onPlan(n * (Number(EST.ahoySendUsdPerProposal) || 0.02)) + '.',
         'Send ' + n + ' proposal' + (n > 1 ? 's' : '')).then(function (ok) {
         if (!ok) return;
         api('/api/ahoy/send', { ids: ids, lensId: lens ? lens.id : undefined }).then(function (r) {
@@ -2031,32 +2299,40 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       });
     }).catch(function (e) { toast('Could not plan the send: ' + e.message, 'bad'); });
   }
+  /** Ahoy ▾ in the selection bar: two labelled steps. Disabled items say why. */
   function renderAhoyMenu() {
     var pop = $('ahoySelPop');
     pop.textContent = '';
     var ids = Array.from(selected).filter(function (id) { return byId.has(id); });
-    var unchecked = 0, ready = 0, amb = 0, sent = 0;
+    var unchecked = 0, ready = 0, amb = 0, sent = 0, failed = 0;
     ids.forEach(function (id) {
       var c = get(id).crm;
       if (!c) unchecked++;
       else if (c.sent) sent++;
       else if (c.status === 'ambiguous') amb++;
       else if (c.status === 'in_crm' || c.status === 'new') ready++;
+      else failed++;
     });
     var close = function () { $('ahoySelDd').open = false; };
+    var perCheck = Number(EST.ahoyCheckUsdPerPerson) || 0.005;
+    var busy = ahoyJob ? 'An Ahoy ' + (ahoyJob.kind === 'send' ? 'send' : 'check') + ' is running — wait for it to finish' : '';
     pop.appendChild(h('div', { class: 'dd-head' }, h('span', { text: 'Ahoy CRM · ' + ids.length.toLocaleString() + ' selected' })));
     pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: !LIVE || !ids.length || !!ahoyJob,
-      text: (unchecked ? 'Check ' + ids.length.toLocaleString() : 'Re-check ' + ids.length.toLocaleString()) + ' in Ahoy (read-only)',
-      on: { click: function () { close(); scopeToShown(ids, 'Check').then(function (r) { if (r && r.length) ahoyCheck(r); }); } } }));
+      on: { click: function () { close(); scopeToShown(ids, 'Check').then(function (r) { if (r && r.length) ahoyCheck(r); }); } } },
+      h('span', { class: 'step', text: '1' }), (unchecked ? 'Check ' : 'Re-check ') + ids.length.toLocaleString() + ' in Ahoy',
+      h('small', { text: busy || ('Read-only: finds who is already in your CRM · ' + onPlan(perCheck * ids.length) + (unchecked && unchecked < ids.length ? ' · ' + unchecked + ' not checked yet' : '')) })));
+    var why = !LIVE ? 'Needs the live explorer' : busy ? busy : ready ? 'Creates proposals; nothing changes until you approve them in Ahoy'
+      : unchecked === ids.length ? 'Check them first (step 1) — sending needs a check'
+      : amb ? amb + ' need a pick first: open the row and choose the matching contact'
+      : sent ? 'Already sent' : failed ? 'The check failed for these — re-check them' : 'Check them first (step 1)';
     pop.appendChild(h('button', { class: 'dd-action', type: 'button', disabled: !LIVE || !ready || !!ahoyJob,
-      text: 'Send ' + ready.toLocaleString() + ' to Ahoy as proposal…',
-      title: 'You approve proposals in the Ahoy app before anything is created',
-      on: { click: function () { close(); scopeToShown(ids, 'Send').then(function (r) { if (r && r.length) ahoySend(r); }); } } }));
+      on: { click: function () { close(); scopeToShown(ids, 'Send').then(function (r) { if (r && r.length) ahoySend(r); }); } } },
+      h('span', { class: 'step', text: '2' }), 'Send ' + (ready ? ready.toLocaleString() + ' ' : '') + 'as a proposal…', h('small', { text: why })));
     var bits = [];
-    if (unchecked) bits.push(unchecked + ' not checked');
-    if (amb) bits.push(amb + ' need a pick (open the row)');
+    if (amb && ready) bits.push(amb + ' need a pick (open the row)');
     if (sent) bits.push(sent + ' already sent');
-    if (bits.length) pop.appendChild(h('div', { class: 'dd-note', text: bits.join(' · ') }));
+    bits.push('Uses the Ahoy connector in your Claude Code. Prefer files? Export → “Ahoy CRM import”.');
+    pop.appendChild(h('div', { class: 'dd-note', text: bits.join(' · ') }));
   }
 
   // ---------------------------------------------------------------- rows
@@ -2080,14 +2356,14 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   }
 
   function queueBtn(p, depth, label, force, cls) {
-    var est = depth === 'deep' ? EST.deepUsd : EST.lightUsd;
+    var est = depth === 'deep' ? perDeep() : perLight();
     return h('button', { class: 'btn sm' + (cls ? ' ' + cls : ''), type: 'button', disabled: !LIVE,
-      title: LIVE ? (depth === 'deep' ? 'Deep web profile: career, investments, boards, sources (≈ ' + usd(est) + ')' : 'Light web profile: 1–2 searches (≈ ' + usd(est) + ')') : 'Needs the live explorer',
+      title: LIVE ? (depth === 'deep' ? 'Deep web profile: career, recent activity, boards, sources (' + onPlan(est) + ')' : 'Light web profile: 1–2 web searches (' + onPlan(est) + ')') : 'Needs the live explorer',
       text: label,
       on: { click: function (e) {
         e.stopPropagation();
         if (force) {
-          confirmDlg('Re-run ' + depth + ' profile?', 'Builds a fresh ' + depth + ' web profile for ' + (p.fullName || 'this person') + ' (≈ ' + usd(est) + '). The previous one is kept in history.', 'Re-run')
+          confirmDlg('Re-run ' + depth + ' profile?', 'Builds a fresh ' + depth + ' web profile for ' + (p.fullName || 'this person') + ' (' + onPlan(est) + '). The previous one is kept in history.', 'Re-run')
             .then(function (ok) { if (ok) queueDossiers([p.id], depth, true); });
         } else queueDossiers([p.id], depth, false);
       } } });
@@ -2100,9 +2376,9 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
         on: { click: function (e) { e.stopPropagation(); cancel([p.id]); } } });
     }
     var dp = depthOf(p);
-    if (dp === 'none') return [queueBtn(p, 'light', 'Profile'), ' ', queueBtn(p, 'deep', 'Deep', false, 'ghost')];
-    if (dp === 'light') return queueBtn(p, 'deep', 'Deep', false, 'ghost');
-    return queueBtn(p, 'deep', '↻', true, 'ghost');
+    if (dp === 'none') return [queueBtn(p, 'light', 'Light profile · ' + usd(perLight())), ' ', queueBtn(p, 'deep', 'Deep profile · ' + usd(perDeep()), false, 'ghost')];
+    if (dp === 'light') return queueBtn(p, 'deep', 'Deep profile · ' + usd(perDeep()), false, 'ghost');
+    return queueBtn(p, 'deep', '↻ Re-run deep profile', true, 'ghost');
   }
 
   function tagChips(p) {
@@ -2131,8 +2407,9 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       case 'score': {
         var sc = scoreOf(p, ui.lens), cl = lensById(ui.lens);
         var pc = cl ? pinChip(cl, p) : null;
-        if (!sc) return h('td', { class: 'num' }, scorePill(undefined), pc);
-        return h('td', { class: 'num', title: (sc.reason || '') }, scorePill(Number(sc.score)), basisChip(sc.basis), sc.stale ? staleChip() : null, pc);
+        if (!sc) return h('td', { class: 'num scorecell' }, scorePill(undefined), pc ? h('span', { class: 'chipline' }, pc) : null);
+        return h('td', { class: 'num scorecell', title: reasonText(sc.reason) }, pc, scorePill(Number(sc.score)),
+          h('span', { class: 'chipline' }, basisChip(sc.basis), sc.stale ? staleChip() : null));
       }
       case 'name': {
         var url = safeUrl(p.url);
@@ -2141,9 +2418,10 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
           url ? h('span', { class: 'li', 'aria-hidden': 'true', text: 'in' }) : null);
       }
       case 'title': {
-        var co = ui.hidden.indexOf('company') >= 0 ? companyOf(p) : '';
+        var co = hiddenCols().indexOf('company') >= 0 ? companyOf(p) : '';
         var tt = (p.title || '') + (co ? ' @ ' + co : '');
-        return h('td', { class: 'title', title: tt }, p.title || '', co ? h('span', { class: 'co', text: (p.title ? ' @ ' : '') + co }) : null);
+        var inner = [p.title || '', co ? h('span', { class: 'co', text: (p.title ? ' @ ' : '') + co }) : null];
+        return h('td', { class: 'title', title: tt }, h('span', { class: 'clamp' }, inner));
       }
       case 'company': return h('td', { class: 'co-cell', title: companyOf(p) }, dash(companyOf(p)));
       case 'seniority': return h('td', { class: 'small' }, dash(pr && pr.seniority && pr.seniority !== 'unknown' ? pr.seniority : ''));
@@ -2151,7 +2429,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       case 'tags': return h('td', { class: 'tags', title: tagsOf(p).join(', ') }, tagChips(p));
       case 'location': return h('td', { class: 'loc', title: locationOf(p) }, dash(locationOf(p)));
       case 'connected': return h('td', { class: 'date', text: p.connectedOn || '' });
-      case 'reason': { var s2 = scoreOf(p, ui.lens); return h('td', { class: 'why', title: s2 ? s2.reason || '' : '', text: s2 ? s2.reason || '' : '' }); }
+      case 'reason': { var s2 = scoreOf(p, ui.lens), rt = s2 ? reasonText(s2.reason) : ''; return h('td', { class: 'why', title: rt }, h('span', { class: 'clamp', text: rt })); }
       case 'profile': return h('td', null, profileCell(p));
       case 'crm': return h('td', { class: 'crmcell' }, crmChip(p));
       case 'act': {
@@ -2159,7 +2437,10 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
           ? h('button', { class: 'rm', type: 'button', title: 'Remove from selection (x)', 'aria-label': 'Remove ' + (p.fullName || 'row') + ' from selection', text: '✕',
             on: { click: function (e) { e.stopPropagation(); toggleSelect(p.id, false, false); } } })
           : null;
-        return h('td', { class: 'act' }, rm, actionCell(p));
+        // paid Light/Deep buttons live in the expanded row and the Research ▾ menu, not in every row
+        var job = jobOf(p);
+        return h('td', { class: 'act' }, rm, job === 'queued' ? h('button', { class: 'btn sm danger', type: 'button', disabled: !LIVE, text: 'Cancel', title: 'Cancel the queued web profile',
+          on: { click: function (e) { e.stopPropagation(); cancel([p.id]); } } }) : null);
       }
     }
     return h('td');
@@ -2271,6 +2552,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       append(left, sec('Notable', list(d.notable)));
       append(left, sec('Education', list(d.education)));
       append(left, sec('Public presence', list(d.publicPresence)));
+      if (LIVE && !jobOf(p)) append(left, h('div', { style: 'margin-top:12px;display:flex;gap:6px' }, actionCell(p)));
       var ln = legacyNotes(p);
       if (ln) {
         var lgoal = ln.goal || ln.prompt || '';
@@ -2286,9 +2568,9 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       var job = jobOf(p);
       append(left, h('p', { class: 'empty-detail', text: job
         ? 'A web profile is ' + job + ' for this person…'
-        : LIVE ? 'No web profile yet. “Profile” runs 1–2 quick searches (≈ ' + usd(EST.lightUsd) + '); “Deep” builds a full profile with career, investments and boards (≈ ' + usd(EST.deepUsd) + ').'
+        : LIVE ? 'No web profile yet. A light profile runs 1–2 quick web searches (≈ ' + usd(perLight()) + '); a deep profile builds a full one with career, recent activity and boards (≈ ' + usd(perDeep()) + '). Both run on your Claude plan, make this person’s lens scores more accurate and add detail to exports.'
           : 'No web profile yet. Open the live explorer (network-builder) to build one.' }));
-      if (LIVE && !job) append(left, h('div', { style: 'margin-top:10px;display:flex;gap:6px' }, actionCell(p)));
+      if (LIVE && !job) append(left, h('div', { style: 'margin:10px 0 16px;display:flex;gap:6px;flex-wrap:wrap' }, actionCell(p)));
     }
 
     // scores across all lenses
@@ -2299,7 +2581,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
         tb.appendChild(h('tr', { class: l.id === ui.lens ? 'cur' : '' },
           h('td', { class: 'g', title: l.goal }, memBtn(l, p), l.goal),
           h('td', { class: 'num' }, scorePill(sc ? Number(sc.score) : undefined), sc ? basisChip(sc.basis) : null, sc && sc.stale ? staleChip() : null),
-          h('td', { class: 'r', text: sc ? sc.reason || '' : 'not scored' })));
+          h('td', { class: 'r', text: sc ? reasonText(sc.reason) : 'not scored' })));
       });
       append(left, sec('Lens scores', tb));
     }
@@ -2347,6 +2629,45 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     return tr;
   }
 
+  /** What the empty table says: import help, scoring progress, a lens offer for question-like searches, or how to widen. */
+  function renderEmpty() {
+    var box = $('empty');
+    box.textContent = '';
+    var cur = lensById(ui.lens);
+    if (!people.length) {
+      append(box, [h('h3', { text: 'No connections yet' }),
+        h('p', { text: 'Import your LinkedIn connections to start. Two ways to get the file:' }),
+        h('ol', null,
+          h('li', null, 'LinkedIn → Settings → Data privacy → ', h('b', { text: 'Get a copy of your data' }), ' → Connections (arrives by email, usually within minutes).'),
+          h('li', null, 'Or the LinkedIn connections exporter Chrome extension, which saves a CSV straight away.')),
+        h('p', null, 'Then run ', h('code', { class: 'kbd', text: 'network-builder import <file.csv>' }), ' — or File → Import in the Network Builder app — and reload this page.')]);
+      return;
+    }
+    if (cur && lensJob && lensJob.lensId === cur.id && ui.lensView === 'in') {
+      append(box, [h('h3', null, h('span', { class: 'spin', 'aria-hidden': 'true' }),
+        (lensJob.phase === 'rerank' ? 'Re-checking the top ' : 'Scoring ') + (Number(lensJob.done) || 0).toLocaleString() + ' / ' + (Number(lensJob.total) || 0).toLocaleString() + '…'),
+        h('p', { text: 'People appear here as they reach the cut-off (' + thrOf(cur) + '+). Everyone else lands in Candidates.' })]);
+      return;
+    }
+    var q = ui.q.trim(), af = activeFilters();
+    if (q) {
+      append(box, [h('h3', { text: 'No one matches “' + q + '”' }),
+        h('p', { text: 'Search finds the words people wrote in their name, title, company and web profile — it can’t tell that Cork is in Ireland or that a CMO leads marketing. A lens can.' })]);
+      var off = lensOfferFor(q);
+      append(box, h('div', { class: 'row-btns' }, off, h('button', { class: 'btn sm', type: 'button', text: 'Clear search', on: { click: function () { ui.q = ''; afterFilterEdit(); } } })));
+      return;
+    }
+    if (cur && ui.lensView === 'in' && !af.length) {
+      var hs = lensHistogram(cur);
+      append(box, [h('h3', { text: 'Nobody has reached the cut-off (' + thrOf(cur) + ') yet' }),
+        h('p', { text: hs.near ? hs.near + ' people scored ' + hs.nearLo + '–' + (thrOf(cur) - 1) + '. Lower the cut-off, or add the good ones from Candidates.' : 'Lower the cut-off, or add people by hand from Candidates.' }),
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn sm primary', type: 'button', text: 'Show candidates', on: { click: function () { setLensView('out'); } } }))]);
+      return;
+    }
+    append(box, [h('h3', { text: 'No people match these filters' }),
+      af.length ? h('div', { class: 'row-btns' }, h('button', { class: 'btn sm', type: 'button', text: 'Clear filters', on: { click: function () { $('reset').click(); } } })) : null]);
+  }
+
   function pageSlice() {
     var ps = ui.pageSize;
     if (!ps) return { start: 0, end: view.length };
@@ -2367,6 +2688,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     tbody.textContent = '';
     tbody.appendChild(frag);
     $('empty').hidden = view.length > 0;
+    if (!view.length) renderEmpty();
     $('pageInfo').textContent = view.length
       ? (sl.start + 1).toLocaleString() + '–' + sl.end.toLocaleString() + ' of ' + view.length.toLocaleString() +
         (view.length !== people.length ? ' (filtered from ' + people.length.toLocaleString() + ')' : '') + hiddenSelNote()
@@ -2529,6 +2851,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var st = selectionStats();
     var bar = $('selbar');
     bar.classList.toggle('show', st.ids.length > 0);
+    document.body.classList.toggle('has-selbar', st.ids.length > 0 && mode !== 'accounts');
     var shownSet = new Set(view), hiddenSel = 0;
     st.ids.forEach(function (id) { if (!shownSet.has(id)) hiddenSel++; });
     var sc = $('selCount');
@@ -2538,11 +2861,15 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       ' · ' + hiddenSel.toLocaleString() + ' not shown ',
       h('button', { class: 'btn sm ghost', type: 'button', text: 'Keep only shown', on: { click: keepOnlyShown } })));
     var cur = currentList();
-    $('saveListSel').textContent = cur && LIVE ? 'Update “' + cur.name + '”' : 'Save as list';
+    // "Save as list" always makes a new list; updating the loaded list is its own button (never a silent overwrite)
+    $('saveListSel').textContent = 'Save as list';
     $('saveListSel').disabled = !LIVE;
-    $('saveListSel').title = LIVE ? (cur ? 'Overwrite the saved list “' + cur.name + '” with this selection (shift-click: save as a new list)' : 'Save this selection as a named list') : 'Saving lists needs the live explorer';
+    $('saveListSel').title = LIVE ? 'Save this selection as a new named list' : 'Saving lists needs the live explorer';
+    var upd = $('updListSel');
+    upd.hidden = !(cur && LIVE);
+    if (cur) { upd.textContent = '↻ Update “' + trunc(cur.name, 22) + '”'; upd.title = 'Overwrite the saved list “' + cur.name + '” with these ' + st.ids.length + ' people'; }
     $('lensSelDd').hidden = $('lensSelSep').hidden = !lenses.length;
-    $('lensSelBtn').textContent = ui.lens ? 'Other lenses ▾' : 'Add to lens ▾';
+    $('lensSelBtn').textContent = ui.lens ? 'Lenses ▾' : 'Add to lens ▾';
     $('lensSelBtn').title = 'Add the selected people to any lens, or remove them from one';
     // the active lens gets direct buttons, so removing selected people is one click
     var curLens = ui.lens ? lensById(ui.lens) : null, sm = curLens ? lensSelSplit(curLens) : null;
@@ -2551,29 +2878,34 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     addB.hidden = !sm || !sm.canAdd.length;
     if (sm) {
       rmB.disabled = addB.disabled = !LIVE;
-      rmB.textContent = '✕ Remove ' + sm.canRemove.length.toLocaleString() + ' from lens';
+      rmB.textContent = '✕ Remove ' + sm.canRemove.length.toLocaleString();
       rmB.title = 'Remove the selected people from “' + curLens.goal + '” — they move to Removed and stay out';
       addB.textContent = '＋ Add ' + sm.canAdd.length.toLocaleString() + ' to lens';
+      rmB.textContent += sm.canAdd.length ? '' : ' from lens';
       addB.title = 'Add the selected people to “' + curLens.goal + '” — they stay in whatever their score';
     }
     if ($('lensSelDd').open) renderLensMenu();
     if ($('ahoySelDd').open) renderAhoyMenu();
     if ($('acctSelDd').open) renderAcctMenu();
-    $('viewSel').textContent = ui.show === 'sel' ? 'Show all' : 'Review';
+    $('viewSel').textContent = ui.show === 'sel' ? 'Show all' : 'Show selected';
     $('viewSel').title = ui.show === 'sel' ? 'Back to all rows' : 'Show only the selected people';
     $('selEst').textContent = st.light.length || st.deep.length
-      ? (st.light.length ? st.light.length + ' without a profile' : 'all have a profile') + (st.deep.length ? ' · ' + st.deep.length + ' not deep' : '')
-      : 'all deep-profiled';
+      ? (st.light.length ? st.light.length + ' without a web profile' : 'all have a web profile') + (st.deep.length ? ' · ' + st.deep.length + ' not deep' : '')
+      : 'all have a deep profile';
     var lb = $('lightSel');
     lb.disabled = !LIVE || !st.light.length;
-    lb.textContent = st.light.length ? 'Build light profiles (' + st.light.length + ') ≈ ' + usd(st.light.length * EST.lightUsd) : 'Build light profiles';
-    lb.title = LIVE ? 'Quick web lookup (1–2 searches each) for selected people without a web profile' : 'Needs the live explorer';
+    lb.textContent = '';
+    append(lb, ['Light profiles' + (st.light.length ? ' for ' + st.light.length : ''), h('small', { text: st.light.length ? '1–2 web searches each · ' + onPlan(st.light.length * perLight()) : 'Everyone selected already has one' })]);
+    lb.title = LIVE ? 'Quick web lookup for selected people without a web profile (asks first for more than 10)' : 'Needs the live explorer';
     var db = $('deepSel');
     db.disabled = !LIVE || !st.deep.length;
-    db.textContent = st.deep.length ? 'Deep profile (' + st.deep.length + ') ≈ ' + usd(st.deep.length * EST.deepUsd) : 'Deep profile';
-    db.title = LIVE ? 'Full web profile (career, investments, boards, sources) for selected people without a deep profile' : 'Needs the live explorer';
-    $('cancelQueued').disabled = !LIVE || qmap.size === 0;
-    $('cancelQueued').textContent = st.queuedSel.length ? 'Cancel ' + st.queuedSel.length + ' queued' : 'Cancel all queued';
+    db.textContent = '';
+    append(db, ['Deep profiles' + (st.deep.length ? ' for ' + st.deep.length : ''), h('small', { text: st.deep.length ? 'Career, recent activity, boards, sources · ' + onPlan(st.deep.length * perDeep()) : 'Everyone selected already has one' })]);
+    db.title = LIVE ? 'Full web profile for selected people without a deep profile (asks first for more than 10)' : 'Needs the live explorer';
+    $('cancelQueued').hidden = !LIVE || qmap.size === 0;
+    $('cancelQueued').textContent = st.queuedSel.length ? 'Cancel ' + st.queuedSel.length + ' queued' : 'Cancel all queued (' + qmap.size + ')';
+    var queuedN = qmap.size + rmap.size;
+    $('researchBtn').title = queuedN ? queuedN + ' web profiles queued or running' : 'Web profiles for the selected people (paid: runs on your Claude plan, asks first for more than 10)';
   }
 
   // ---------------------------------------------------------------- API (live only)
@@ -2628,11 +2960,48 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var changed = [];
     function diff(a, b) { a.forEach(function (v, id) { if (b.get(id) !== v) changed.push(id); }); }
     diff(oq, qmap); diff(qmap, oq); diff(or, rmap); diff(rmap, or);
-    if (JSON.stringify(oldJob) !== JSON.stringify(lensJob)) renderLensBar();
+    if (JSON.stringify(oldJob) !== JSON.stringify(lensJob)) { lensJobChanged(oldJob, lensJob); renderLensBar(); }
     renderStats();
     return changed;
   }
   function uniq(a) { return Array.from(new Set(a)); }
+  /** Lens job transitions: remember who was in before the re-check, then explain what the re-check changed. */
+  var rerankSnap = null;
+  function memberIds(l) { var s2 = new Set(); people.forEach(function (p) { if (isMember(l, p)) s2.add(p.id); }); return s2; }
+  function lensJobChanged(was, now) {
+    if (now && now.phase === 'rerank' && !(was && was.phase === 'rerank' && was.lensId === now.lensId)) {
+      var l0 = lensById(now.lensId);
+      rerankSnap = l0 ? { lensId: l0.id, ids: memberIds(l0), total: Number(now.total) || 0 } : null;
+    }
+    if (was && !now) {
+      var l = lensById(was.lensId);
+      var snap = rerankSnap && rerankSnap.lensId === was.lensId ? rerankSnap : null;
+      rerankSnap = null;
+      if (!l) return;
+      // let the final `lens` event land first
+      setTimeout(function () { lensFinished(l.id, snap); }, 50);
+    }
+    if (now || was) heavyRefresh();
+  }
+  function lensFinished(id, snap) {
+    var l = lensById(id);
+    if (!l) return;
+    var after = memberIds(l), thr = thrOf(l), here = ui.lens === l.id;
+    var msg = 'Done: ' + after.size.toLocaleString() + ' in ' + (here ? 'the lens' : '“' + trunc(l.goal, 40) + '”') + ' (' + thr + '+).';
+    var left = 0, joined = 0;
+    if (snap) {
+      snap.ids.forEach(function (x) { if (!after.has(x)) left++; });
+      after.forEach(function (x) { if (!snap.ids.has(x)) joined++; });
+      if (left || joined) {
+        msg += ' The ' + modelName(l.rerankModel) + ' re-check of the top ' + (snap.total || '') + ' moved ' +
+          (left ? left + ' below the cut-off' : '') + (left && joined ? ', ' : '') + (joined ? joined + ' above it' : '') + '.';
+      }
+    }
+    var act = !here ? { label: 'Open', fn: function () { setLens(l.id); } }
+      : left ? { label: 'See candidates', fn: function () { ui.sortKey = 'score'; ui.sortDir = -1; setLensView('out'); } } : null;
+    toast(msg, 'good', act);
+    renderGs();
+  }
   function applyState(s) {
     if (!s || !Array.isArray(s.people)) return;
     people = s.people;
@@ -2675,7 +3044,8 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     catch (e) { scheduleReconnect(); return; }
     var wasDown = retry > 0;
     es.addEventListener('open', function () {
-      connected = 'live'; retry = 0; renderStats();
+      var wasOut = connected === 'unreachable';
+      connected = 'live'; retry = 0; renderStats(); if (wasOut) renderNotice();
       if (wasDown) api('/api/state').then(applyState).catch(function () { /* next event will fix */ });
       wasDown = false;
     });
@@ -2760,7 +3130,14 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   }
   function scheduleReconnect() {
     clearTimeout(retryTimer);
+    if (connected === 'gone') return;
     retry = Math.min(retry + 1, 6);
+    // after a few failures, ask the server directly: a 401 means it restarted with a new token, so this tab can't reconnect
+    if (retry >= 3) {
+      fetch('/api/state', { headers: { 'X-NB-Token': TOKEN } }).then(function (res) {
+        if (res.status === 401 || res.status === 403) { connected = 'gone'; clearTimeout(retryTimer); renderStats(); renderNotice(); }
+      }, function () { if (retry >= 4) { connected = 'unreachable'; renderStats(); renderNotice(); } });
+    }
     var delay = Math.min(30000, 500 * Math.pow(2, retry)) + Math.random() * 400;
     retryTimer = setTimeout(connect, delay);
   }
@@ -2991,7 +3368,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   function openExport(only, defName) {
     if (only && !Array.isArray(only)) only = null; // called as an event handler
     var ids = (only || Array.from(selected)).filter(function (id) { return byId.has(id); });
-    if (!ids.length) { toast(only ? 'Nobody is in this lens yet.' : 'Select people first — e.g. filter, then “＋ Add filtered”.'); return; }
+    if (!ids.length) { toast(only ? 'Nobody is in this lens yet.' : 'Select people first — tick rows, or “Select these N” above the table.'); return; }
     var dlg = $('dlgEx');
     var cur = currentList();
     var curIds = cur ? cur.ids.filter(function (id) { return byId.has(id); }) : [];
@@ -3004,18 +3381,30 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       (lens ? ' Fit columns come from the lens “' + lens.goal + '”.' : ' No lens active — fit columns will be empty.') +
       (LIVE ? '' : ' (Static snapshot: download only.)');
     $('dlgExSave').hidden = !LIVE;
+    // remember the last format; say up front that LinkedIn exports carry no emails
+    var lastPreset = '';
+    try { lastPreset = localStorage.getItem('nbx-export-preset:' + STORE_ID) || ''; } catch (e) { /* ignore */ }
+    var radio = document.querySelector('#dlgEx input[name=preset][value="' + (/^(crm|ahoy|full)$/.test(lastPreset) ? lastPreset : 'crm') + '"]');
+    if (radio) radio.checked = true;
+    var withEmail = ids.filter(function (id) { var pp = get(id); return pp && pp.email; }).length;
+    $('dlgExEmail').hidden = withEmail === ids.length;
+    $('dlgExEmail').textContent = withEmail ? 'Email is filled for ' + withEmail + ' of ' + ids.length + ' — LinkedIn exports usually leave it out.' : 'Email will be empty: LinkedIn exports don’t include email addresses.';
     var run = function (how) {
       var name = $('dlgExName').value.trim() || 'Selection';
       var presetEl = document.querySelector('#dlgEx input[name=preset]:checked');
       var preset = presetEl ? presetEl.value : 'crm';
+      if (how === 'download' || how === 'save') {
+        try { localStorage.setItem('nbx-export-preset:' + STORE_ID, preset); } catch (e) { /* ignore */ }
+        markGs('out');
+      }
       var rows = sortIds(ids);
       if (how === 'download' && preset === 'ahoy') {
         var af = ahoyFiles(rows, lens), base = exportFilename(name, rows.length).replace(/\.csv$/, '');
         var zf = [{ name: base + '_ahoy-companies.csv', text: af.companies }, { name: base + '_ahoy-contacts.csv', text: af.contacts }];
         if (af.counts.notes) zf.push({ name: base + '_ahoy-notes.csv', text: af.notes });
         saveBytes(zipFiles(zf), base + '_ahoy.zip', 'application/zip');
-        toast('Downloaded ' + base + '_ahoy.zip: ' + af.counts.companies + ' companies, ' + af.counts.contacts + ' contacts' +
-          (af.counts.notes ? ', ' + af.counts.notes + ' notes' : '') + ' (one CSV each — upload them to Ahoy separately)', 'good');
+        toast('Downloaded the Ahoy .zip: ' + af.counts.companies + ' companies, ' + af.counts.contacts + ' contacts' +
+          (af.counts.notes ? ', ' + af.counts.notes + ' notes' : '') + '. Import each CSV into Ahoy separately.', 'good');
       } else if (how === 'download') {
         saveBlob(buildCsv(rows, preset), exportFilename(name, rows.length));
         toast('Downloaded ' + rows.length.toLocaleString() + ' people (' + (preset === 'crm' ? 'CRM' : 'full') + ' CSV)', 'good');
@@ -3024,7 +3413,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
         if (sameAsList && name === cur.name) body.listId = cur.id;
         if (lens) body.lensId = lens.id;
         api('/api/export', body).then(function (res) {
-          toast('Saved ' + ((res && res.count) || rows.length).toLocaleString() + ' people to ' + ((res && res.paths ? res.paths.join(', ') : res && res.path) || 'outputs'), 'good');
+          toast('Saved ' + ((res && res.count) || rows.length).toLocaleString() + ' people to the outputs folder', 'good', { label: 'Where?', fn: function () { openHelp('help-data'); } });
         }).catch(function (e) { toast('Export failed: ' + e.message, 'bad'); });
       }
     };
@@ -3069,7 +3458,8 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       if (!name) return;
       putList(uniqueListId(name), name, ids, true).then(function (l) {
         if (l) { ui.listId = l.id; savePrefs(); renderLists(); renderSelbar(); }
-        toast('Saved list “' + name + '” (' + ids.length.toLocaleString() + ')', 'good');
+        renderGs();
+        toast('Saved list “' + trunc(name, 40) + '” (' + ids.length.toLocaleString() + ').', 'good', { label: 'Next, in Claude Code →', fn: function () { openHelp('help-claude'); } });
       }).catch(function (e) { toast('Could not save list: ' + e.message, 'bad'); });
     });
   }
@@ -3101,8 +3491,11 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       var n = (l.ids || []).filter(function (id) { return byId.has(id); }).length;
       var row = h('div', { class: 'list-row' + (l.id === ui.listId ? ' cur' : '') },
         h('span', { class: 'ln', title: l.name }, l.name + ' ', h('small', { text: '· ' + n.toLocaleString() })),
-        h('button', { class: 'btn sm', type: 'button', text: 'Load', title: 'Replace the selection with this list', on: { click: function () { loadList(l, 'replace'); } } }),
-        h('button', { class: 'btn ghost sm', type: 'button', text: '＋', title: 'Add this list to the current selection', 'aria-label': 'Add ' + l.name + ' to selection', on: { click: function () { loadList(l, 'add'); } } }),
+        h('button', { class: 'btn sm', type: 'button', text: 'Select', title: 'Replace the selection with this list (then “Show selected” to see only them)', on: { click: function () { loadList(l, 'replace'); } } }),
+        h('button', { class: 'btn ghost sm', type: 'button', text: '＋ Add', title: 'Add this list to the current selection', 'aria-label': 'Add ' + l.name + ' to selection', on: { click: function () { loadList(l, 'add'); } } }),
+        h('button', { class: 'btn ghost sm', type: 'button', text: '⧉', title: 'Copy a Claude Code prompt for this list', 'aria-label': 'Copy a Claude Code prompt for ' + l.name, on: { click: function () {
+          copyPrompt('Using my network-builder list "' + l.name + '", build an Ahoy pipeline: check who is already in Ahoy and propose the rest as new contacts with a short note on each.');
+        } } }),
         LIVE ? h('button', { class: 'btn ghost sm', type: 'button', text: '✎', title: 'Rename', 'aria-label': 'Rename ' + l.name, on: { click: function () {
           promptDlg('Rename list', '', l.name, 'Rename').then(function (name) {
             if (!name || name === l.name) return;
@@ -3138,6 +3531,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
 
   // ---------------------------------------------------------------- filter menus (multi-select chips)
   var msBadges = {};
+  var OPT_LABELS = { unknown: 'unknown / no profile', ic: 'individual contributor', 'senior ic': 'senior individual contributor', 'c-suite': 'C-suite', vp: 'VP' };
   function countBy(fn) {
     var m = {};
     people.forEach(function (p) { var vals = fn(p); (Array.isArray(vals) ? vals : [vals]).forEach(function (v) { m[v] = (m[v] || 0) + 1; }); });
@@ -3171,7 +3565,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
         if (cb.checked) ui[key].push(v);
         paintMsBadge(key); onFilter();
       });
-      pop.appendChild(h('label', { class: 'opt' }, cb, h('span', { text: v === 'unknown' ? 'unknown / no profile' : v }), h('span', { class: 'n', text: (counts[v] || 0).toLocaleString() })));
+      pop.appendChild(h('label', { class: 'opt' }, cb, h('span', { text: OPT_LABELS[v] || v }), h('span', { class: 'n', text: (counts[v] || 0).toLocaleString() })));
     });
     append(d, [sum, pop]);
     host.appendChild(d);
@@ -3190,7 +3584,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   }
   function paintMoreBadge() {
     var n = 0;
-    if (ui.co) n++; if (ui.past) n++; if (ui.talk) n++; if (ui.loc) n++; if (ui.ind) n++;
+    if (ui.co) n++; if (ui.past) n++; if (ui.talk) n++; if (ui.ind) n++; if (ui.dossier !== 'any') n++; if (ui.lens && ui.minScore > 0) n++; if (ui.searchReasons) n++;
     if (ui.conf !== 'any') n++; if (ui.idc !== 'any') n++; if (ui.crmf && ui.crmf !== 'any') n++; if (ui.from || ui.to) n++;
     var b = $('moreBadge');
     b.className = n ? 'badge' : '';
@@ -3206,30 +3600,13 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     for (var i = 0; i < open.length; i++) { open[i].open = false; var sm = open[i].querySelector('summary'); if (sm) sm.focus(); }
   });
 
-  // ---------------------------------------------------------------- presets
-  function renderPresets() {
-    var box = $('presets');
-    box.textContent = '';
-    append(box, h('span', { text: 'Try:' }));
-    PRESETS.forEach(function (q) {
-      append(box, h('button', { class: 'preset', type: 'button', text: q.replace(/"/g, ''), 'aria-pressed': ui.q.trim().toLowerCase() === q.toLowerCase() ? 'true' : 'false',
-        title: 'Search for ' + q,
-        on: { click: function () {
-          var on = ui.q.trim().toLowerCase() === q.toLowerCase();
-          ui.q = on ? '' : q; $('q').value = ui.q; onFilter(); renderPresets();
-        } } }));
-    });
-  }
-
   // ---------------------------------------------------------------- static chrome
   function renderNotice() {
     var box = $('notice');
     box.textContent = '';
     if (LIVE) {
-      if (!lenses.length) {
-        append(box, h('div', { class: 'notice info' },
-          h('span', { text: 'Tip: create a lens (e.g. “potential angel investors”) to score everyone for a goal — or just search and filter your network.' })));
-      }
+      if (connected === 'gone') append(box, h('div', { class: 'notice' }, h('span', { text: 'The explorer restarted, so this tab can’t reconnect. Reopen it from the terminal (network-builder) or the Network Builder app.' })));
+      else if (connected === 'unreachable') append(box, h('div', { class: 'notice' }, h('span', { text: 'The explorer isn’t running. Start it again with network-builder (or open the app) — this tab keeps retrying.' })));
       return;
     }
     var cmd = 'network-builder' + (state.dbPath ? ' --db "' + state.dbPath + '"' : '');
@@ -3243,12 +3620,8 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
       h('span', { text: 'Static snapshot' + (state.generatedAt ? ' from ' + fmtDate(state.generatedAt) : '') + ' — search, filter and export work here. To build profiles or lenses, open the live explorer:' }),
       h('code', { text: cmd }), copy));
   }
-  function renderPaths() {
-    var box = $('paths');
-    box.textContent = '';
-    if (state.dbPath) append(box, h('div', null, 'Database ', h('code', { text: state.dbPath })));
-    if (lastSnapshot) append(box, h('div', null, 'Snapshot ', h('code', { text: lastSnapshot })));
-  }
+  /** File paths live in the help panel (? → Where your data lives), not on the main page. */
+  function renderPaths() { if (!$('help').hidden) renderHelp(); }
   var lastSnapshot = '';
 
   function syncControls() {
@@ -3285,10 +3658,11 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     renderStats();
     renderSelbar();
     renderViewbar();
+    renderGs();
   }
 
   // ---------------------------------------------------------------- wire up
-  var onFilter = debounce(function () { page = 0; savePrefs(); paintMoreBadge(); renderPresets(); refresh(); }, 150);
+  var onFilter = debounce(function () { page = 0; savePrefs(); paintMoreBadge(); refresh(); }, 150);
   $('q').addEventListener('input', function (e) { ui.q = e.target.value; onFilter(); });
   function setMinScore(v) {
     var n = Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
@@ -3306,24 +3680,28 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   $('reset').addEventListener('click', function () {
     var keep = { sortKey: ui.sortKey, sortDir: ui.sortDir, pageSize: ui.pageSize, show: ui.show, hidden: ui.hidden, listId: ui.listId, lens: ui.lens, lensView: ui.lensView };
     ui = Object.assign(cloneDefaults(), keep);
-    syncControls(); renderFilterMenus(); renderPresets(); page = 0; savePrefs(); refresh();
+    syncControls(); renderFilterMenus(); page = 0; savePrefs(); refresh();
   });
   $('pageSize').addEventListener('change', function (e) { ui.pageSize = Number(e.target.value) || 0; page = 0; savePrefs(); refresh(); });
   $('prev').addEventListener('click', function () { if (page > 0) { page--; renderBody(); window.scrollTo({ top: 0 }); } });
   $('next').addEventListener('click', function () { page++; compute(); renderBody(); window.scrollTo({ top: 0 }); });
 
   // lens bar
-  $('lensSel').addEventListener('change', function (e) { setLens(e.target.value); });
-  $('lensDel').addEventListener('click', deleteLens);
-  $('lensEdit').addEventListener('click', editLens);
+  $('lensSel').addEventListener('change', function (e) {
+    if (e.target.value === '__new') { e.target.value = ui.lens || ''; openNewLens(''); return; }
+    composing = false;
+    setLens(e.target.value);
+  });
+  $('lensMenuDd').addEventListener('toggle', function () { if ($('lensMenuDd').open) renderLensActions(); });
+  $('newLensOpen').addEventListener('click', function () { openNewLens(''); });
+  $('newLensX').addEventListener('click', closeNewLens);
+  $('newLensGoal').addEventListener('keydown', function (e) { if (e.key === 'Escape' && composing) { e.preventDefault(); closeNewLens(); } });
   $('lensThr').addEventListener('change', function (e) { setThrLocal(e.target.value); });
   $('lensThr').addEventListener('keydown', function (e) { if (e.key === 'Enter') setThrLocal(e.target.value); });
   $('lensThrRange').addEventListener('input', function (e) { setThrLocal(e.target.value); });
-  Array.prototype.forEach.call(document.querySelectorAll('#lensWs [data-lv]'), function (b) {
+  Array.prototype.forEach.call(document.querySelectorAll('#lensTabs [data-lv]'), function (b) {
     b.addEventListener('click', function () { setLensView(b.getAttribute('data-lv')); });
   });
-  $('lensBulk').addEventListener('click', lensBulk);
-  $('lensBulkDismiss').addEventListener('click', function (e) { lensBulk(e, true); });
   $('lensExport').addEventListener('click', function () {
     var l = lensById(ui.lens);
     if (!l) return;
@@ -3374,7 +3752,6 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   $('lensSelDd').addEventListener('toggle', function () { if ($('lensSelDd').open) renderLensMenu(); });
   $('ahoySelDd').addEventListener('toggle', function () { if ($('ahoySelDd').open) renderAhoyMenu(); });
   $('lensStale').addEventListener('click', refreshStale);
-  $('lensAll').addEventListener('click', rescoreAll);
   $('newLensForm').addEventListener('submit', function (e) { e.preventDefault(); if (LIVE) createLens($('newLensGoal').value); });
 
   function setShow(v) { ui.show = v; page = 0; savePrefs(); refresh(); }
@@ -3405,11 +3782,12 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     bulk('Cleared selection', function () { selected = new Set(); });
   });
 
-  $('dlCsv').addEventListener('click', function (e) { downloadCsv(e.shiftKey); });
+  $('dlCsv').addEventListener('click', function () { $('viewDd').open = false; downloadCsv(false); });
+  $('dlCsvAll').addEventListener('click', function () { $('viewDd').open = false; downloadCsv(true); });
+  $('viewHelp').addEventListener('click', function () { $('viewDd').open = false; openHelp('help-keys'); });
   $('exportSel').addEventListener('click', openExport);
-  $('saveListSel').addEventListener('click', function (e) {
-    if (e.shiftKey || !currentList()) saveSelectionAsNew(); else updateCurrentList();
-  });
+  $('saveListSel').addEventListener('click', function () { saveSelectionAsNew(); });
+  $('updListSel').addEventListener('click', function () { updateCurrentList(); });
   function bulkProfile(depth) {
     var st = selectionStats();
     var all = depth === 'deep' ? st.deep : st.light;
@@ -3417,21 +3795,23 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     scopeToShown(all, depth === 'deep' ? 'Deep-profile' : 'Build light profiles for').then(function (ids) { if (ids && ids.length) bulkProfileIds(depth, ids); });
   }
   function bulkProfileIds(depth, ids) {
-    var per = depth === 'deep' ? EST.deepUsd : EST.lightUsd;
+    var per = depth === 'deep' ? perDeep() : perLight();
     // the selection is also the export list, so it is kept after queueing
     var go = function () { queueDossiers(ids, depth, false); };
     if (ids.length > 10) {
       confirmDlg((depth === 'deep' ? 'Deep-profile ' : 'Build light profiles for ') + ids.length + ' people?',
         (depth === 'deep'
-          ? 'Each person gets a full goal-free web profile (career, investments, boards, sources).'
-          : 'Each person gets 1–2 quick web searches for career history, investments and boards.') +
-        ' Estimated cost ≈ ' + usd(ids.length * per) + ' (rough). Web search is rate-limited, so large batches run slowly and pause automatically — you can cancel queued people at any time.',
+          ? 'Each person gets a full web profile: career, recent talks and articles, boards, investments, sources.'
+          : 'Each person gets 1–2 quick web searches: current role, career, location.') +
+        ' Why: lens scores then use real evidence instead of the headline alone, and exports carry the detail. ' +
+        onPlan(ids.length * per) + ' (rough). Web search is rate-limited, so large batches run slowly; when it keeps hitting the limit the queue pauses and asks you to Resume. You can cancel queued people at any time.',
         'Queue ' + ids.length).then(function (ok) { if (ok) go(); });
     } else go();
   }
-  $('lightSel').addEventListener('click', function () { bulkProfile('light'); });
-  $('deepSel').addEventListener('click', function () { bulkProfile('deep'); });
+  $('lightSel').addEventListener('click', function () { $('researchDd').open = false; bulkProfile('light'); });
+  $('deepSel').addEventListener('click', function () { $('researchDd').open = false; bulkProfile('deep'); });
   $('cancelQueued').addEventListener('click', function () {
+    $('researchDd').open = false;
     var st = selectionStats();
     if (!st.queuedSel.length) return cancel(null);
     scopeToShown(st.queuedSel, 'Cancel the queued profiles for').then(function (ids) { if (ids && ids.length) cancel(ids); });
@@ -3442,7 +3822,8 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     sv.addEventListener('click', function () {
       api('/api/snapshot', {}).then(function (res) {
         lastSnapshot = (res && res.path) || '';
-        renderPaths(); toast('Snapshot saved' + (lastSnapshot ? ' to ' + lastSnapshot : ''), 'good');
+        $('viewDd').open = false;
+        renderPaths(); toast('Snapshot saved to the outputs folder', 'good', { label: 'Where?', fn: function () { openHelp('help-data'); } });
       }).catch(function (e) { toast('Snapshot failed: ' + e.message, 'bad'); });
     });
   }
@@ -3450,6 +3831,17 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   document.addEventListener('keydown', function (e) {
     var tag = (e.target && e.target.tagName) || '';
     var typing = /INPUT|SELECT|TEXTAREA/.test(tag);
+    if (e.key === '?' && !typing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); if ($('help').hidden) openHelp(); else closeHelp(); return; }
+    if (e.key === 'Escape' && !typing && !document.querySelector('dialog[open]') && !document.querySelector('details.dd[open]')) {
+      // Esc: close the help panel, else the New lens box, else collapse expanded rows
+      if (!$('help').hidden) { closeHelp(); return; }
+      if (composing) { closeNewLens(); return; }
+      if (expanded.size && mode === 'people') {
+        var ids = Array.from(expanded);
+        ids.forEach(function (id) { if (expanded.has(id)) toggleExpand(id); });
+        return;
+      }
+    }
     if (e.key === '/' && !typing) { e.preventDefault(); $('q').focus(); }
     else if (e.key === 'Escape' && e.target === $('q') && ui.q) { ui.q = ''; $('q').value = ''; onFilter(); }
     else if ((e.key === 'j' || e.key === 'ArrowDown') && !typing && (e.target === document.body || e.target === document.documentElement)) {
@@ -3459,6 +3851,138 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   });
   // the rate-limit pause chip expires on its own
   setInterval(function () { if (pausedUntil) renderStats(); }, 30000);
+
+  // ---------------------------------------------------------------- getting started (dismissible checklist)
+  var GS_KEY = 'nbx-gs:' + STORE_ID;
+  var gs = { hidden: false, out: false };
+  try { var gsSaved = JSON.parse(localStorage.getItem(GS_KEY) || 'null'); if (gsSaved && typeof gsSaved === 'object') { gs.hidden = !!gsSaved.hidden; gs.out = !!gsSaved.out; } } catch (e) { /* ignore */ }
+  function saveGs() { try { localStorage.setItem(GS_KEY, JSON.stringify(gs)); } catch (e) { /* ignore */ } }
+  function markGs(k) { if (gs[k]) return; gs[k] = true; saveGs(); renderGs(); }
+  function gsSteps() {
+    var curated = lenses.some(function (l) { return (l.pinnedIn || []).length || (l.pinnedOut || []).length; });
+    var crm = people.some(function (p) { return p.crm; });
+    return [
+      { done: people.length > 0, t: people.length ? 'Imported ' + people.length.toLocaleString() + ' connections' : 'Import your connections',
+        d: people.length ? 'Headlines are parsed into role, seniority and function.' : 'Run network-builder import <file.csv>.' },
+      { done: lenses.length > 0, t: 'Score a lens', d: 'Describe who you want to find; everyone gets a 0–100 score with a reason.', a: 'lens' },
+      { done: curated, t: 'Curate it', d: 'On a row, ＋ adds and ✕ removes. Check Candidates for near misses just below the cut-off.', a: 'curate' },
+      { done: lists.length > 0, t: 'Save a list', d: 'Tick people (or “Select these N”), then Save as list in the bar at the bottom.' },
+      { done: gs.out || crm, t: 'Export, Ahoy or Claude', d: 'Export → “Ahoy CRM import”, check them in Ahoy, or hand the list to Claude Code.', a: 'out' }
+    ];
+  }
+  function renderGs() {
+    var box = $('gs'), steps = gsSteps();
+    var n = steps.filter(function (x) { return x.done; }).length, all = n === steps.length;
+    $('gsPill').hidden = !LIVE || !gs.hidden || all;
+    $('gsPillN').textContent = n + '/' + steps.length;
+    box.hidden = !LIVE || gs.hidden || all || mode === 'accounts';
+    if (box.hidden) return;
+    box.textContent = '';
+    var curIdx = -1;
+    steps.forEach(function (x, i) { if (curIdx < 0 && !x.done) curIdx = i; });
+    append(box, h('div', { class: 'gs-h' }, h('b', { text: 'Getting started' }), h('span', { class: 'prog', text: n + ' of ' + steps.length + ' done' }),
+      h('span', { class: 'sp' }),
+      h('button', { class: 'btn sm ghost', type: 'button', text: 'Help & glossary', on: { click: function () { openHelp(); } } }),
+      h('button', { class: 'btn sm ghost', type: 'button', text: 'Hide', title: 'Hide the checklist (reopen it from “Getting started” at the top)', on: { click: function () { gs.hidden = true; saveGs(); renderGs(); } } })));
+    var ol = h('ol', { class: 'gs-steps' });
+    steps.forEach(function (x, i) {
+      var li = h('li', { class: 'gs-step' + (x.done ? ' done' : i === curIdx ? ' cur' : '') },
+        h('div', { class: 't' }, h('span', { class: 'n', text: x.done ? '✓' : String(i + 1) }), x.t),
+        h('div', { class: 'd', text: x.d }));
+      if (!x.done && x.a === 'lens' && LIVE) {
+        append(li, h('div', { class: 'a' }, STARTER_LENSES.slice(0, 4).map(function (g) {
+          return h('button', { class: 'preset', type: 'button', text: g.replace(/\[|\]/g, ''), title: 'Use this goal (you can edit it before scoring)',
+            on: { click: function () { openNewLens(g); } } });
+        }), h('button', { class: 'preset', type: 'button', text: 'potential customers for …', title: 'Fill in your product, then Create lens', on: { click: function () { openNewLens(STARTER_LENSES[4]); } } })));
+      }
+      if (!x.done && x.a === 'curate' && ui.lens) {
+        append(li, h('div', { class: 'a' }, h('button', { class: 'btn sm', type: 'button', text: 'Show candidates', on: { click: function () { ui.sortKey = 'score'; ui.sortDir = -1; setLensView('out'); } } })));
+      }
+      if (!x.done && x.a === 'out') {
+        append(li, h('div', { class: 'a' }, h('button', { class: 'btn sm', type: 'button', text: 'Claude Code prompts', on: { click: function () { openHelp('help-claude'); } } })));
+      }
+      ol.appendChild(li);
+    });
+    box.appendChild(ol);
+  }
+  $('gsPill').addEventListener('click', function () { gs.hidden = false; saveGs(); renderGs(); });
+
+  // ---------------------------------------------------------------- help panel (?)
+  function copyPrompt(text) {
+    markGs('out');
+    copyText(text).then(function () { toast('Copied — paste it into Claude Code', 'good'); }, function () { toast('Copy failed — select the text and copy it', 'bad'); });
+  }
+  /** prompts for Claude Code, using the user's own lens / list / account names when there are some */
+  function claudePrompts() {
+    var cur = lensById(ui.lens) || lenses[0], list = currentList() || lists[0], a = accounts[0];
+    var out = [];
+    if (list) out.push({ q: 'Build an Ahoy pipeline from my network-builder list "' + list.name + '": check who is already in Ahoy and propose the rest as new contacts with a one-line note each.', s: 'Uses your Ahoy connector; you approve the proposal in Ahoy.' });
+    if (cur) out.push({ q: 'From my network-builder lens "' + cur.goal + '", who are the 10 strongest fits and why? Draft a short, personal intro note for each.', s: 'Reads the lens members and their reasons.' });
+    out.push({ q: 'Search my LinkedIn network (network-builder) for people at fintech companies in Dublin and save them as a list called "Dublin fintech".', s: 'Claude can search, read people, curate lenses and save lists.' });
+    out.push({ q: a ? 'Plan an ABM campaign for ' + a.name + ' using my network-builder account: who to approach first, through whom, and with what message.' : 'Plan an ABM campaign for <company> using my network-builder account.', s: 'Claude Code can read the account: brief, buying committee, org chart and your connections there.' });
+    return out;
+  }
+  function renderHelp() {
+    var box = $('help');
+    box.textContent = '';
+    function sec(id, title) { return h('h3', { id: id, text: title }); }
+    function dt(t, d) { return [h('dt', { text: t }), h('dd', { text: d })]; }
+    append(box, [h('button', { class: 'btn sm ghost x', type: 'button', text: '✕', 'aria-label': 'Close help', title: 'Close (Esc)', on: { click: closeHelp } }),
+      h('h2', { id: 'helpTitle', text: 'Help' }),
+      h('p', { text: 'network-builder turns your LinkedIn connections into goal-scored lists. Everything runs on this computer; AI calls go through Claude Code on your own login.' }),
+      LIVE && gs.hidden ? h('button', { class: 'btn sm', type: 'button', text: 'Show the getting-started checklist', on: { click: function () { gs.hidden = false; saveGs(); renderGs(); closeHelp(); } } }) : null,
+      sec('help-terms', 'Glossary'),
+      h('dl', { class: 'gloss' },
+        dt('Lens', 'A goal (“heads of marketing in Ireland”) scored 0–100 across your whole network, each score with a reason. Switch lenses to rank the same people for different purposes.'),
+        dt('Lens cut-off', 'People scoring at or above it are In lens. Drag it to widen or narrow the lens; the bars next to it show how everyone scored.'),
+        dt('In lens · Candidates · Removed', 'In lens: at or above the cut-off, or added by hand. Candidates: scored below the cut-off — add the good ones. Removed: people you took out; they stay out even if a re-score raises them, and are hidden everywhere else.'),
+        dt('Headline only', 'The score is based on the LinkedIn headline and parsed profile alone. A web profile gives it real evidence.'),
+        dt('Light / deep web profile', 'Light: 1–2 web searches for current role and career (≈ ' + usd(perLight()) + '). Deep: a full profile with career, recent talks and articles, boards and sources (≈ ' + usd(perDeep()) + '). Only ever started by you.'),
+        dt('Stale', 'Someone’s info changed (for example a new web profile) since they were scored. “↻ Update stale” re-scores just them.'),
+        dt('List', 'A named, saved selection of people — for an export, Ahoy, or Claude Code to work from.'),
+        dt('Account', 'A company you’re targeting: its people by department and seniority, their buying-committee role, and your account brief. Claude Code can read it.')),
+      sec('help-claude', 'Next, in Claude Code'),
+      h('p', { text: 'Claude Code can use your network through the network-builder tools: search people, read profiles, curate lenses, save lists and export. Copy a prompt to start:' }),
+      h('div', { class: 'pcards' }, claudePrompts().map(function (c) {
+        return h('div', { class: 'pcard2' }, h('div', { class: 'q' }, '“' + c.q + '”', h('small', { text: c.s })),
+          h('button', { class: 'btn sm', type: 'button', text: '⧉ Copy', on: { click: function () { copyPrompt(c.q); } } }));
+      })),
+      sec('help-keys', 'Keyboard'),
+      h('div', { class: 'keys' },
+        [['/', 'Search'], ['j  k  or  ↑ ↓', 'Move between rows'], ['x  or  Space', 'Select the focused row'], ['Shift-click', 'Select a range'], ['Enter', 'Expand the focused row'],
+          ['a / r', 'Add to / remove from the active lens'], ['Esc', 'Close a menu, dialog or this panel; collapse rows'], ['?', 'Open or close this panel']].map(function (k) {
+          return [h('span', null, k[0].split('  ').map(function (x, i) { return [i ? ' ' : '', /^(or|and)$/.test(x) ? x : h('kbd', { text: x })]; })), h('span', { text: k[1] })];
+        })),
+      sec('help-costs', 'Costs'),
+      h('p', { text: PLAN_NOTE + ' Paid work — lenses, web profiles, Ahoy checks, org research — only starts when you click, and asks first with an estimate. So far: ' + usd(costs.total) + '.' }),
+      sec('help-data', 'Where your data lives'),
+      h('div', { class: 'paths2' },
+        state.dbPath ? [h('div', { text: 'Database (everything: people, lenses, lists, accounts)' }), h('code', { text: state.dbPath })] : null,
+        state.outDir ? [h('div', { text: 'Outputs folder (“Save to outputs”, snapshots)' }), h('code', { text: state.outDir })] : null,
+        lastSnapshot ? [h('div', { text: 'Last snapshot' }), h('code', { text: lastSnapshot })] : null),
+      h('p', { text: 'Nothing is uploaded anywhere except the AI calls you start, which go through Claude Code.' })]);
+  }
+  var helpReturn = null;
+  function openHelp(anchor) {
+    var box = $('help');
+    if (box.hidden) helpReturn = document.activeElement;
+    renderHelp();
+    box.hidden = false;
+    var target = anchor ? $(anchor) : null;
+    if (target) target.scrollIntoView({ block: 'start' }); else box.scrollTop = 0;
+    box.focus({ preventScroll: true });
+  }
+  function closeHelp() {
+    $('help').hidden = true;
+    if (helpReturn && helpReturn.focus) try { helpReturn.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+  }
+  $('helpBtn').addEventListener('click', function () { if ($('help').hidden) openHelp(); else closeHelp(); });
+  document.addEventListener('click', function (e) {
+    var hb = $('help');
+    if (hb.hidden || hb.contains(e.target) || e.target === $('helpBtn') || e.target.closest('.toast, dialog, .gs, #viewDd, .act-link')) return;
+    if (!document.body.contains(e.target)) return;
+    closeHelp();
+  });
 
   // ---------------------------------------------------------------- accounts (ABX)
   // Vocab mirrors src/accounts/types.ts.
@@ -3488,7 +4012,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   function accountsOf(pid) { return accounts.filter(function (a) { return (a.memberIds || []).indexOf(pid) >= 0; }); }
   function enc(s) { return encodeURIComponent(s); }
   function roleChip(r) {
-    return r ? h('span', { class: 'role r-' + r, text: ROLE_LABELS[r] || r }) : h('span', { class: 'role r-none', text: 'no role' });
+    return r ? h('span', { class: 'role r-' + r, text: ROLE_LABELS[r] || r }) : h('span', { class: 'role r-none', text: 'set role' });
   }
   function statusChip(st) { return h('span', { class: 'st st-' + st, text: st }); }
   function remember() {
@@ -3504,6 +4028,9 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     });
     if (mode === 'accounts') { $('goal').textContent = 'Accounts'; $('goal').title = 'Target accounts and their key people'; }
     else renderLensBar();
+    renderExt();
+    document.body.classList.toggle('has-selbar', mode !== 'accounts' && selected.size > 0);
+    renderGs();
     remember();
     if (mode === 'accounts') {
       if ((!acc.cur || !accById(acc.cur)) && accounts.length) acc.cur = accounts[0].id;
@@ -3630,7 +4157,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   function copyBrief() {
     api('/api/accounts/' + enc(acc.cur) + '/brief').then(function (res) {
       return copyText(res.markdown).then(function () {
-        toast('Copied the account context (' + Math.round(res.markdown.length / 1000) + 'k chars) — paste it into Claude, or ask Claude to use network_get_account.', 'good');
+        toast('Copied the account context — paste it into Claude, or ask Claude Code to read the account “' + trunc(acc.view && acc.view.account ? acc.view.account.name : '', 40) + '”.', 'good');
       });
     }).catch(function (e) { toast('Copy failed: ' + e.message, 'bad'); });
   }
@@ -3639,12 +4166,12 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   function accEmpty() {
     return h('div', { class: 'card acc-empty' },
       h('h3', { text: accounts.length ? 'Pick an account' : 'Focus on the accounts that matter' }),
-      h('div', { text: 'An account is a company you’re targeting: its key people grouped by org chart, their role in the buying committee, and your ABX brief — all available to Claude through the network-builder MCP tools.' }),
+      h('div', { text: 'An account is a company you’re targeting: its key people grouped by department and seniority, their role in the buying committee, and your account brief. Claude Code can read all of it.' }),
       h('ol', null,
         h('li', null, 'Create an account, or let the Chrome extension create it from a LinkedIn profile.'),
         h('li', null, 'On LinkedIn, click ＋ Network Builder on a decision maker’s profile.'),
         h('li', null, 'Or select connections in People → “Add to account”.'),
-        h('li', null, 'Ask Claude: “plan an ABX campaign for <company>” (uses network_get_account).')),
+        h('li', null, 'Ask Claude Code: “plan an ABM campaign for <company> using my network-builder account”.')),
       h('div', { class: 'row-btns', style: 'justify-content:center;display:flex;gap:8px' },
         h('button', { class: 'btn primary', type: 'button', text: '＋ New account', disabled: !LIVE, on: { click: function () { newAccount(); } } }),
         h('button', { class: 'btn', type: 'button', text: '🧩 Set up the Chrome extension', disabled: !LIVE, on: { click: openExtDialog } })));
@@ -3682,7 +4209,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
         h('button', { class: 'btn sm ghost danger', type: 'button', text: '🗑', title: 'Delete this account', on: { click: deleteAccount } })),
       h('div', { class: 'acc-sub', text: ms.length + (ms.length === 1 ? ' key person' : ' key people') + ' · ' +
         ms.filter(function (m) { return m.isConnection; }).length + ' your connections · ' +
-        ms.filter(function (m) { return m.capturedAt; }).length + ' captured from LinkedIn · MCP: network_get_account "' + a.name + '"' }),
+        ms.filter(function (m) { return m.capturedAt; }).length + ' captured from LinkedIn · Claude Code can read this account' }),
       h('div', { class: 'acc-fields' },
         field('Website domain', 'domain', a.domain, 'example.com'),
         field('LinkedIn company page', 'linkedinUrl', a.linkedinUrl, 'https://www.linkedin.com/company/…'),
@@ -3692,7 +4219,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
 
     // brief
     var saveState = h('span', { class: 'savestate' });
-    var ta = h('textarea', { placeholder: 'Why this account, why now · their pains and priorities · triggers (funding, new exec, expansion…) · your offer and angle · the plan · notes from conversations. Markdown is fine — this is the context Claude gets.', 'aria-label': 'ABX brief' });
+    var ta = h('textarea', { placeholder: 'Why this account, why now · their pains and priorities · triggers (funding, new exec, expansion…) · your offer and angle · the plan · notes from conversations. Markdown is fine — this is the context Claude gets.', 'aria-label': 'Account brief' });
     ta.value = a.brief || '';
     var briefTimer = null, lastSaved = a.brief || '';
     function saveBrief() {
@@ -3708,7 +4235,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     ta.addEventListener('input', function () { saveState.textContent = 'Editing…'; clearTimeout(briefTimer); briefTimer = setTimeout(saveBrief, 1200); });
     ta.addEventListener('blur', saveBrief);
     var brief = h('div', { class: 'card acc-brief' },
-      h('div', { class: 'acc-card-h' }, 'ABX brief', h('span', { class: 'sub', text: 'markdown · autosaves' }), h('span', { class: 'sp' }), saveState), ta);
+      h('div', { class: 'acc-card-h' }, 'Account brief', h('span', { class: 'sub', text: 'markdown · autosaves · Claude Code reads it' }), h('span', { class: 'sp' }), saveState), ta);
 
     // committee
     var committee = h('div', { class: 'acc-committee' });
@@ -3798,7 +4325,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   var NOISE_LABELS = { 'hr-marketing': 'HR / employer marketing', 'sales-hybrid': 'Sales & marketing hybrid', 'not-marketing': 'Not marketing',
     stale: 'Left / out of date', 'other-employer': 'Works for another company' };
   var SOURCE_LABELS = { 'extension-list': ['☰', 'LinkedIn list'], 'extension-profile': ['👤', 'LinkedIn profile'], web: ['🌐', 'Web research'],
-    connection: ['🤝', 'Your connection'], manual: ['✎', 'Added by hand'], mcp: ['⚙', 'Added through Claude (MCP)'] };
+    connection: ['🤝', 'Your connection'], manual: ['✎', 'Added by hand'], mcp: ['⚙', 'Added by Claude Code'] };
   var PASS_LABELS = { seed: 'Company site', press: 'Press & news', jobs: 'Jobs & careers', events: 'Events & talks', headcount: 'Headcount' };
   acc.orgView = 'all';
   try { acc.orgView = localStorage.getItem('nb.orgView') === 'marketing' ? 'marketing' : 'all'; } catch (e) { /* storage blocked */ }
@@ -4058,8 +4585,10 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
           paintOrg();
         } } }, h('span', { class: 'bar', style: 'width:' + Math.round(n / big * 100) + '%' }), h('span', { class: 'v', text: String(n) })) : '');
     }
-    return h('div', { class: 'bd-wrap' }, h('table', { class: 'bd' },
-      h('thead', null, h('tr', null, h('th', { text: 'Sub-function × seniority', style: 'min-width:120px' }), cols.map(function (s) { return h('th', { text: SENIORITY_LABELS[s] }); }), h('th', { text: 'Total' }))),
+    return h('div', { class: 'bd-wrap' },
+      h('div', { class: 'bd-legend', text: 'People in the org by sub-function (rows) and seniority (columns). The bar shows the share of the biggest cell; click a cell to filter the list below.' }),
+      h('table', { class: 'bd' },
+      h('thead', null, h('tr', null, h('th', { text: '', style: 'min-width:120px' }), cols.map(function (s) { return h('th', { text: SENIORITY_LABELS[s], style: 'min-width:58px' }); }), h('th', { text: 'Total', style: 'min-width:46px' }))),
       h('tbody', null, rows.map(function (sf) {
         return h('tr', null, h('th', { text: SUBFUNCTION_LABELS[sf] }), cols.map(function (sn) { return cell(sf, sn, cross[sf + '|' + sn] || 0, max); }), cell(sf, '', rowT[sf], rmax));
       }))));
@@ -4083,7 +4612,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     return [chips,
       sel('Seniority', 'sen', [['', 'Any seniority']].concat(sens.map(function (s) { return [s, SENIORITY_LABELS[s]]; }))),
       ents.length ? sel('Entity / country', 'ent', [['', 'Any entity']].concat(ents, [['__none', 'No entity known']])) : null,
-      sel('Source', 'src', [['', 'Any source'], ['extension-list', 'LinkedIn list'], ['extension-profile', 'LinkedIn profile'], ['web', 'Web research'], ['connection', 'Your connection'], ['manual', 'Added by hand'], ['mcp', 'Claude (MCP)']]),
+      sel('Source', 'src', [['', 'Any source'], ['extension-list', 'LinkedIn list'], ['extension-profile', 'LinkedIn profile'], ['web', 'Web research'], ['connection', 'Your connection'], ['manual', 'Added by hand'], ['mcp', 'Claude Code']]),
       sel('Minimum confidence', 'conf', [['', 'Any confidence'], ['medium', 'Medium or better (not assessed shown)'], ['high', 'High only (assessed)']]),
       f.conf ? h('span', { class: 'o-hint', text: (function () {
         var n = org.members.filter(function (id) { var m = memberById(id); return m && (m.confidence === null || m.confidence === undefined); }).length;
@@ -4144,7 +4673,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var est = Math.max(0.005, n / 100 * ((EST && EST.orgInferUsdPer100) || 0.06));
     confirmDlg('Classify ' + n + ' ' + (n === 1 ? 'person' : 'people') + ' on ' + v.account.name + '?',
       'Claude Haiku reads titles, headlines and captured profiles to set sub-function, seniority, entity and noise, then suggests reporting lines with a confidence (shown dashed until you confirm them). ≈ ' + usd(est) +
-      ' on your Claude subscription. Anything you set by hand is never overwritten; earlier suggestions are replaced.', 'Classify (≈ ' + usd(est) + ')').then(function (ok) {
+      ' on your Claude plan. Anything you set by hand is never overwritten; earlier suggestions are replaced.', 'Classify (≈ ' + usd(est) + ')').then(function (ok) {
       if (!ok) return;
       var id = v.account.id;
       api('/api/accounts/' + enc(id) + '/org/infer', {}).then(function (res) {
@@ -4157,7 +4686,7 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
     var v = acc.view, rs = (EST && EST.orgResearchUsd) || { min: 0.3, max: 1.4 };
     confirmDlg('Research ' + v.account.name + '’s marketing org on the web?',
       'Five passes, one after another (company site, press, jobs, events, headcount) with web search: leaders, teams, legal entities, headcount hints and “reports to” statements. Every person and fact needs an evidence link and quote, or it is dropped; LinkedIn is never searched. ≈ ' +
-      usd(rs.min) + '–' + usd(rs.max) + ' on your Claude subscription. If web search is rate-limited it waits, then asks you to Resume.', 'Research (≈ ' + usd(rs.min) + '–' + usd(rs.max) + ')').then(function (ok) {
+      usd(rs.min) + '–' + usd(rs.max) + ' on your Claude plan. If web search is rate-limited it waits, then asks you to Resume.', 'Research (≈ ' + usd(rs.min) + '–' + usd(rs.max) + ')').then(function (ok) {
       if (!ok) return;
       var id = v.account.id;
       api('/api/accounts/' + enc(id) + '/org/research', {}).then(function (res) {
@@ -4416,10 +4945,11 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   }
   function renderExt() {
     var b = $('extBtn'), st = extState;
-    b.hidden = !LIVE;
     var kind = !st || !st.paired ? 'off' : st.seenAt ? 'ok' : 'wait';
+    // the extension matters for Accounts; in People it only shows once it's connected (it isn't the first thing to do)
+    b.hidden = !LIVE || (mode !== 'accounts' && kind !== 'ok');
     b.className = 'chip extbtn ' + kind;
-    $('extBtnT').textContent = kind === 'off' ? '🧩 Connect Chrome extension' : kind === 'wait' ? '🧩 Extension: waiting to pair' : '🧩 Extension';
+    $('extBtnT').textContent = kind === 'off' ? '🧩 LinkedIn extension' : kind === 'wait' ? '🧩 Extension: waiting to pair' : '🧩 Extension';
     b.title = kind === 'off' ? 'Add people to accounts from LinkedIn with one click — set up the Chrome extension'
       : kind === 'wait' ? 'A pairing code was made but the extension hasn’t used it yet — paste it into the extension'
       : 'Chrome extension connected (last seen ' + extAgo(st.seenAt) + ')';
@@ -4523,12 +5053,12 @@ body.mode-accounts main.wrap, body.mode-accounts #selbar { display: none !import
   renderFilterMenus();
   renderColsMenu();
   renderLists();
-  renderPresets();
   renderNotice();
   renderPaths();
   renderLensBar();
   refresh();
   renderModeSw();
+  renderGs();
   if (mode === 'accounts') setMode('accounts');
   connect();
 

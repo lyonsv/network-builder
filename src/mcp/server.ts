@@ -33,6 +33,7 @@ import {
   type SortKey,
 } from './data';
 import { ACCOUNT_INSTRUCTIONS, registerAccountTools } from './accounts';
+import { lensMembers, planPipeline } from './ahoy-plan';
 
 /**
  * network-builder as an MCP server (stdio): read your network, curate lens membership and lists, and export CSVs —
@@ -56,12 +57,15 @@ Data model:
 
 Typical workflows: find people (network_search_people, network_find_connections_at) → read one in depth
 (network_get_person) → curate a lens (network_lens_add / network_lens_remove / network_set_lens_threshold) → save a
-list (network_save_list) → export CSV for a CRM (network_export, preset "ahoy" for Ahoy imports).
+list (network_save_list) → plan an Ahoy pipeline (network_ahoy_plan, then the Ahoy connector's create_proposal per
+batch, after the user agrees) or export CSV for a CRM (network_export, preset "ahoy").
 
-Not available here by design: starting web research, creating or re-scoring lenses, sending to Ahoy, classifying an
-account's org, web org research, or walking LinkedIn lists — those cost money or touch external systems and are started
-by the user in the explorer UI (run \`network-builder\`) or the Chrome extension. Suggest it when a task needs them
-(e.g. "these 5 have no web profile; research them in the explorer first").
+Location: \`location\` comes from a web profile (confirmed) or, failing that, the headline (unconfirmed). Say which.
+
+Not in these tools, because they cost money or touch external systems: web research (the user starts it in the
+explorer), creating or re-scoring a lens, Ahoy writes. A lens can be created when the user asks for it and agrees to
+the cost, with the CLI: \`network-builder -p "<goal>" --no-serve\` (≈ $0.30 per 1,000 people + $0.75 for re-checking
+the top 150). Ahoy writes only ever go through the user-approved proposals of the Ahoy connector.
 ${ACCOUNT_INSTRUCTIONS}`;
 
 export interface NetworkMcpOptions {
@@ -236,7 +240,7 @@ export function createNetworkMcpServer(opts: NetworkMcpOptions): { server: McpSe
     },
     wrap(async () => {
       const { people, lenses } = load();
-      if (!lenses.length) return ok('No lenses yet. Lenses are created in the explorer UI (run `network-builder`, then "New lens").', { lenses: [] });
+      if (!lenses.length) return ok('No lenses yet. Create one in the Network Builder app (New lens), or, if the user agrees to the cost, run `network-builder -p "<goal>" --no-serve`.', { lenses: [] });
       const rows = lenses.map((l) => ({
         id: l.id,
         goal: l.goal,
@@ -513,6 +517,87 @@ export function createNetworkMcpServer(opts: NetworkMcpOptions): { server: McpSe
           ` Export it with network_export (list="${name}").`,
         { list_id: id, name, size: ids.length, unknown },
       );
+    }),
+  );
+
+  server.registerTool(
+    'network_ahoy_plan',
+    {
+      title: 'Plan an Ahoy pipeline',
+      description:
+        'Build ready-to-send Ahoy create_proposal batches (≤ 50 operations each) from a list, a lens or chosen people: ' +
+        'companies, contacts, one deal per company in a pipeline stage, and a "why them" note on each person, every ' +
+        'operation with sources. Free and local: it writes nothing. First look people up in Ahoy (search_crm / ' +
+        'query_crm_objects) and pass the ids you found in `people` so nothing is duplicated; get the stage id from ' +
+        'get_crm_pipelines. Then, after the user agrees, call create_proposal once per batch with its title, description ' +
+        'and operations exactly as returned. Guessed (headline) locations are never written to Ahoy, only mentioned in notes.',
+      inputSchema: {
+        campaign: z.string().min(1).max(120).describe('Short campaign name, used in deal names and notes, e.g. "Ireland marketing outreach".'),
+        user_request: z.string().min(1).max(1000).describe("The user's request, quoted exactly (Ahoy cites it as the source)."),
+        list: z.string().optional().describe('A saved list (name or id) to plan from.'),
+        lens: z.string().optional().describe('A lens (id or goal): its members, unless list/person_ids are given; also adds fit scores to notes.'),
+        person_ids: z.array(z.string().min(1)).max(500).optional().describe('Or these people (ids), in priority order.'),
+        people: z
+          .array(
+            z.object({
+              person_id: z.string().min(1),
+              contact_id: z.string().optional().describe('Existing Ahoy contact id (from search_crm).'),
+              company_id: z.string().optional().describe('Existing Ahoy company id.'),
+              company_name: z.string().optional().describe('Company name to use (e.g. the exact name already in Ahoy).'),
+              deal_id: z.string().optional().describe('Existing open deal for this company in the chosen pipeline.'),
+            }),
+          )
+          .max(500)
+          .optional()
+          .describe('What you found in Ahoy, per person. People here are added to the selection.'),
+        stage_id: z.string().optional().describe('Pipeline stage entity_id for new deals (get_crm_pipelines). Omit with include_deals=false.'),
+        include_deals: z.boolean().default(true).describe('Create a deal per company (needs stage_id).'),
+        batch: z.number().int().min(1).optional().describe('Omit for the summary; then 1, 2, … to get each batch to send. The same inputs always give the same batches.'),
+      },
+      annotations: { title: 'Plan an Ahoy pipeline', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    wrap(async (a) => {
+      const { s, people, lenses } = load();
+      const lens = a.lens ? lensOrThrow(lenses, a.lens) : undefined;
+      let ids: string[] = [];
+      let listLens: Lens | undefined;
+      if (a.list) {
+        const l = s.findList(a.list);
+        if (!l) throw new UserError(`No list "${a.list}". Use network_list_lists.`);
+        ids = l.ids;
+        const lid = s.getMeta(`list_lens:${l.id}`);
+        listLens = lid ? lenses.find((x) => x.id === lid) : undefined;
+      } else if (a.person_ids?.length) ids = a.person_ids;
+      else if (lens) ids = lensMembers(people, lens).map((p) => p.id);
+      const extra = (a.people ?? []).map((x) => x.person_id);
+      ids = [...new Set([...ids, ...extra])];
+      if (!ids.length) throw new UserError('Nobody to plan: pass list, lens, person_ids or people.');
+      if (a.include_deals && !a.stage_id) throw new UserError('Pass stage_id (from get_crm_pipelines) or include_deals=false.');
+      const given = new Map((a.people ?? []).map((x) => [x.person_id, x]));
+      const plan = planPipeline(
+        people,
+        ids.map((id) => given.get(id) ?? { person_id: id }),
+        { campaign: a.campaign, stageId: a.stage_id, userRequest: a.user_request, lens: lens ?? listLens, network: people, includeDeals: a.include_deals },
+      );
+      const sm = plan.summary;
+      const n = plan.proposals.length;
+      if (a.batch) {
+        const pr = plan.proposals[a.batch - 1];
+        if (!pr) throw new UserError(`There are ${n} batches; ask for batch 1–${n}.`);
+        // the batch as create_proposal arguments, in one compact JSON block, so it can be passed on exactly
+        return ok(
+          `Batch ${a.batch}/${n}: ${pr.companies.join(', ')} (${pr.operations.length} operations). Pass this to create_proposal exactly:\n` +
+            JSON.stringify({ title: pr.title, description: pr.description, operations: pr.operations }),
+        );
+      }
+      const text =
+        `**Plan: ${sm.companies} companies (${sm.newCompanies} new), ${sm.people} people (${sm.newContacts} new contacts), ` +
+        `${sm.deals} deals, ${sm.notes} notes → ${n} proposal(s), ${sm.operations} operations.**\n` +
+        plan.proposals.map((pr, i) => `- Batch ${i + 1}: ${pr.companies.join(', ')} — ${pr.people.join(', ')} (${pr.operations.length} ops)`).join('\n') +
+        (plan.skipped.length ? `\nSkipped: ${plan.skipped.map((x) => `${x.name ?? x.person_id} (${x.why})`).join('; ')}` : '') +
+        `\nNothing is written yet. After the user agrees, for each batch: call network_ahoy_plan again with the same arguments plus batch: i, ` +
+        'then pass what it returns to create_proposal unchanged.';
+      return ok(text, { summary: sm, skipped: plan.skipped, batches: plan.proposals.map((pr, i) => ({ batch: i + 1, companies: pr.companies, people: pr.people, operations: pr.operations.length })) });
     }),
   );
 

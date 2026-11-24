@@ -900,7 +900,7 @@ vendor-funded roles are part of the org.
 
 ### v9 Phase 6 — MCP + docs (v9 complete)
 
-- MCP (`src/mcp/accounts.ts`), 22 tools. The MCP `view()` attaches `org = buildOrgMap(view, orgMapSources(repo, id))`
+- MCP (`src/mcp/accounts.ts`), 23 tools. The MCP `view()` attaches `org = buildOrgMap(view, orgMapSources(repo, id))`
   (the same pure functions as the page; no AI, nothing under `src/llm/` is imported by the MCP server — tested).
   - New **`network_get_org_map {account, function: 'marketing' (default, only value), detail: 'full' (default) |
     'summary'}`**, `readOnlyHint`. Text = `orgMapMarkdown(view, org, detail)` (`src/accounts/brief.ts`): headcount table
@@ -935,3 +935,109 @@ vendor-funded roles are part of the org.
 - Docs: README "Map a marketing org" (workflow, live LinkedIn findings, costs, LinkedIn risk, GDPR), docs/MCP.md,
   extension/README.md (walk the people search; headcount from the unfiltered People tab; per entity page), AGENTS.md
   layout + costs, CHANGELOG 0.4.0; package + desktop version 0.4.0.
+
+## v0.6 — first-hour UX (explorer page)
+
+Supersedes the toolbar / selection-bar layout in "UI (explorer)" (v6) and v6.4 where they differ. No new endpoints.
+
+### State (server → page)
+- `ExplorerState.estimates` gains `lensRerankTop` (the band a **new** lens gets: `--rerank-top`, default 150),
+  `lensRerankModel` (`researchModel`, or `''` when the band is 0) and `lensModel`. `createLens` uses the same
+  `defaultRerankTop`, so the page's estimate matches the real run. Existing lenses carry their own `rerankTop` /
+  `rerankModel` and the page uses those for Update / Re-score / Edit.
+- `ExplorerState.outDir` (exports + snapshots folder) — shown only in the help panel.
+
+### Costs (page)
+- One formatter `usd()`: 2 decimals, `< $0.01` below a cent. One sentence for estimates: `≈ $X on your Claude plan`
+  (`onPlan`), and `PLAN_NOTE` (help panel + "used" chip tooltip): costs are what Claude Code reports on the user's own
+  login, counted against their Claude plan; network-builder never bills.
+- Per-person web-profile prices are rounded up to the cent (`perLight()` ≈ $0.02, `perDeep()` ≈ $0.17) and used
+  everywhere (row detail, Research ▾ totals, confirms, help).
+- Lens estimate: `lensCost(n, lens)` = first pass `n` + re-check `min(lensTop(lens), n)` (same formula as
+  `estimateLensUsd`); shown as a range `lensRange` = 50–100 % of it (measured runs come in near the low end) plus a
+  rough time `lensTime` (first pass: batches of 60, 8 at a time; re-check: batches of 25, 6 at a time). Tested in
+  `test/explorer-page.test.ts`.
+
+### Layout
+- Header: brand · People/Accounts · "Getting started n/5" pill (when the checklist is hidden) · LinkedIn-extension pill
+  (People view: only once connected; always in Accounts) · stats (people, web profiles if any, "$X used", live) · **?**.
+- Row 1 (lens bar): lens picker (last option "＋ New lens…") · ⋯ lens actions (Edit wording, Re-score everyone with
+  range + rerank band, New lens, Delete) · job chip · "↻ Update N" (hidden while any lens job runs) · tabs In lens /
+  Candidates / Removed / Everyone · **Lens cut-off** (slider + number) with a 10-bin score histogram (green ≥ cut-off,
+  amber = the 10 points below) and a near-miss chip "N at 60–69" → Candidates sorted by score · ＋ (new lens) ·
+  Export lens (N). With no lens: the "Who do you want to find?" box with `≈ $a–$b · about a minute` and **Create lens**.
+  With a lens, ＋ / "New lens…" swaps the lens controls for that box (✕ or Esc closes it).
+- Row 2: search · Seniority · Function · **Location** (promoted; tooltip: matches the text people wrote) · Tags ·
+  More filters ▾ (Min score (view only) — the old "Show score ≥", Search lens reasons too, Web profile, Company, Past
+  company, Talking about, Industry, Confidence, Ahoy, Identity, Connected) · Lists ▾ · **⋯ View** ▾ (Show All /
+  Selected / Not selected, Select / Deselect filtered, Invert, Select top N, Columns, ⬇ Shown rows as CSV, ⬇ Everyone
+  as CSV (replaces shift-click), Save a read-only snapshot, Keyboard shortcuts). The "Try:" search chips, the keyboard
+  hint strip and the footer file paths are gone (paths are in the help panel).
+- Table: fixed layout that fits the window (no sideways scroll at ≥ 1280 px; `min-width` 900 px below that). Title and
+  Why (lens) are flexible and clamp to 2 lines; with a lens the default hidden set is `ui.hiddenLens` = Seniority,
+  Function, Tags, Connected (its own Columns set; `ui.hidden` is the no-lens set). The Ahoy column appears once anyone
+  has been checked; the action column only when something is queued or in "Selected" view. Per-row paid Light/Deep
+  buttons are gone: they are in the expanded row ("Light profile · $0.02", "Deep profile · $0.17") and Research ▾.
+- Score cell: pill + basis chip below it (`headline only` / `light profile` / `deep profile`; was TITLE/LIGHT/DEEP),
+  stale chip; the added/removed pin chip sits before the pill. Reasons are shown without a leading `[headline]`-style
+  token (`reasonText`, display only — exports unchanged).
+
+### Search ↔ lens
+- When a search has 3+ words, or finds fewer than 5 people, the results bar (and the empty state) offers
+  "Score everyone for “‹query›” as a lens (≈ $a–$b, about a minute) →", which opens the normal Create-lens confirm.
+- A Location filter shows a hint: matches the text people wrote; for region words (ireland, uk, usa, …) it names
+  example cities and suggests a lens "… based in ‹region›".
+- "Add / Remove / Restore these N" for the people shown moved from the lens strip to the results bar and only appear
+  once a search or filter narrows the view (never on an unfiltered tab).
+
+### Empty states (`renderEmpty`)
+- 0 people: import card (LinkedIn data download / exporter extension → `network-builder import <file.csv>` or File →
+  Import in the app). Lens job running on the In-lens tab: "Scoring 125 / 245… people appear here as they reach the
+  cut-off (70+)". Search with no hits: explanation + the lens offer + Clear search. In lens empty: near-miss count +
+  Show candidates. Else "No people match these filters" + Clear filters.
+
+### Lens jobs
+- Update / Re-score / Edit are disabled or hidden while any lens job runs (the server allows one at a time).
+- When the job enters the re-check phase the page snapshots the lens members; when it ends, one toast: "Done: N in the
+  lens (70+). The Sonnet re-check of the top 20 moved X below the cut-off, Y above it." with "See candidates".
+
+### Selection bar (one row)
+- `N selected [· M not shown · Keep only shown]` | ⬇ Export · Save as list · ↻ Update “list” (only when a list is
+  loaded; Save as list never overwrites) | ＋ Add N to lens · ✕ Remove N · Lenses ▾ · Account ▾ | Research **$** ▾
+  (Light profiles for N · ≈ $ on your Claude plan / Deep profiles for N · ≈ $ / Cancel queued, shown only when
+  something is queued; why a web profile helps) · Ahoy ▾ | Show selected (was "Review") · Clear.
+- Ahoy ▾: "1 Check N in Ahoy" (read-only, ≈ $0.005/person on your Claude plan) and "2 Send N as a proposal…"; a
+  disabled step says why (check first / N need a pick / already sent / job running). Every action still goes through
+  `scopeToShown`.
+- `body.has-selbar` lifts the toast above the bar.
+
+### Export dialog
+- Remembers the last format per database (`localStorage nbx-export-preset:<db>`). Under CRM upload: "Email will be
+  empty: LinkedIn exports don't include email addresses" (or "filled for X of N"). Export mappers unchanged.
+
+### Toasts
+- One at a time (a new one replaces the last), bottom-left (above the selection bar), ≥ 8 s (10 s with an action,
+  12 s for errors), paused while hovered, × to dismiss. Lens add/remove toasts name the person or count only.
+
+### Getting started + help + Claude Code bridge
+- Dismissible checklist card above the results (replaces the permanent tip): 1 Imported N connections · 2 Score a lens
+  (marketer starter chips; "potential customers for [your product]" selects the bracket) · 3 Curate it · 4 Save a list
+  · 5 Export, Ahoy or Claude — each checked from real state (people, lenses, any pin, lists, an export / Ahoy check /
+  copied prompt or any `crm`). Hidden → header pill "Getting started n/5". Stored in `localStorage nbx-gs:<db>`.
+- **?** button and the `?` key open a side panel: glossary (lens, cut-off, In lens / Candidates / Removed, headline
+  only, light / deep profile, stale, list, account), "Next, in Claude Code" prompt cards with Copy (built from the
+  user's own list / lens / account names), keyboard shortcuts, costs sentence, where data lives (database, outputs
+  folder, last snapshot). Esc or a click outside closes it.
+- After "Save as list" the toast offers "Next, in Claude Code →"; each saved list has a ⧉ copy-prompt button.
+
+### Keyboard
+- `?` help · `Esc` closes (in order) menus/dialogs, the help panel, the New-lens box, then collapses expanded rows.
+
+### Connection
+- After 3 failed SSE reconnects the page probes `/api/state`: 401/403 → "restarted — reopen" chip + banner (the token
+  changed; stop retrying); network error after 4 → "not running" + banner, still retrying.
+
+### Accounts copy
+- No "MCP" / tool names in page chrome: "Claude Code can read this account", "Account brief", empty-state step 4
+  "Ask Claude Code: plan an ABM campaign for <company> using my network-builder account". Buying-committee chip for no
+  role reads "set role". Marketing-org heat table has a one-line legend and centred column headers.

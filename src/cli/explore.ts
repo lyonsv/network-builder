@@ -5,7 +5,7 @@ import Table from 'cli-table3';
 import pc from 'picocolors';
 import { dbProfileCache, openStore, withLedger, type Store } from '../db';
 import { readPeopleCsv } from '../io/csv';
-import { checkClaudeAvailable } from '../llm/claude';
+import { checkClaudeAvailable, checkClaudeLogin } from '../llm/claude';
 import { createCostTracker } from '../llm/costs';
 import { DEFAULT_DOSSIER_PATH, ensureDossierTemplate } from '../llm/dossier';
 import { enrichProfiles } from '../llm/enrich';
@@ -30,7 +30,7 @@ import { openInBrowser } from '../web/open';
 import { logImport } from './db';
 import { isInteractive } from './interactive';
 import { runSetup } from './setup';
-import { banner, colorScore, formatUsd } from './ui';
+import { banner, colorScore, formatUsd, progress } from './ui';
 
 export interface ExploreFlags {
   input?: string;
@@ -181,6 +181,11 @@ export async function runExplore(flags: ExploreFlags): Promise<number> {
     // Claude Code is only needed for model work (profiles, lenses, dossiers); browsing works without it.
     const needsModel = Boolean(inputPath || goal);
     const claude = await checkClaudeAvailable();
+    // a logged-out CLI answers --version but fails every model call: catch it here instead of "Profiled 0/N"
+    if (claude.ok && needsModel && (await checkClaudeLogin()).loggedIn === false) {
+      claude.ok = false;
+      claude.error = 'not logged in; run `claude auth login`';
+    }
     if (!claude.ok) {
       const msg = `Claude Code CLI not available (${claude.error ?? 'unknown'}). Install it and log in with \`claude\`.`;
       if (needsModel) p.log.warn(`${msg} Skipping profiles/lens scoring; the explorer still opens.`);
@@ -191,7 +196,7 @@ export async function runExplore(flags: ExploreFlags): Promise<number> {
 
     // ---- 1. import CSV ----
     if (inputPath) {
-      const s = p.spinner();
+      const s = progress(() => p.spinner());
       s.start(`Reading ${tildify(inputPath)}`);
       let csvPeople: Person[];
       try {
@@ -218,7 +223,7 @@ export async function runExplore(flags: ExploreFlags): Promise<number> {
       // cheap goal-free headline profiles for new/changed titles (cached per person+title)
       if (claude.ok) {
         const before = costs.byStage().enrich;
-        const s2 = p.spinner();
+        const s2 = progress(() => p.spinner());
         s2.start(`Profiling titles with ${DEFAULTS.enrichModel}`);
         let done = 0;
         const enriched = await enrichProfiles<Person & EnrichedFields>(csvPeople, {
@@ -272,7 +277,7 @@ export async function runExplore(flags: ExploreFlags): Promise<number> {
           `${pc.magenta('Scoring')} “${lens.goal}” · ${todo.size} people ${pc.dim(`(≈ ${formatUsd(est)}; ${lens.rerankTop ? `top ${lens.rerankTop} re-checked with ${lens.rerankModel}` : 'no rerank'})`)}`,
         );
         const before = costs.byStage().lens;
-        const s3 = p.spinner();
+        const s3 = progress(() => p.spinner());
         s3.start('Scoring');
         try {
           await scoreFn({

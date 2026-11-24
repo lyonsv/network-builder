@@ -204,6 +204,8 @@ export interface AhoyOperation {
   association_type?: string;
   source_entity_id?: string;
   target_entity_id?: string;
+  /** where the facts came from (Ahoy requires 1–7 per operation): the person's LinkedIn profile */
+  sources?: { type: 'web'; url: string; title: string }[];
 }
 export interface AhoyProposalPlan {
   title: string;
@@ -263,7 +265,7 @@ export function planAhoySend(people: ExplorerPerson[], lens?: Pick<Lens, 'id' | 
         companyRef = `company_${++tc}`;
         const props: Record<string, unknown> = { ahoy_name: coName };
         if (p.profile?.industry) props.ahoy_industry = p.profile.industry;
-        createCompany = { operation: 'create', object_type: 'ahoy_company', temp_id: companyRef, properties: props };
+        createCompany = { operation: 'create', object_type: 'ahoy_company', temp_id: companyRef, properties: props, ...sourcesOf(p) };
       }
       u = { key, createCompany, companyRef, people: [] };
       units.set(key, u);
@@ -320,9 +322,17 @@ export function planAhoySend(people: ExplorerPerson[], lens?: Pick<Lens, 'id' | 
   return { proposals, summary, skipped };
 }
 
+/** the person's LinkedIn profile as an Ahoy `web` source (omitted when there's no URL) */
+function sourcesOf(p: ExplorerPerson): Pick<AhoyOperation, 'sources'> {
+  const url = String(p.url ?? '').trim();
+  if (!/^https?:\/\/\S+$/i.test(url)) return {};
+  return { sources: [{ type: 'web', url, title: `LinkedIn profile of ${p.fullName || 'this person'}`.slice(0, 200) }] };
+}
+
 function personOps(p: ExplorerPerson, companyRef: string | null, lens: Pick<Lens, 'id' | 'goal'> | null | undefined, n: number): AhoyOperation[] {
   const c = p.crm!;
   const ops: AhoyOperation[] = [];
+  const src = sourcesOf(p);
   let contactRef = c.contactId ?? '';
   if (c.status === 'new') {
     const [first, last] = ahoyName(p);
@@ -336,16 +346,16 @@ function personOps(p: ExplorerPerson, companyRef: string | null, lens: Pick<Lens
     const loc = ahoyLocation(p);
     if (loc) props.ahoy_location = loc;
     if (p.email && isEmail(p.email)) props.ahoy_email = [p.email];
-    ops.push({ operation: 'create', object_type: 'ahoy_contact', temp_id: contactRef, properties: props });
+    ops.push({ operation: 'create', object_type: 'ahoy_contact', temp_id: contactRef, properties: props, ...src });
     if (companyRef) {
-      ops.push({ operation: 'associate', association_type: 'ahoy_contact_to_company', source_entity_id: contactRef, target_entity_id: companyRef });
+      ops.push({ operation: 'associate', association_type: 'ahoy_contact_to_company', source_entity_id: contactRef, target_entity_id: companyRef, ...src });
     }
   }
   const content = ahoyNote(p, lens);
   if (content && contactRef) {
     const noteRef = `note_${n}`;
-    ops.push({ operation: 'create', object_type: 'ahoy_note', temp_id: noteRef, properties: { ahoy_title: ahoyNoteTitle(lens), ahoy_content: content } });
-    ops.push({ operation: 'associate', association_type: 'ahoy_note_to_contact', source_entity_id: noteRef, target_entity_id: contactRef });
+    ops.push({ operation: 'create', object_type: 'ahoy_note', temp_id: noteRef, properties: { ahoy_title: ahoyNoteTitle(lens), ahoy_content: content }, ...src });
+    ops.push({ operation: 'associate', association_type: 'ahoy_note_to_contact', source_entity_id: noteRef, target_entity_id: contactRef, ...src });
   }
   return ops;
 }

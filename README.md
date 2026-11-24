@@ -14,7 +14,7 @@ Describe who you're looking for and AI scores every connection. Then refine the 
 [![Runs locally](https://img.shields.io/badge/data-stays%20on%20your%20machine-0ea5e9)](#-privacy)
 
 ```bash
-npx github:lyonsv/network-builder
+curl -fsSL https://raw.githubusercontent.com/lyonsv/network-builder/main/install.sh | bash
 ```
 
 <picture>
@@ -64,7 +64,46 @@ outrank a partner at a fund. Then you curate the list in a fast local web app an
 - 🔐 **Local-first.** One SQLite file on your machine. The web app runs on `127.0.0.1` with a per-session token.
 - 🔑 **No API key.** All AI runs through your existing [Claude Code](https://claude.com/claude-code) login.
 
-## 🚀 Quick start
+## 🚀 Quick start (Mac, about 10 minutes)
+
+Paste **one** of these. Both set up everything, and are safe to run again if anything goes wrong.
+
+**In Terminal** (⌘ Space, type *Terminal*, Enter):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lyonsv/network-builder/main/install.sh | bash
+```
+
+**Or as a prompt in Claude Code**, if you already use it:
+
+```text
+Set up network-builder for me by following https://raw.githubusercontent.com/lyonsv/network-builder/main/SETUP.md
+```
+
+It walks you through each step and does everything it can by itself:
+
+1. **Claude Code**: installs it if needed and has you log in. All the AI runs on your own Claude plan, with no API key.
+2. **network-builder**: the command, the **desktop app** in your Dock, and a connection to Claude Code (MCP server +
+   skill), so Claude can work with your network.
+3. **Chrome**: opens the Extensions page and copies the folder path for you; you click **Load unpacked** and paste. It
+   notices when the extension is loaded.
+4. **Your connections**: opens LinkedIn; you click **Start export**. It spots the file in Downloads and imports it
+   (≈ $0.20 per 1,000 connections on your Claude plan).
+5. **Ahoy**: checks your Ahoy CRM is connected to Claude Code, and helps you connect it if not.
+
+Then open Claude Code (`claude`) and ask:
+
+> *Find the marketing leaders in my network based in Ireland and build an Ahoy pipeline of the target companies and
+> people to reach out to.*
+
+Claude scores your network for that goal, shows you a shortlist grouped by company to trim, then proposes the companies,
+contacts, one deal per company in your pipeline, and a "why them" note on each person. Nothing changes in Ahoy until you
+approve the proposal there.
+
+Check what's installed any time: `bash <(curl -fsSL https://raw.githubusercontent.com/lyonsv/network-builder/main/install.sh) --status`
+
+<details>
+<summary><b>Manual install</b> (Linux, or if you prefer npm)</summary>
 
 **1. Install Claude Code and log in** (one time):
 
@@ -104,7 +143,9 @@ The first run walks you through setup:
 
 > **Needs Node.js 22.13+** (`node --version`). The first `npx` run takes a minute while it downloads and builds. If you
 > prefer a permanent install, run `npm install -g github:lyonsv/network-builder`
-> and then `network-builder`.
+> and then `network-builder`. Add the Claude Code skill by copying `skills/network-builder` to `~/.claude/skills/`.
+
+</details>
 
 ## 📥 Getting your connections
 

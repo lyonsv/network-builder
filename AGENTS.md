@@ -26,6 +26,10 @@ child env). Data is one local SQLite file.
 | `src/mcp/` | stdio MCP server (`network-builder mcp`): 22 `network_*` tools + 3 prompts + `account://` resources (account tools in `accounts.ts`); see `docs/MCP.md` |
 | `extension/` | Chrome MV3 extension (plain JS, no build): `content.js` (profile button + panel + DOM reader on linkedin.com/in/*; list-walk panel on People tabs / people search), `list-reader.js` (pure DOM helpers for lists, tested with happy-dom against fictional fixtures), `background.js` (pairing, `/ext/*` client, offline queue for profiles), `popup.*` |
 | `desktop/` | macOS Electron shell (own pnpm root + lockfile, so CLI installs never pull Electron): `src/main.ts`, `scripts/build.mjs` (main + fully-bundled server `dist-server/bin.mjs`), `scripts/icon.mjs`, `scripts/install.mjs` (→ /Applications + Dock), `electron-builder.yml` (unsigned, ad-hoc) |
+| `install.sh` | One-step macOS installer (curl … \| bash; `--agent`, `--status`, `--import`). Bash 3.2, no python/jq/git. Pulls `network-builder.tgz` and `Network-Builder-mac-arm64.zip` from the latest release (`NB_ASSET_BASE` to test locally; `NB_SKIP` to skip steps that touch real config) |
+| `SETUP.md` | The installer runbook for Claude Code (what a pasted "set this up for me" prompt follows) |
+| `skills/network-builder/` | The Claude Code skill the installer copies to `~/.claude/skills/` (shipped in the npm package) |
+| `scripts/release-assets.sh` | Builds the release files the installer downloads; upload them with `gh release create` |
 | `test/` | vitest; `test/fixtures/*.csv` are fictional |
 
 ## Commands

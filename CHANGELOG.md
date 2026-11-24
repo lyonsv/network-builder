@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **One-step setup for someone new** (0.5.0). `install.sh` sets up everything on a Mac and is safe to re-run: a private
+  Node.js, Claude Code and its login, the `network-builder` command, the MCP server (all projects), a Claude Code
+  **skill**, the desktop app (Applications + Dock), and both Chrome extensions. It opens Chrome's Extensions page with
+  the folder on the clipboard and notices when the extension is loaded, opens LinkedIn's Connections page, watches
+  Downloads for the exported CSV and imports it, then checks Ahoy is connected. `--agent` runs it from Claude Code
+  (see `SETUP.md`); `--status` reports what's missing.
+- **Claude Code skill** (`skills/network-builder`): how to search the network, build a lens, and turn it into an Ahoy
+  pipeline (companies, contacts, a deal per company in the chosen pipeline, a note per person), as proposals.
+- `scripts/release-assets.sh` builds the release files the installer downloads (`network-builder.tgz`,
+  `Network-Builder-mac-arm64.zip`).
+
 - **Chrome extension 0.3.3:** when LinkedIn's **Next** loads the next results page as a full page load, the walk now
   continues on that page (same run, cap and counts) instead of stopping after page 1. The page number is read only once
   the results have rendered.
